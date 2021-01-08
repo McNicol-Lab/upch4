@@ -1,0 +1,13 @@
+---
+title: "FLUXNET-CH4 Upscaling"
+author: "Gavin McNicol"
+date: "1/8/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Code used for data-driven model upscaling of FLUXNET-CH4 data to produce a globally-gridded estimate of freshwater wetland methane emissions.
+
