@@ -2,7 +2,7 @@
 title: "FLUXNET-CH4 Upscaling"
 author: "Gavin McNicol"
 date: "1/8/2021"
-output: html_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
