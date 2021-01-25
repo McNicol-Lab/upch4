@@ -50,7 +50,7 @@ all_data %>%
             length = n()) %>% 
   group_by(Year) %>% 
   summarize(mean = mean(TgCH4year),
-            sd = sd(TgCH4year)*1.96) %>% 
+            ci = sd(TgCH4year)*1.96) %>% 
   write.csv("results/final_product_eval/annual_sum_95ci.csv",
             row.names = F)
 
@@ -59,7 +59,7 @@ all_data %>%
   dplyr::select(bootstrap = b, member = m, timestep = t, TgCH4month = sum_TgCH4month) %>% 
   group_by(timestep) %>% 
   summarize(mean = mean(TgCH4month),
-            sd = sd(TgCH4month)*1.96) %>% 
+            ci = sd(TgCH4month)*1.96) %>% 
   write.csv("results/final_product_eval/monthly_sum_95ci.csv",
             row.names = F)
 
@@ -68,7 +68,7 @@ all_data %>%
   dplyr::select(bootstrap = b, member = m, timestep = t, TgCH4month = sum_TgCH4month) %>% 
   group_by(member, timestep) %>% 
   summarize(mean = mean(TgCH4month),
-            sd = sd(TgCH4month)*1.96) %>% 
+            ci = sd(TgCH4month)*1.96) %>% 
   write.csv("results/final_product_eval/member_monthly_sum_95ci.csv",
             row.names = F)
 
