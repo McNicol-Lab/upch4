@@ -34,6 +34,12 @@ gcp <- read_csv("results/final_product_eval/gcp_ch4_model_sum_2000_2017_indiv.cs
          timestep = rep(1:156, n()/156)) %>% 
   dplyr::select(model, timestep, Tg_month)
 
+# check on GCP global sums 
+gcp %>% 
+  group_by(model) %>% 
+  filter(timestep %in% c(1:12)) %>% 
+  summarize(sum = sum(Tg_month))
+
 # merge with upscaling data
 all <- upscaling[["member_monthly_sum_95ci.csv"]] %>% 
   mutate(model = paste("upscaling", member, sep =  "_")) %>% 
