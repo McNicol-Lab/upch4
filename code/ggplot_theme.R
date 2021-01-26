@@ -1,4 +1,4 @@
-theme_bw() +
+my_theme <- theme_bw() +
   theme(panel.border = element_blank(), 
         axis.title=element_text(size=14), axis.text=element_text(size=14),
         panel.grid.major = element_blank(), 
