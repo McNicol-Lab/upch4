@@ -52,7 +52,8 @@ gcp_tg %>%
   filter(timestep %in% c(1:12)) %>% 
   summarize(sum = sum(tg_month))
 
-write.csv(gcp_tg, "results/final_product_eval/gcp_monthly_sum.csv")
+write.csv(gcp_tg, "results/final_product_eval/gcp_monthly_sum.csv", 
+          row.names = F)
 
 
 
