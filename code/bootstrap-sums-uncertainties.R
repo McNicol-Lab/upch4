@@ -14,7 +14,8 @@ mytheme <- theme_bw() +
         axis.line = element_line(colour = "black"),
         legend.position = "bottom",
         strip.text = element_text(face="bold", size=10),
-        strip.background = element_rect(fill='white', colour='white',size=1))
+        strip.background = element_rect(fill='white', colour='white',size=1),
+        plot.margin=unit(c(1,2,1.5,1.2),"cm"))
 
 loc <- "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Predictions/Gridded/individual_bootstrap/"
 setwd(loc)
@@ -37,9 +38,12 @@ all_data %>%
   summarize(TgCH4year = sum(TgCH4month),
             length = n()) %>% 
   ggplot(aes(TgCH4year)) +
-  geom_histogram() +
+  geom_histogram(aes(fill = factor(Year))) +
   facet_wrap(~member, ncol = 1) +
+  scale_fill_manual(values = c(rep("dark grey", 7), rep("light grey", 8))) +
   mytheme
+ggsave("results/final_product_eval/bootstrap_annual_sum_histogram.png",
+       width = 12, height = 22, units = c("cm"), dpi = 300)
 
 # annual overall member-average global sum and confidence intervals
 all_data %>% 
