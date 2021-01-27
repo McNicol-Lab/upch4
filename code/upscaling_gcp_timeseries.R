@@ -55,13 +55,44 @@ all %>%
   # facet_wrap(~type, ncol = 1) +
   scale_y_continuous(limits = c(0, 30)) +
   scale_x_continuous(limits = c(2001, 2015)) +
-  scale_color_manual(values = c(rep("grey", 9), rep("red", 4), rep("blue", 4), rep("grey", 4))) +
-  scale_alpha_manual(values = c(rep(0.4, 9), rep(0.8, 8), rep(0.4, 4))) +
+  scale_color_manual(name = "Model", values = c(rep("grey", 9), rep("red", 4), rep("blue", 4), rep("grey", 4))) +
+  scale_alpha_manual(name = "Model", values = c(rep(0.4, 9), rep(0.8, 8), rep(0.4, 4))) +
   # scale_fill_manual(values = c(rep(NA, 9), rep("red", 4), rep("blue", 4), rep(NA, 4))) + 
   labs(x = "Year", y = expression( atop( "Wetland Emissions", paste("(Tg "*CH[4]*" month"^{-1}*")") ) ) ) +
   my_theme
 ggsave("results/final_product_eval/upscaling_gcp_2001_2015_timeseries.png",
        width = 24, height = 20, units = c("cm"), dpi = 300)
 
+# read in carbon tracker
+ctracker <- read_csv("results/final_product_eval/ctracker_monthly_sum.csv") %>% 
+  mutate(type = "ctracker") %>% 
+  rename(tg_month = r_sum)
 
+# check on ctracker global sums 
+ctracker %>% 
+  filter(timestep %in% c(1:12)) %>% 
+  summarize(sum = sum(tg_month))
 
+# join ctracker
+all <- all %>% 
+  bind_rows(ctracker) %>% 
+  mutate(ci = ifelse(is.na(ci), 0, ci), 
+         Year = ceiling(timestep/12) + 2000) %>% 
+  group_by(type, model, Year) %>% 
+  mutate(month = 1:n(),
+         dec_year = Year + month/12)
+
+all %>% 
+  ggplot(aes(dec_year, tg_month, color = factor(model), alpha = factor(model))) + 
+  geom_line() +
+  # geom_ribbon(aes(ymin = tg_month + ci, ymax = tg_month - ci, fill = factor(model)))  +
+  # facet_wrap(~type, ncol = 1) +
+  scale_y_continuous(limits = c(0, 30)) +
+  scale_x_continuous(limits = c(2001, 2015)) +
+  scale_color_manual(name = "Model", values = c("grey", "black", rep("grey", 8), rep("red", 4), rep("blue", 4), rep("grey", 4))) +
+  scale_alpha_manual(name = "Model", values = c(0.4, 0.8, rep(0.4, 8), rep(0.8, 8), rep(0.4, 4))) +
+  # scale_fill_manual(values = c(rep(NA, 9), rep("red", 4), rep("blue", 4), rep(NA, 4))) + 
+  labs(x = "Year", y = expression( atop( "Wetland Emissions", paste("(Tg "*CH[4]*" month"^{-1}*")") ) ) ) +
+  my_theme
+ggsave("results/final_product_eval/upscaling_gcp_ctracker_2001_2015_timeseries.png",
+       width = 24, height = 20, units = c("cm"), dpi = 300)
