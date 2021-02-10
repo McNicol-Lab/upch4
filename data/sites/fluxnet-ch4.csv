@@ -1,0 +1,85 @@
+﻿ID,LAT,LON,IGBP,LOWLAND_CLASS,KOPPEN,KOPPEN_FULL
+AT-NEU,47.117,11.318,GRA,NA,Dfc ,Subarctic
+BR-NPW,-16.498,-56.412,WSA,Seasonal,Aw,Tropical wet savanna
+BW-GUM,-18.965,22.371,WET,Swamp,BSh ,Hot semi-arid
+BW-NXR,-19.548,23.179,GRA,Seasonal,BSh ,Hot semi-arid
+CA-SCB,61.309,-121.298,WET,Bog,Dfc,Subarctic
+CA-SCC,61.308,-121.299,ENF,NA,Dfc,Subarctic
+CH-CHA,47.21,8.41,GRA,NA,Cfb ,Temperate oceanic
+CH-DAV,46.815,9.856,ENF,NA,ET ,Tundra
+CH-OE2,47.286,7.734,CRO,NA,Cfb ,Temperate oceanic
+CN-HGU,32.8,102.55,GRA,NA,Dwc ,Monsoon-influenced subarctic
+DE-DGW,53.151,13.054,WAT,NA,Cfb ,Temperate oceanic
+DE-HTE,54.21,12.176,WET,Fen,Cfb ,Temperate oceanic
+DE-SFN,47.806,11.328,WET,Bog,Cfb ,Temperate oceanic
+DE-ZRK,53.876,12.889,WET,Fen,Cfb ,Temperate oceanic
+FI-HYY,61.847,24.295,ENF,NA,Dfc ,Subarctic
+FI-LOM,67.997,24.209,WET,Fen,Dfc ,Subarctic
+FI-SI2,61.837,24.197,WET,Bog,Dfc ,Subarctic
+FI-SII,61.833,24.193,WET,Fen,Dfc ,Subarctic
+FR-LGT,47.323,2.284,WET,Agricultural,Cfb ,Temperate oceanic
+HK-MPM,22.498,114.029,WET,Mangrove,Cfa,Humid subtropical
+ID-PAG,-2.32,113.9,WET,Swamp,Af,Tropical rainforest
+IT-BCI,40.524,14.957,CRO - Other,NA,Csa ,Hot-summer Mediterranean
+IT-CAS,45.07,8.718,CRO - Rice,NA,Cfa ,Humid subtropical
+JP-BBY,43.323,141.811,WET,Bog,Dfb ,Warm-summer humid continental
+JP-MSE,36.054,140.027,CRO - Rice,NA,Cfa ,Humid subtropical
+JP-SWL,36.047,138.108,WAT,NA,Dfb ,Warm-summer humid continental
+KR-CRK,38.201,127.251,CRO - Rice,NA,Dwa ,Monsoon-influenced hot-summer humid continental
+MA-ERC,27.163,-81.187,WET,Agricultural,Cwa,Monsoon-influenced humid subtropical 
+MY-MLM,1.464,111.149,WET,Swamp,Af ,Tropical rainforest
+NL-HOR,52.24,5.071,GRA,NA,Cfb ,Temperate oceanic
+NZ-KOP,-37.388,175.554,WET,Bog,Cfb ,Temperate oceanic
+PH-RIF,14.141,121.265,CRO - Rice,NA,Am ,Tropical monsoon
+RU-CH2,68.617,161.351,WET,Wet tundra,Dfc ,Subarctic
+RU-CHE,68.613,161.341,WET,Wet tundra,Dfc ,Subarctic
+RU-COK,70.829,147.494,OSH,NA,Dfc ,Subarctic
+RU-FY2,56.448,32.902,ENF,NA,Dfb ,Warm-summer humid continental
+RU-SAM,72.374,126.496,GRA,Wet tundra,Dfd ,Extremely cold subarctic
+RU-VRK,67.055,62.94,CSH,Wet tundra,Dfc ,Subarctic
+SE-DEG,64.182,19.557,WET,Fen,Dfc ,Subarctic
+SE-ST1,68.354,19.05,WET,Fen,ET ,Tundra
+SE-STO,68.356,19.045,WET,Bog,ET ,Tundra
+UK-LBT,51.522,-0.139,URB,NA,Cfb ,Temperate oceanic
+US-A03,70.495,-149.882,BSV,Barren,ET,Tundra
+US-A10,71.324,-156.615,BSV,Barren,ET,Tundra
+US-ATQ,70.47,-157.409,WET,Wet tundra,ET,Tundra
+US-BEO,71.281,-156.612,WET,Wet tundra,ET,Tundra
+US-BES,71.281,-156.597,WET,Wet tundra,ET,Tundra
+US-BI1,38.099,-121.499,CRO,NA,Csa,Hot-summer Mediterranean
+US-BI2,38.109,-121.535,CRO,NA,Csa,Hot-summer Mediterranean
+US-BRW,71.323,-156.609,WET,Wet tundra,ET,Tundra
+US-BZB,64.696,-148.321,WET,Bog,Dfd,Extremely cold subarctic
+US-BZF,64.704,-148.313,WET,Fen,Dfd,Extremely cold subarctic
+US-BZS,64.696,-148.324,ENF,NA,Dfd,Extremely cold subarctic
+US-CRT,41.628,-83.347,CRO,NA,Dfa,Hot-summer humid continental
+US-DPW,28.052,-81.436,WET,Marsh,Cwa,Monsoon-influenced humid subtropical 
+US-EDN,37.616,-122.114,WET,Salt marsh,Csa,Hot-summer Mediterranean
+US-EML,63.878,-149.254,OSH,NA,ET,Tundra
+US-HO1,45.204,-68.74,ENF,NA,Dfb,Warm-summer humid continental
+US-HRA,34.583,-91.748,CRO - Rice,NA,Cfa,Humid subtropical
+US-HRC,34.586,-91.748,CRO - Rice,NA,Cfa,Humid subtropical
+US-ICS,68.606,-149.311,WET,Wet tundra,ET,Tundra
+US-IVO,68.487,-155.75,WET,Wet tundra,ET,Tundra
+US-LA1,29.501,-90.445,WET,Salt marsh,Cfa,Humid subtropical
+US-LA2,29.859,-90.287,WET,Marsh,Cfa,Humid subtropical
+US-LOS,46.083,-89.979,WET,Fen,Dfb,Warm-summer humid continental
+US-MRM,40.816,-74.044,WET,Salt marsh,Cfa,Humid subtropical
+US-MYB,38.05,-121.765,WET,Marsh,Csa,Hot-summer Mediterranean
+US-NC4,35.788,-75.904,WET,Swamp,Cfa,Humid subtropical
+US-NGB,71.28,-156.609,SNO,Wet tundra,ET,Tundra
+US-NGC,64.861,-163.701,GRA,NA,ET,Tundra
+US-ORV,40.02,-83.018,WET,Marsh,Cfa,Humid subtropical
+US-OWC,41.38,-82.512,WET,Marsh,Dfb,Warm-summer humid continental
+US-PFA,45.946,-90.272,MF,NA,Dfb,Warm-summer humid continental
+US-SND,38.037,-121.754,GRA,NA,Csa,Hot-summer Mediterranean
+US-SNE,38.037,-121.755,GRA,Marsh,Csa,Hot-summer Mediterranean
+US-SRR,38.201,-122.026,WET,Salt marsh,Csa,Hot-summer Mediterranean
+US-STJ,39.088,-75.437,WET,Salt marsh,Cfa,Humid subtropical
+US-TW1,38.107,-121.647,WET,Marsh,Csa,Hot-summer Mediterranean
+US-TW3,38.116,-121.647,CRO,NA,Csa,Hot-summer Mediterranean
+US-TW4,38.103,-121.641,WET,Marsh,Csa,Hot-summer Mediterranean
+US-TW5,38.107,-121.643,WET,Marsh,Csa,Hot-summer Mediterranean
+US-TWT,38.106,-121.652,CRO - Rice,NA,Csa,Hot-summer Mediterranean
+US-UAF,64.866,-147.856,ENF,Bog,Dwc,Monsoon-influenced subarctic
+US-WPT,41.465,-82.996,WET,Marsh,Dfa,Hot-summer humid continental
