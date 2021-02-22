@@ -1,0 +1,105 @@
+---
+title: "FLUXNET-CH4 Upscaling"
+author: "Gavin McNicol"
+date: "2/22/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Workflow
+
+  1. Objective of Study
+  2. Input Data
+      + FLUXNET-CH4 Data
+      + Gridded Data
+  3. FLUXNET-CH4 Pre-Processing
+      + FLUXNET-CH4 Data Preparation
+          - Averaging
+          - Variable Selection
+      + Subset Wetlands, Dates
+      + Cluster Sites for Cross Validation
+      + Finalize Data
+          - Remove Extraneous
+          - Impute Missing Data
+          - Add Lagged Data
+      + FLUXNET-CH4 Data Quality Control
+      + Table of Final FLUXNET-CH4 Inputs
+  4. Gridded Data Pre-Processing
+      + Grid Preparation
+          - MODIS
+          - PPFD_IN
+          - Temporal (not used)
+          - Rpot (not used)
+      + Grid Extraction
+          - Extract Global Products
+              - Canopy Height
+              - Computed (not used)
+              - Compound Topographic Index
+              - Earth Environment
+              - N and S Deposition
+              - SoilGrids
+              - TerraClimate
+              - Fractional Vegetation Cover (VCF)
+              - Wetland Extent (WAD2M)
+              - WorldClim 2.0
+          - MODIS Processing
+          - Merge Gridded Data
+      + Gridded Data Quality Control
+  5. Forward Feature Selection (FFS)
+      + Filter Weekly Data
+      + Feature Subset Experiments
+      + FFS
+          - First Pair
+          - Additional Stepwise Features
+          - FFS Evolution Plots
+      + Summarize FFS Performance
+  6. Cross Validation
+      + ML Model Training
+          - RF and Final Predictors or Subsets
+          - XGB and Final Predictors or Subsets
+          - ANN and Final Predictors or Subsets
+          - RNN and Final Predictors or Subsets
+      + Output Ensembles and Predictions
+      + Validation 
+          - Global Performance
+          - Site-means
+          - Monthly Seasonal Cycles
+          - Monthly Anomalies
+  7. Variable Importances
+      + Variable Importance Rankings
+      + Variable Responses
+      + Partial Dependency Plots
+      + ShapR
+  8. Upscaled Model with Monte Carlo (MC)
+      + Forcing Data
+          - Mapping
+          - Member Product Choices
+          - Evaluate Product Divergence
+      + Data Preparation
+          - Extract Gridded Data for MC
+          - Pre-Process FLUXNET-CH4 for MC
+      + MC Simulations
+      + MC ML Model Training
+      + MC ML Model Validation
+  9. Upscaling
+      + Prepare Member Forcing Data
+      + Run on Computing Cluster
+          - Output Grids and Sums
+      + Product Evaluation
+          - Unweighted Wetland Fluxes (nmol)
+          - Weighted Sums and Uncertainties (Tg)
+          - Independent Validation
+  10. Data Representativeness
+      + Prepare Gridded Data
+      + Global Dissimilarity
+      + Tower Constituency
+      + Extrapolation Errors
+          - MC ML Model Training - Dissimilarity Only
+          
+      
+      
+          
+
