@@ -9,12 +9,13 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-Load packages:
+Load packages and ggplot theme:
 
 ```{r}
 library(tidyverse)
+library(lubridate)
+source("code/ggplot_theme.R")
 ```
-
 
 ## Workflow
 
@@ -108,6 +109,7 @@ library(tidyverse)
           
 [**Link to Workflow Figure**](https://drive.google.com/drive/folders/1jiFyqzoxxMpdtRLCwxCtzKpfILRNIW5K)
           
+$~$            
       
 #### 1. Objective of Study 
 
@@ -118,6 +120,8 @@ The goal of `FLUXNET-CH4 Upscaling` is to implement FLUXCOM-like ML approaches (
   - 0.25-degree grid cell resolution (as is WAD2M)
   - Propagates training data uncertainties using Monte Carlo simulations
   - Considers sensitivity to global forcing data product choices
+
+$~$    
   
 #### 2. Input Data
 
@@ -133,8 +137,13 @@ Links:
   - FLUXNET-CH4 data were used both for methane fluxes (FCH4; target variable) and tower-measured bio-meteorological variables (e.g., LE, GPP, TA; predictors)
       + Link to [FLUXNET.org variable descriptions](https://fluxnet.org/data/fluxnet-ch4-community-product/data-variables/)
   
+$~$  
+  
 **Gridded Data (Predictors)**
 
+
+
+$~$
 
 #### 3. FLUXNET-CH4 Pre-Processing
 
@@ -164,5 +173,58 @@ head(one_site)
 
 No, but there is a quality flag `_QC`. `1`= data gap shorter than 2 months, `3` = gap exceeds 2 months.
 
-          
+Clear work space:
+
+```{r}
+rm(one_site)
+```
+
+Get FLUXNET-CH4 site names:
+
+```{r}
+site.names <- paste( substr(files, 5, 6), substr(files, 8, 10), sep = "")
+```
+
+Get all flux data:
+
+```{r}
+daily <- lapply(paste(loc, "fluxnet-ch4-data/daily/", files, sep = ""), read_csv)
+names(daily) <- site.names
+# str(daily)
+```
+
+Create a pristine replicate:
+
+```{r}
+daily2 <- daily
+```
+
+Look at date columns:
+
+```{r}
+names(daily[[1]])
+head(daily[[1]]$TIMESTAMP)
+```
+
+Write and apply function to expand `TIMESTAMP` into`Year`, `Month`, `Week`, `Day`, and `DOY` variables to facilitate merging with other data:
+
+```{r}
+fix_weeks <- function(daily_data) {
+  daily_data <- daily_data %>% 
+  mutate(Year = as.numeric(substr(TIMESTAMP, 1, 4)),
+         Month = as.numeric(substr(TIMESTAMP, 5, 6)),
+         Day = as.numeric(substr(TIMESTAMP, 7, 8)),
+         Date = make_date(Year, Month, Day),
+         DOY = yday(Date),
+         Week = ceiling(DOY/7),
+         Week = ifelse(Week == 53, 52, Week)) %>% 
+  dplyr::select(Year, Month, Week, Day, DOY, everything(), - Date, -TIMESTAMP)
+}
+
+daily <- lapply(daily, fix_weeks)
+# daily[[11]] # check it worked
+```
+
+
+
 
