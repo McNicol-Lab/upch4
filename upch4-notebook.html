@@ -330,6 +330,7 @@ summary {
 </ul></li>
 </ul></li>
 </ol>
+<p><a href="https://drive.google.com/drive/folders/1jiFyqzoxxMpdtRLCwxCtzKpfILRNIW5K"><strong>Link to Workflow Figure</strong></a></p>
 <div id="objective-of-study" class="section level4">
 <h4>1. Objective of Study</h4>
 <p>The goal of <code>FLUXNET-CH4 Upscaling</code> is to implement FLUXCOM-like ML approaches (e.g. <a href="10.5194/bg-17-1343-2020">Jung et al. 2020</a>) to train a machine learning model using eddy covariance data that can predict wetland methane (CH4) fluxes globally. The predictions should be readily comparable to the Global Carbon Project (GCP) bottom-up process model ensembles that inform the Global Methane Budget (<a href="10.5194/essd-12-1561-2020">Saunois et al. 2020</a>). Wetland fluxes specifically, rather than methane fluxes from all terrestrial ecosystems, are the predictive goal of this study because 1) most eddy covariance data available are in wetlands, with limited coverage across the multitude of upland ecosystems, 2) methane fluxes are highest and most variable in wetlands, and 3) comparable bottom-up process models predict wetland fluxes, then scale predictions to a global grid-cell using a prescribed (diagnostic runs) or model-derived (prognostic runs) wetland extent. In the last GCP Global Methane Budget (<a href="10.5194/essd-12-1561-2020">Saunois et al. 2020</a>), diagnostic runs used the WAD2M product (<a href="10.5194/essd-2020-262">Zhang et al. in review</a>). WAD2M includes coastal wetlands, however, we exclude coastal wetlands from the upscaling because they are salt-influenced and we do not have consistent salinity coverage, thus their inclusion is likely to bias flux estimates low even in non-coastal wetlands. The final model will be forced with available globally gridded data. Final product specifications are:</p>
@@ -344,13 +345,18 @@ summary {
 <div id="input-data" class="section level4">
 <h4>2. Input Data</h4>
 <p><strong>FLUXNET-CH4 Data</strong></p>
-<p>The eddy covariance data used in this study are publicly available as part of the FLUXNET-CH4 community product V1.0 at <a href="https://fluxnet.org/data/fluxnet-ch4-community-product/">FLUXNET.org</a>. The FLUXNET-CH4 synthesis activity is introduced in <a href="10.1175/BAMS-D-18-0268.1">Knox et al. 2019</a> along with a detailed description of the eddy covariance post-processing steps including methane flux (FCH4) uncertainties. The first full (V1.0) database release (FLUXNET-CH4, hereafter) is described for 81 sites, and used for a wetland seasonality analysis in <a href="10.5194/essd-2020-307">Delwiche et al. in review</a>.</p>
+<p>The eddy covariance data used in this study are publicly available as part of the FLUXNET-CH4 community product V1.0 at <a href="https://fluxnet.org/data/fluxnet-ch4-community-product/">fluxnet.org</a>. The FLUXNET-CH4 synthesis activity is introduced in <a href="10.1175/BAMS-D-18-0268.1">Knox et al. 2019</a> along with a detailed description of the eddy covariance post-processing steps including methane flux (FCH4) uncertainties. The first full (V1.0) database release (FLUXNET-CH4, hereafter) is described for 81 sites, and used for a wetland seasonality analysis in <a href="10.5194/essd-2020-307">Delwiche et al. in review</a>. Data for this analysis were downloaded from fluxnet.org on <strong>Feb 22, 2021</strong>. <a href="https://docs.google.com/spreadsheets/d/1--_-XyBqsyiMIdc6JXqhilOOYFLeaY-UTMFhhI4Sd5M/edit#gid=0">Download Manifest</a></p>
 <p>Links:</p>
 <ul>
 <li><a href="https://docs.google.com/spreadsheets/d/1yBJr_Q8Fv_VKxAoVO1M6ZCUAYlS46iAa5FFqQheH3aE/edit#gid=0">FLUXNET-CH4 Site Metadata</a></li>
 <li>Permission was received via email on Feb 22, 2021, to use Tier 2 Data Policy sites in this study (SE-St1 and RU-Vrk; PI Thomas Friborg)</li>
 <li>Two additional sites (RU-SAM and SE-Sto) were included in the analysis (permission pending), however, were not included in FLUXNET-CH4 V1.0</li>
+<li>FLUXNET-CH4 data were used both for methane fluxes (FCH4; target variable) and tower-measured bio-meteorological variables (e.g., LE, GPP, TA; predictors)
+<ul>
+<li>Link to <a href="https://fluxnet.org/data/fluxnet-ch4-community-product/data-variables/">FLUXNET.org variable descriptions</a></li>
+</ul></li>
 </ul>
+<p><strong>Gridded Data (Predictors)</strong></p>
 </div>
 </div>
 

@@ -99,6 +99,8 @@ knitr::opts_chunk$set(echo = TRUE)
       + Extrapolation Errors
           - MC ML Model Training - Dissimilarity Only
           
+[**Link to Workflow Figure**](https://drive.google.com/drive/folders/1jiFyqzoxxMpdtRLCwxCtzKpfILRNIW5K)
+          
       
 #### 1. Objective of Study 
 
@@ -114,15 +116,17 @@ The goal of `FLUXNET-CH4 Upscaling` is to implement FLUXCOM-like ML approaches (
 
 **FLUXNET-CH4 Data**
 
-The eddy covariance data used in this study are publicly available as part of the FLUXNET-CH4 community product V1.0 at [FLUXNET.org](https://fluxnet.org/data/fluxnet-ch4-community-product/). The FLUXNET-CH4 synthesis activity is introduced in [Knox et al. 2019](10.1175/BAMS-D-18-0268.1) along with a detailed description of the eddy covariance post-processing steps including methane flux (FCH4) uncertainties. The first full (V1.0) database release (FLUXNET-CH4, hereafter) is described for 81 sites, and used for a wetland seasonality analysis in [Delwiche et al. in review](10.5194/essd-2020-307). 
+The eddy covariance data used in this study are publicly available as part of the FLUXNET-CH4 community product V1.0 at [fluxnet.org](https://fluxnet.org/data/fluxnet-ch4-community-product/). The FLUXNET-CH4 synthesis activity is introduced in [Knox et al. 2019](10.1175/BAMS-D-18-0268.1) along with a detailed description of the eddy covariance post-processing steps including methane flux (FCH4) uncertainties. The first full (V1.0) database release (FLUXNET-CH4, hereafter) is described for 81 sites, and used for a wetland seasonality analysis in [Delwiche et al. in review](10.5194/essd-2020-307). Data for this analysis were downloaded from fluxnet.org on **Feb 22, 2021**. [Download Manifest](https://docs.google.com/spreadsheets/d/1--_-XyBqsyiMIdc6JXqhilOOYFLeaY-UTMFhhI4Sd5M/edit#gid=0)
 
 Links:
 
   - [FLUXNET-CH4 Site Metadata](https://docs.google.com/spreadsheets/d/1yBJr_Q8Fv_VKxAoVO1M6ZCUAYlS46iAa5FFqQheH3aE/edit#gid=0)
   - Permission was received via email on Feb 22, 2021, to use Tier 2 Data Policy sites in this study (SE-St1 and RU-Vrk; PI Thomas Friborg)
   - Two additional sites (RU-SAM and SE-Sto) were included in the analysis (permission pending), however, were not included in FLUXNET-CH4 V1.0
+  - FLUXNET-CH4 data were used both for methane fluxes (FCH4; target variable) and tower-measured bio-meteorological variables (e.g., LE, GPP, TA; predictors)
+      + Link to [FLUXNET.org variable descriptions](https://fluxnet.org/data/fluxnet-ch4-community-product/data-variables/)
   
-
+**Gridded Data (Predictors)**
 
 
           
