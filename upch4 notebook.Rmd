@@ -222,7 +222,13 @@ fix_weeks <- function(daily_data) {
 }
 
 daily <- lapply(daily, fix_weeks)
-# daily[[11]] # check it worked
+# daily[[2]] # check it worked
+```
+
+Check that FCH4 daily mean is -9999 when missing (not already gap-filled). Try `daily[[2]]` (BWGum), which has missing data at the start of the record:
+
+```{r}
+daily[[2]]
 ```
 
 
