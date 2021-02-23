@@ -266,6 +266,26 @@ hh <- lapply(hh, create_imputed)
 # hh[[1]] check it worked
 ```
 
+Create ID column:
+
+```{r}
+for (i in 1:length(hh)){
+  hh[[i]] <- hh[[i]] %>%
+    mutate(ID = site.names[i]) %>%
+    dplyr::select(ID, everything())
+}
+head(hh[[1]])
+```
+
+Convert `-9999`- to `NA`:
+
+```{r}
+for (i in 1:length(hh)){
+  hh[[i]][hh[[i]] == -9999] <- NA
+}
+head(hh[[1]])
+```
+
 
 
 
