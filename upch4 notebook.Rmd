@@ -162,22 +162,38 @@ Local machine steps:
   + Unzip all site flux files in `/fluxnet-ch4-data` 
   + Reorganize into half-hourly (`/hh`) and `/daily` folders for easy access
   
-Are daily means computed on gap-filled data and are they reported with an imputed variable?
+Look at one site of **daily means** data.
+
+```{r}
+# setwd(loc)
+# files <- list.files("fluxnet-ch4-data/daily/")
+# one_site <- read_csv(paste(loc, "fluxnet-ch4-data/daily/", files[1], sep = ""))
+# head(one_site)
+```
+
+No, but there is a quality flag `_QC`. `1`= data gap shorter than 2 months, `3` = gap exceeds 2 months. 
+
+Issue: **There is also no uncertainty (`_UNC`) estimate on the downloaded daily mean data.**
+
+Clean up workspace:
+
+```{r}
+# rm(one_site)
+```
+
+Look at one site of **half-hourly** data.
 
 ```{r}
 setwd(loc)
-files <- list.files("fluxnet-ch4-data/daily/")
-one_site <- read_csv(paste(loc, "fluxnet-ch4-data/daily/", files[1], sep = ""))
+files <- list.files("fluxnet-ch4-data/hh/")
+one_site <- read_csv(paste(loc, "fluxnet-ch4-data/hh/", files[1], sep = ""))
 head(one_site)
 ```
 
-No, but there is a quality flag `_QC`. `1`= data gap shorter than 2 months, `3` = gap exceeds 2 months.
+  - Half-hourly data has `FCH4` uncertainty columns `FCH4_F_RANDUNC` and `FCH4_F_ANNOPTLM_UNC`. Can be averaged over day or week.
+  - Missing values are filled with `-9999`
 
-Clear work space:
-
-```{r}
-rm(one_site)
-```
+$~$ 
 
 Get FLUXNET-CH4 site names:
 
@@ -185,51 +201,47 @@ Get FLUXNET-CH4 site names:
 site.names <- paste( substr(files, 5, 6), substr(files, 8, 10), sep = "")
 ```
 
-Get all flux data:
+Get all **half-hourly** flux data: (this will take a few minutes)
 
-```{r}
-daily <- lapply(paste(loc, "fluxnet-ch4-data/daily/", files, sep = ""), read_csv)
-names(daily) <- site.names
-# str(daily)
+```{r echo = F}
+hh <- lapply(paste(loc, "fluxnet-ch4-data/hh/", files, sep = ""), read_csv)
+names(hh) <- site.names
+# str(hh)
 ```
-
 Create a pristine replicate:
 
 ```{r}
-daily2 <- daily
+hh2 <- hh
 ```
 
-Look at date columns:
+Look at all and date columns (to see date and time format):
 
 ```{r}
-names(daily[[1]])
-head(daily[[1]]$TIMESTAMP)
+names(hh[[1]])
+head(hh[[1]]$TIMESTAMP_END)
 ```
 
-Write and apply function to expand `TIMESTAMP` into`Year`, `Month`, `Week`, `Day`, and `DOY` variables to facilitate merging with other data:
+Write and apply function to expand `TIMESTAMP_END` into`Year`, `Month`, `Week`, `Day`, and `DOY` variables to facilitate merging with other data:
 
 ```{r}
-fix_weeks <- function(daily_data) {
-  daily_data <- daily_data %>% 
-  mutate(Year = as.numeric(substr(TIMESTAMP, 1, 4)),
-         Month = as.numeric(substr(TIMESTAMP, 5, 6)),
-         Day = as.numeric(substr(TIMESTAMP, 7, 8)),
+expand_date <- function(hh_data) {
+  hh_data <- hh_data %>% 
+  mutate(Year = as.numeric(substr(TIMESTAMP_END, 1, 4)),
+         Month = as.numeric(substr(TIMESTAMP_END, 5, 6)),
+         Day = as.numeric(substr(TIMESTAMP_END, 7, 8)),
          Date = make_date(Year, Month, Day),
          DOY = yday(Date),
          Week = ceiling(DOY/7),
          Week = ifelse(Week == 53, 52, Week)) %>% 
-  dplyr::select(Year, Month, Week, Day, DOY, everything(), - Date, -TIMESTAMP)
+    group_by(Year, DOY) %>% 
+    mutate(HH = 1:n()) %>% 
+  dplyr::select(Year, Month, Week, Day, HH, DOY, everything(), - Date, -TIMESTAMP_START, -TIMESTAMP_END)
 }
 
-daily <- lapply(daily, fix_weeks)
-# daily[[2]] # check it worked
+hh <- lapply(hh, expand_date)
+hh[[2]] # check it worked
 ```
 
-Check that FCH4 daily mean is -9999 when missing (not already gap-filled). Try `daily[[2]]` (BWGum), which has missing data at the start of the record:
-
-```{r}
-daily[[2]]
-```
 
 
 
