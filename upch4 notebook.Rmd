@@ -332,3 +332,65 @@ head(hh[[1]]) # check it worked
 
 
 
+
+##### Compute daily means of everything, including vector average WD and speed, excluding precip. (sums)
+
+Create function to compute daily means:
+
+```{r echo = F}
+compute_daily1 <- function(hh_data) {
+  hh_data <- hh_data %>% 
+    group_by(ID, Year, DOY) %>% 
+    summarize_all(list(~mean(., na.rm = T))) %>% 
+    mutate(WD_mean = (atan2(U, V) * 360/2/pi) + 180,
+           WS_mean = ((U^2 + V^2)^0.5)) %>% 
+    dplyr::select(ID, Year, Month, Week, Day, DOY, everything(), -HH)
+}
+```
+
+Check run time for one site:
+
+```{r warning = F}
+system.time( 
+ compute_daily1(hh[[1]])
+)
+```
+
+Apply to all sites using lapply:
+
+```{r warning = F}
+daily <- lapply(hh, compute_daily1)
+```
+
+Get sum of precip.
+
+```{r warning = F}
+sum_precip <- function(hh_data) {
+  hh_data <- hh_data %>% 
+    group_by(ID, Year, DOY) %>% 
+    summarize(P_F_sum = sum(P_F))
+}
+
+daily_precip <- lapply(hh, sum_precip)
+```
+
+Rejoin precip. to main data frame:
+
+```{r}
+for (i in 1:length(daily)) {
+daily[[i]] <- daily[[i]] %>% 
+  left_join(daily_precip[[i]], by = c("ID", "Year", "DOY")) 
+}
+names(daily[[1]])
+```
+
+Output each "complete" daily site as a separate .csv file:
+
+```{r}
+for (i in 1:length(daily)) {
+  daily[[i]] %>% write.csv(paste(loc, "fluxnet-ch4-data/daily_upch4/", site.names[i], "_daily_upch4.csv", sep = ""), row.names=FALSE)
+}
+```
+
+
+
