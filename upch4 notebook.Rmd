@@ -17,7 +17,7 @@ library(lubridate)
 source("code/ggplot_theme.R")
 ```
 
-## Workflow
+#### Workflow
 
   1. Objective of Study
   2. Input Data
@@ -285,6 +285,49 @@ for (i in 1:length(hh)){
 head(hh[[1]])
 ```
 
+
+
+
+
+
+##### Get `u` and `v` wind components:
+
+Identify which sites lack WD:
+
+```{r}
+find_wd <- function(hh_data) {
+  sum(names(hh_data) == "WD") == 0
+}
+
+unlist(lapply(hh, find_wd))
+sum(unname(unlist(lapply(hh, find_wd))))
+```
+
+OK, `CASCB` and `RUVrk` and missing `WD`.
+
+Create dummy `WD` variables:
+
+```{r}
+hh$CASCB$WD <- NA
+hh$RUVrk$WD <- NA
+
+unlist(lapply(hh, find_wd))
+sum(unname(unlist(lapply(hh, find_wd))))
+```
+
+Now compute wind direction components:
+
+```{r}
+compute_uv <- function(hh_data) {
+  hh_data <- hh_data %>% 
+    mutate(U = -WS_F * sin(2 * pi * WD/360),
+           V = -WS_F * cos(2 * pi * WD/360))
+}
+
+hh <- lapply(hh, compute_uv)
+
+head(hh[[1]]) # check it worked
+```
 
 
 
