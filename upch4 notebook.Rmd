@@ -150,19 +150,19 @@ $~$
 **NOTE: This work flow uses many large files so most data is stored locally and requires hard filepaths**
 The local file path used for all large files is: `/Volumes/LACIE SHARE/Stanford CH4/upch4_local/`.
 
-Set the local head directory:
+##### Set the local head directory:
 
 ```{r}
 loc <- "/Volumes/LACIE SHARE/Stanford CH4/upch4_local/"
 ```
 
-Local machine steps:
+##### Local machine steps:
 
   + Create a copy of FLUXNET-CH4 data and name it `/fluxnet-ch4-data-original`
   + Unzip all site flux files in `/fluxnet-ch4-data` 
   + Reorganize into half-hourly (`/hh`) and `/daily` folders for easy access
   
-Look at one site of **daily means** data.
+##### Look at one site of **daily means** data.
 
 ```{r}
 # setwd(loc)
@@ -175,13 +175,13 @@ No, but there is a quality flag `_QC`. `1`= data gap shorter than 2 months, `3` 
 
 Issue: **There is also no uncertainty (`_UNC`) estimate on the downloaded daily mean data.**
 
-Clean up workspace:
+##### Clean up workspace:
 
 ```{r}
 # rm(one_site)
 ```
 
-Look at one site of **half-hourly** data.
+##### Look at one site of **half-hourly** data.
 
 ```{r}
 setwd(loc)
@@ -193,35 +193,34 @@ head(one_site)
   - Half-hourly data has `FCH4` uncertainty columns `FCH4_F_RANDUNC` and `FCH4_F_ANNOPTLM_UNC`. Can be averaged over day or week.
   - Missing values are filled with `-9999`
 
-$~$ 
-
-Get FLUXNET-CH4 site names:
+##### Get FLUXNET-CH4 site names:
 
 ```{r}
 site.names <- paste( substr(files, 5, 6), substr(files, 8, 10), sep = "")
 ```
 
-Get all **half-hourly** flux data: (this will take a few minutes)
+##### Get all **half-hourly** flux data: (this will take a few minutes)
 
 ```{r echo = F}
 hh <- lapply(paste(loc, "fluxnet-ch4-data/hh/", files, sep = ""), read_csv)
 names(hh) <- site.names
 # str(hh)
 ```
-Create a pristine replicate:
+
+##### Create a pristine replicate:
 
 ```{r}
 hh2 <- hh
 ```
 
-Look at all and date columns (to see date and time format):
+##### Look at all and date columns (to see date and time format):
 
 ```{r}
 names(hh[[1]])
 head(hh[[1]]$TIMESTAMP_END)
 ```
 
-Write and apply function to expand `TIMESTAMP_END` into`Year`, `Month`, `Week`, `Day`, and `DOY` variables to facilitate merging with other data:
+##### Write and apply function to expand `TIMESTAMP_END` into`Year`, `Month`, `Week`, `Day`, and `DOY` variables to facilitate merging with other data:
 
 ```{r}
 expand_date <- function(hh_data) {
@@ -242,7 +241,7 @@ hh <- lapply(hh, expand_date)
 hh[[2]] # check it worked
 ```
 
-Check if gap-filled FCH4 `CH4_F_ANNOPTLM` has already been pre-filled with observations `FCH4`, where available.
+##### Check if gap-filled FCH4 `CH4_F_ANNOPTLM` has already been pre-filled with observations `FCH4`, where available.
 
 ```{r}
 hh[[1]] 
@@ -251,7 +250,7 @@ hh[[1]]
 FCH4 in row 7 in `hh[[1]]` (ID BRNpw) = 10.71, which **matches** `CH4_F_ANNOPTLM` = 1.071e+01. 
 **`CH4_F_ANNOPTLM` has been pre-filled with observations.**
 
-Write and apply function to create `imputed`, a flag variable where:
+##### Write and apply function to create `imputed`, a flag variable where:
 
   - `1` == `CH4_F_ANNOPTLM` was imputed
   - `2` == `CH4_F_ANNOPTLM` was observed
@@ -266,7 +265,7 @@ hh <- lapply(hh, create_imputed)
 # hh[[1]] check it worked
 ```
 
-Create ID column:
+##### Create ID column:
 
 ```{r}
 for (i in 1:length(hh)){
@@ -277,7 +276,7 @@ for (i in 1:length(hh)){
 head(hh[[1]])
 ```
 
-Convert `-9999`- to `NA`:
+##### Convert `-9999`- to `NA`:
 
 ```{r}
 for (i in 1:length(hh)){
