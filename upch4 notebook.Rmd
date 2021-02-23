@@ -242,6 +242,30 @@ hh <- lapply(hh, expand_date)
 hh[[2]] # check it worked
 ```
 
+Check if gap-filled FCH4 `CH4_F_ANNOPTLM` has already been pre-filled with observations `FCH4`, where available.
+
+```{r}
+hh[[1]] 
+```
+
+FCH4 in row 7 in `hh[[1]]` (ID BRNpw) = 10.71, which **matches** `CH4_F_ANNOPTLM` = 1.071e+01. 
+**`CH4_F_ANNOPTLM` has been pre-filled with observations.**
+
+Write and apply function to create `imputed`, a flag variable where:
+
+  - `1` == `CH4_F_ANNOPTLM` was imputed
+  - `2` == `CH4_F_ANNOPTLM` was observed
+
+```{r}
+create_imputed <- function(hh_data) {
+  hh_data <- hh_data %>% 
+    mutate(imputed = ifelse(FCH4 == -9999, 1, 0))
+}
+
+hh <- lapply(hh, create_imputed)
+# hh[[1]] check it worked
+```
+
 
 
 
