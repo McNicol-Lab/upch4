@@ -140,7 +140,7 @@ $~$
   
 **Gridded Data (Predictors)**
 
-
+A summary of predictors (`Predictor Summary`) is available [here](https://docs.google.com/spreadsheets/d/1DN0huLs-vVM3g_XcF1hBQrTpkKaGhzuWwaacfbe4iCo/edit#gid=0), as well as an appendix (`Appendix: All Predictors`) table with all individual predictors. Candidate predictors were drawn from a mix of source classes (EC tower measurements, models, computations from observed data, or remote sensing) and information content groups (spatial-only or spatio-temporal) and at different temporal frequencies (Static, Yearly, Monthly, Weekly, or Half-hourly) . Using this information, we assigned each candidate predictor to a class (Generic, Climate, Biometeorological, Land Cover, Soil and Relief, or Greenness). For MODIS predictors, we computed the mean seasonal cycle (msc), and yearly mean, min, max, and amplitude parameters, as in [Tramontana et al. (2016)](10.5194/bg-13-4291-2016) and [Jung et al. (2020)](10.5194/bg-17-1343-2020). For derived TerraClimate soil moisture and actual evapotranspiration (aet) we computed the interannual range and annual seasonality. More information is provided in the manuscript.
 
 $~$
 
