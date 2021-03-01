@@ -383,12 +383,46 @@ daily[[i]] <- daily[[i]] %>%
 names(daily[[1]])
 ```
 
-Output each "complete" daily site as a separate .csv file:
+##### Output each "complete" daily site as a separate .csv file:
 
 ```{r}
 for (i in 1:length(daily)) {
   daily[[i]] %>% write.csv(paste(loc, "fluxnet-ch4-data/daily_upch4/", site.names[i], "_daily_upch4.csv", sep = ""), row.names=FALSE)
 }
+```
+
+#### 3. (cont.) (re)Load Daily Data
+
+```{r message = F}
+loc <- "/Volumes/LACIE SHARE/Stanford CH4/upch4_local/"
+files <- list.files(paste(loc, "fluxnet-ch4-data/daily_upch4/", sep = ""))
+daily <- lapply(paste(loc,"fluxnet-ch4-data/daily_upch4/",files, sep = ""), read_csv)
+```
+
+##### Bind rows
+
+```{r}
+daily_flat <- daily %>% bind_rows() %>% as_tibble()
+head(daily_flat)
+```
+
+##### Compute FCH4 uncertainty, and subset gap-filled (and best) predictors
+
+Notes:
+
+  + Total FCH4 uncertainty `FCH4_F_UNC` is random `FCH4_F_RANDUNC` and gap-filling `FCH4_F_ANNOPTLM_UNC` uncertainty summed in quadrature.
+  + The output of the daytime method `_DT` is used for gross primary production (GPP) and ecosystem respiration (RECO). Although both methods are subject to bias due to light-inhibition of leaf respiration, [Keenan et al. 2019](https://doi.org/10.1038/s41559-019-0809-2) show that the biases for the DT method only impact night-time respiration, but did not impact apparent photosynthesis or daytime respiration.
+
+```{r}
+daily_subset <- daily_flat %>% 
+  mutate(FCH4_F_UNC = sqrt(FCH4_F_ANNOPTLM_UNC^2 + FCH4_F_RANDUNC^2)) %>% 
+  dplyr::select(ID, Year, Month, Week, Day, DOY,    # descriptive data
+         FCH4 = FCH4_F_ANNOPTLM, FCH4_F_UNC, imputed,   # methane fluxes
+         NEE = NEE_F_ANNOPTLM, GPP = GPP_DT, RECO = RECO_DT,  # ecosystem C fluxes
+         PPFD_IN = PPFD_IN_F, SW_IN = SW_IN_F, LW_IN = LW_IN_F, NETRAD = NETRAD_F,   # radiation
+         LE = LE_F_ANN, H = H_F,  # ecosystem energy fluxes
+         TA = TA_F, PA = PA_F, RH = RH_F, VPD = VPD_F, P = P_F, USTAR = USTAR, WS = WS_mean,    # meteorology 
+         TS = TS_1, SWC = SWC_F, WTD = WTD_F) # soil properties 
 ```
 
 
