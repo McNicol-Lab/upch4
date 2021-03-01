@@ -133,7 +133,6 @@ Links:
 
   - [FLUXNET-CH4 Site Metadata](https://docs.google.com/spreadsheets/d/1yBJr_Q8Fv_VKxAoVO1M6ZCUAYlS46iAa5FFqQheH3aE/edit#gid=0)
   - Permission was received via email on Feb 22, 2021, to use Tier 2 Data Policy sites in this study (SE-St1 and RU-Vrk; PI Thomas Friborg)
-  - Two additional sites (RU-SAM and SE-Sto) were included in the analysis (permission pending), however, were not included in FLUXNET-CH4 V1.0
   - FLUXNET-CH4 data were used both for methane fluxes (FCH4; target variable) and tower-measured bio-meteorological variables (e.g., LE, GPP, TA; predictors)
       + Link to [FLUXNET.org variable descriptions](https://fluxnet.org/data/fluxnet-ch4-community-product/data-variables/)
   
