@@ -27,14 +27,6 @@ source("code/ggplot_theme.R")
       + FLUXNET-CH4 Data Preparation
           - Averaging
           - Variable Selection
-      + Subset Wetlands, Dates
-      + Cluster Sites for Cross Validation
-      + Finalize Data
-          - Remove Extraneous
-          - Impute Missing Data
-          - Add Lagged Data
-      + FLUXNET-CH4 Data Quality Control
-      + Table of Final FLUXNET-CH4 Inputs
   4. Gridded Data Pre-Processing
       + Grid Preparation
           - MODIS
@@ -56,7 +48,16 @@ source("code/ggplot_theme.R")
           - MODIS Processing
           - Merge Gridded Data
       + Gridded Data Quality Control
-  5. Forward Feature Selection (FFS)
+  5. Finalize Training Data
+      + Subset Wetlands, Dates
+      + Cluster Sites for Cross Validation
+      + Finalize Data
+          - Remove Extraneous
+          - Impute Missing Data
+          - Add Lagged Data
+      + FLUXNET-CH4 Data Quality Control
+      + Table of Final FLUXNET-CH4 Inputs
+  6. Forward Feature Selection (FFS)
       + Filter Weekly Data
       + Feature Subset Experiments
       + FFS
@@ -64,7 +65,7 @@ source("code/ggplot_theme.R")
           - Additional Stepwise Features
           - FFS Evolution Plots
       + Summarize FFS Performance
-  6. Cross Validation
+  7. Cross Validation
       + ML Model Training
           - RF and Final Predictors or Subsets
           - XGB and Final Predictors or Subsets
@@ -76,12 +77,12 @@ source("code/ggplot_theme.R")
           - Site-means
           - Monthly Seasonal Cycles
           - Monthly Anomalies
-  7. Variable Importances
+  8. Variable Importances
       + Variable Importance Rankings
       + Variable Responses
       + Partial Dependency Plots
       + ShapR
-  8. Upscaled Model with Monte Carlo (MC)
+  9. Upscaled Model with Monte Carlo (MC)
       + Forcing Data
           - Mapping
           - Member Product Choices
@@ -92,7 +93,7 @@ source("code/ggplot_theme.R")
       + MC Simulations
       + MC ML Model Training
       + MC ML Model Validation
-  9. Upscaling
+  10. Upscaling
       + Prepare Member Forcing Data
       + Run on Computing Cluster
           - Output Grids and Sums
@@ -100,7 +101,7 @@ source("code/ggplot_theme.R")
           - Unweighted Wetland Fluxes (nmol)
           - Weighted Sums and Uncertainties (Tg)
           - Independent Validation
-  10. Data Representativeness
+  11. Data Representativeness
       + Prepare Gridded Data
       + Global Dissimilarity
       + Tower Constituency
@@ -450,3 +451,5 @@ write.csv(daily_subset_meta, paste(loc, "fluxnet-ch4-data/daily_flat/daily_subse
 
 
 
+
+#### 4. 
