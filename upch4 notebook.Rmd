@@ -12,9 +12,10 @@ knitr::opts_chunk$set(echo = TRUE)
 Load packages and ggplot theme:
 
 ```{r}
-library(tidyverse)
+library(tidyverse) 
 library(lubridate)
 library(raster)
+library(oce) # for time series transformations
 source("code/ggplot_theme.R")
 ```
 
@@ -133,7 +134,7 @@ The eddy covariance data used in this study are publicly available as part of th
 
 Links:
 
-  - [FLUXNET-CH4 Site Metadata](https://docs.google.com/spreadsheets/d/1yBJr_Q8Fv_VKxAoVO1M6ZCUAYlS46iAa5FFqQheH3aE/edit#gid=0)
+  - [FLUXNET-CH4 Site Metadata](https://docs.google.com/spreadsheets/d/1DN0huLs-vVM3g_XcF1hBQrTpkKaGhzuWwaacfbe4iCo/edit#gid=1384338468)
   - Permission was received via email on Feb 22, 2021, to use Tier 2 Data Policy sites in this study (SE-St1 and RU-Vrk; PI Thomas Friborg)
   - FLUXNET-CH4 data were used both for methane fluxes (FCH4; target variable) and tower-measured bio-meteorological variables (e.g., LE, GPP, TA; predictors)
       + Link to [FLUXNET.org variable descriptions](https://fluxnet.org/data/fluxnet-ch4-community-product/data-variables/)
@@ -517,6 +518,327 @@ Zutao Ouyang (Stanford University) extracted MODIS pixels at the FLUXNET-CH4 sit
   + Simple Ratio Water Index (`SRWI` from **MOD09A1**)
   + Normalized Difference Water Index (`NDWI` from **MOD09A1**)
   + Normalized Difference Snow Index (`NDSI`  from **MOD11A2**)
+  
+**NOTE** Tables docmenting MODIS processing step effects on data are here  under [MODIS Processing](https://docs.google.com/spreadsheets/d/1DN0huLs-vVM3g_XcF1hBQrTpkKaGhzuWwaacfbe4iCo/edit#gid=1971246167) and QC figures are output to `upch4_local/modis/modis_qc`.
+
+
+##### Get file local file names/paths for 8-day extracted MODIS data:
+
+```{r}
+setwd("/Volumes/LACIE SHARE/Stanford CH4/upch4_local/modis/modis-extracted")
+files <- list.files()
+```
+
+##### Set MODIS product/file names (for gather values):
+
+```{r}
+modis.names <- c("LSTD", "EVI", "LAI", "LSWI", "NDSI", "NDVI", "NDWI", "LSTN", "SRWI")
+```
+
+##### Read files:
+
+```{r echo = F}
+modis <- lapply(paste("/Volumes/LACIE SHARE/Stanford CH4/upch4_local/modis/modis-extracted/", files, sep = ""), read_csv)
+names(modis) <- modis.names
+str(modis)
+```
+
+##### Look at head for first file:
+
+```{r}
+head(modis[[1]])
+```
+Files are not tidy (short and wide). There are **86** extracted sites (extra sites than in FLUXNET-CH4 V1.0). 
+
+##### Use gather to make long and narrow, remove hyphen from ID:
+
+```{r}
+for (i in 1:length(files)) {
+  modis[[i]] <- modis[[i]] %>% 
+    gather(key = ID, value = "modis.name", 2:87) %>% 
+    mutate(ID = paste(substr(ID, 1, 2), substr(ID, 4, 6), sep = "")) %>% 
+    as_tibble()
+}
+names(modis) <- modis.names
+```
+
+##### Check data are same length:
+
+```{r}
+str(modis)
+```
+
+1) `NDSI` is longer, 2) `LAI` is slightly shorter. Based on the dates, `NDSI` is daily.
+
+Will not be able to bind columns with different lengths
+
+##### Remove `LAI` and `NDSI` then rejoin:
+
+```{r}
+modis.1.names <- c("LSTD", "EVI", "LSWI", "NDVI", "NDWI", "LSTN", "SRWI")
+modis.1 <- modis[modis.1.names]
+```
+
+##### Select only first two columns (Date and ID) then data columns:
+
+```{r}
+modis.1 <- modis.1 %>% 
+  bind_cols() %>% 
+  dplyr::select(1, 2, 3,6,9,12,15,18,21) %>% # subset only data columns
+  as_tibble() 
+names(modis.1) <- c("Date", "ID", modis.1.names)
+```
+
+##### Rejoin `LAI` using `Date`:
+
+```{r}
+modis.2 <- modis.1 %>% left_join(modis$LAI)
+names(modis.2)[10] <- "LAI"
+```
+
+##### Rejoin `NDSI`:
+
+```{r}
+modis <- modis.2 %>% right_join(modis$NDSI)
+names(modis)[11] <- "NDSI"
+```
+
+##### Convert `Date` into `Year` and `DOY`, correct `MARC` name (should be `US-MAC`), remove `LSTD`:
+
+```{r}
+modis <- modis %>% 
+  mutate(Date = as.Date(Date, format = "%m/%d/%Y")) %>% 
+  mutate(ID = ifelse(ID == "MARC", "USMAC",ID),
+         DOY = yday(Date),
+         Date = as_date(Date),
+         Week = ceiling(DOY/7),
+         Week = ifelse(Week == 53, 52, Week),
+         Week = as.factor(Week),
+         Year = as.integer(substr(Date, 1,4 )),
+         Month = as.numeric(substr(Date, 6, 7))) %>% 
+  dplyr::select(ID, Date, Year, Month, Week, DOY, NDSI, NDVI, EVI, LAI, NDWI, SRWI, LSWI, LSTN) 
+```
+
+##### Count `NAs` before despiking:
+
+```{r}
+modis_nas <- modis %>%
+  group_by(ID) %>%
+  summarize_all(list(~sum(is.na(.)))) 
+modis_nas
+```
+##### Despike outlier values for each product:
+
+```{r}
+modis_dsp <- modis %>% 
+  mutate(NDSI_dsp = despike(NDSI, reference = 'trim', min = 0, max = 100, replace = "NA"),
+         NDVI_dsp = despike(NDVI, reference = 'trim', min = -1, max = 1, replace = "NA"),
+         EVI_dsp = despike(EVI, reference = 'trim', min = -1, max = 1, replace = "NA"),
+         LAI_dsp = despike(LAI, reference = 'trim', min = 0, max = 5, replace = "NA"),
+         NDWI_dsp = despike(NDWI, reference = 'trim', min = 0, max = 1, replace = "NA"),
+         SRWI_dsp = despike(SRWI, reference = 'trim', min = -1, max = 3, replace = "NA"),
+         LSWI_dsp = despike(LSWI, reference = 'trim', min = 0, max = 1, replace = "NA"),
+         LSTN_dsp = despike(LSTN, reference = 'trim', min = -60, max = 50, replace = "NA")) %>% 
+dplyr::select(ID, Date, Year, Month, Week, DOY, NDSI, NDVI, EVI, LAI, NDWI, SRWI, LSWI, LSTN,
+              NDSI_dsp, NDVI_dsp, EVI_dsp, LAI_dsp, NDWI_dsp, SRWI_dsp, LSWI_dsp, LSTN_dsp) 
+``` 
+
+##### Count `NAs` after despiking:
+
+```{r}
+modis_dsp_nas <- modis_dsp %>%
+  group_by(ID) %>%
+  summarize_all(list(~sum(is.na(.)))) 
+modis_dsp_nas
+```
+##### Calculate removed values during despiking and output to `upch4_local/modis/modis_qc/`
+
+```{r}
+modis_dsp_nas %>% 
+  mutate(NDSI = NDSI - NDSI_dsp,
+         NDVI = NDVI - NDVI_dsp,
+         EVI = EVI - EVI_dsp,
+         LAI = LAI - LAI_dsp,
+         NDWI = NDWI - NDWI_dsp,
+         SRWI = SRWI - SRWI_dsp,
+         LSWI = LSWI - LSWI_dsp,
+         LSTN = LSTN - LSTN_dsp) %>% 
+  dplyr::select(-ID) %>% 
+  summarize_all(list(~sum(.))) %>% 
+  write.csv("/Volumes/LACIE SHARE/Stanford CH4/upch4_local/modis/modis-qc/despiking_na_effects.csv")
+```
+
+
+##### Rename without `_dsp` suffix:
+
+```{r}
+modis_dsp <- modis_dsp %>% 
+  dplyr::select(ID, Date, Year, Month, Week, DOY, 
+                NDSI = NDSI_dsp, 
+                NDVI = NDVI_dsp, 
+                EVI = EVI_dsp,
+                LAI = LAI_dsp,
+                NDWI = NDWI_dsp,
+                SRWI = SRWI_dsp,
+                LSWI = LSWI_dsp,
+                LSTN = LSTN_dsp)
+```
+
+
+##### Calculate mean  seasonal cycle (msc), then weekly means, then fill weekly gaps with msc:
+
+```{r}
+modis_gapfilled <- modis_dsp %>% 
+  group_by(ID, Month) %>%  # this section computes  monthly values averaged over multiple years
+  mutate(NDSI_msc = mean(NDSI, na.rm = TRUE),
+         NDVI_msc = mean(NDVI, na.rm = TRUE),
+         EVI_msc = mean(EVI, na.rm = TRUE), 
+         LAI_msc = mean(LAI, na.rm = TRUE),
+         NDWI_msc = mean(NDWI, na.rm = TRUE),
+         SRWI_msc = mean(SRWI, na.rm = TRUE),
+         LSWI_msc = mean(LSWI, na.rm = TRUE),
+         LSTN_msc = mean(LSTN, na.rm =TRUE)) %>% 
+  group_by(ID, Year, Month, Week) %>% # this section compute weekly means
+  summarize(NDSI = mean(NDSI, na.rm = TRUE),
+            NDVI = mean(NDVI, na.rm = TRUE),
+            EVI = mean(EVI, na.rm = TRUE),
+            LAI = mean(LAI, na.rm = TRUE),
+            NDWI = mean(NDWI, na.rm = TRUE),
+            SRWI = mean(SRWI, na.rm = TRUE),
+            LSWI = mean(LSWI, na.rm = TRUE),
+            LSTN = mean(LSTN, na.rm = TRUE),
+            NDSI_msc = NDSI_msc[1],    # this section selects the monthly (msc) value corresponding to the weekly data
+            NDVI_msc = NDVI_msc[1],
+            EVI_msc = EVI_msc[1],
+            LAI_msc = LAI_msc[1],
+            NDWI_msc = NDWI_msc[1],
+            SRWI_msc = SRWI_msc[1],
+            LSWI_msc = LSWI_msc[1],
+            LSTN_msc = LSTN_msc[1]) %>% 
+  mutate(NDSI_F = ifelse(is.na(NDSI), NDSI_msc, NDSI), # this section fills any missing weekly values with the msc (monthly average)
+         NDVI_F = ifelse(is.na(NDVI), NDVI_msc, NDVI),
+         EVI_F = ifelse(is.na(EVI), EVI_msc, EVI),
+         LAI_F = ifelse(is.na(LAI), LAI_msc, LAI),
+         NDWI_F = ifelse(is.na(NDWI), NDWI_msc, NDWI),
+         SRWI_F = ifelse(is.na(SRWI), SRWI_msc, SRWI),
+         LSWI_F = ifelse(is.na(LSWI), LSWI_msc, LSWI),
+         LSTN_F = ifelse(is.na(LSTN), LSTN_msc, LSTN)) 
+```
+
+
+##### If snow is on the ground, set water indices to the 5% quantile (frozen):
+
+```{r}
+modis_frozen <- modis_gapfilled %>% 
+  group_by(ID,Year) %>% 
+  mutate(NDWI_msc = ifelse(NDSI_msc > 0, quantile(NDWI_msc, 0.05, na.rm=TRUE), NDWI_msc),
+         SRWI_msc = ifelse(NDSI_msc > 0, quantile(SRWI_msc, 0.05, na.rm=TRUE), SRWI_msc),
+         LSWI_msc = ifelse(NDSI_msc > 0, quantile(LSWI_msc, 0.05, na.rm=TRUE), LSWI_msc),
+         
+         NDWI_F = ifelse(NDSI_F > 0, quantile(NDWI_F, 0.05, na.rm=TRUE), NDWI_F),
+         SRWI_F = ifelse(NDSI_F > 0, quantile(SRWI_F, 0.05, na.rm=TRUE), SRWI_F),
+         LSWI_F = ifelse(NDSI_F > 0, quantile(LSWI_F, 0.05, na.rm=TRUE), LSWI_F))
+```
+
+##### Compute mean, min, max, amplitude:
+
+```{r message = F}
+modis_frozen <- modis_frozen %>% 
+  group_by(ID, Year) %>% 
+  mutate(NDSI_mean = mean(NDSI_F, na.rm=TRUE),
+         NDVI_mean = mean(NDVI_F, na.rm=TRUE),
+         EVI_mean = mean(EVI_F, na.rm=TRUE),
+         LAI_mean = mean(LAI_F, na.rm=TRUE),
+         NDWI_mean = mean(NDWI_F, na.rm=TRUE),
+         SRWI_mean = mean(SRWI_F, na.rm=TRUE),
+         LSWI_mean = mean(LSWI_F, na.rm=TRUE),
+         LSTN_mean = mean(LSTN_F, na.rm=TRUE),
+         
+         NDSI_min = min(NDSI_F, na.rm=TRUE),
+         NDVI_min = min(NDVI_F, na.rm=TRUE),
+         EVI_min = min(EVI_F, na.rm=TRUE),
+         LAI_min = min(LAI_F, na.rm=TRUE),
+         NDWI_min = min(NDWI_F, na.rm=TRUE),
+         SRWI_min = min(SRWI_F, na.rm=TRUE),
+         LSWI_min = min(LSWI_F, na.rm=TRUE),
+         LSTN_min = min(LSTN_F, na.rm=TRUE),
+         
+         NDSI_max = max(NDSI_F, na.rm=TRUE),
+         NDVI_max = max(NDVI_F, na.rm=TRUE),
+         EVI_max = max(EVI_F, na.rm=TRUE),
+         LAI_max = max(LAI_F, na.rm=TRUE),
+         NDWI_max = max(NDWI_F, na.rm=TRUE),
+         SRWI_max = max(SRWI_F, na.rm=TRUE),
+         LSWI_max = max(LSWI_F, na.rm=TRUE),
+         LSTN_max = max(LSTN_F, na.rm=TRUE),
+         
+         NDSI_amp = NDSI_max-NDSI_min,
+         NDVI_amp = NDVI_max-NDVI_min,
+         EVI_amp = EVI_max-EVI_min,
+         LAI_amp = LAI_max-LAI_min,
+         NDWI_amp = NDWI_max-NDWI_min,
+         SRWI_amp = SRWI_max-SRWI_min,
+         LSWI_amp = LSWI_max-LSWI_min,
+         LSTN_amp = LSTN_max-LSTN_min)
+```
+
+##### Get site IDs:
+
+```{r}
+site.names <- modis_frozen %>%
+  ungroup() %>% 
+  mutate(ID = factor(ID)) %>% 
+  dplyr::select(ID) %>% 
+  pull() %>% unique()
+```
+
+##### Get variable names:
+
+```{r}
+names <- names(modis)[7:14]
+names_F <- paste(names, "_F", sep = "")
+names_msc <- paste(names, "_msc", sep = "")
+```
+
+##### Create modis qcqa figures:
+
+```{r message = F}
+for (i in 1:length(names)){
+  
+  # visualize 1-45
+  modis_frozen %>%
+    filter(ID %in% site.names[1:45]) %>%
+    dplyr::select(Month, value_F = names_F[i], value_msc = names_msc[i]) %>% 
+    ggplot(aes(Month, value_F)) +
+    geom_point(size = 1, alpha = 0.3) +
+    geom_line(aes(Month, value_msc), col = 'purple', size = 2) +
+    facet_wrap(~ID, scales = 'free', ncol = 9) +
+    my_theme
+  ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/upch4_local/modis/modis-qc/", names[i], "_1.pdf", sep = ""),
+         width = 50, height = 30, units = c("cm"), dpi = 300)
+  
+  # visualize 46-86
+  modis_frozen %>%
+    filter(ID %in% site.names[46:86]) %>%
+    dplyr::select(Month, value_F = names_F[i], value_msc = names_msc[i]) %>% 
+    ggplot(aes(Month, value_F)) +
+    geom_point(size = 1, alpha = 0.3) +
+    geom_line(aes(Month, value_msc), col = 'purple', size = 2) +
+    facet_wrap(~ID, scales = 'free', ncol = 9) +
+    my_theme
+  ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/upch4_local/modis/modis-qc/", names[i], "_2.pdf", sep = ""),
+         width = 50, height = 30, units = c("cm"), dpi = 300)
+  
+}
+```
+
+##### Output processed MODIS data:
+
+```{r}
+write.csv(modis_frozen, "/Volumes/LACIE SHARE/Stanford CH4/upch4_local/modis/modis-processed/modis-processed.csv",
+          row.names = FALSE)
+```
+
 
 
 
