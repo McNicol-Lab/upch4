@@ -14,6 +14,7 @@ Load packages and ggplot theme:
 ```{r}
 library(tidyverse)
 library(lubridate)
+library(raster)
 source("code/ggplot_theme.R")
 ```
 
@@ -29,10 +30,10 @@ source("code/ggplot_theme.R")
           - Variable Selection
   4. Gridded Data Pre-Processing
       + Grid Preparation
+          - Potential Radiation (computed)
           - MODIS
           - PPFD_IN
           - Temporal (not used)
-          - Rpot (not used)
       + Grid Extraction
           - Extract Global Products
               - Canopy Height
@@ -452,4 +453,50 @@ write.csv(daily_subset_meta, paste(loc, "fluxnet-ch4-data/daily_flat/daily_subse
 
 
 
-#### 4. 
+#### 4. Gridded Data Pre-Processing
+
+**Potential Radiation (RPot)**
+
+Get the mean seasonal cycle from Zutao Ouyang's 2001-2018 MATLAB output.
+
+Define a function to take a number of years and return an index of months:
+
+```{r}
+create_msc_index <- function(years) {
+  msc_index <- list()
+  for (i in 1:12){
+      msc_index[[i]] <- seq(i, ((years-1)*12+i), by = 12)
+  }
+  msc_index
+}
+# create_msc_index(15) # test it out
+```
+
+Load in Rpot and create msc index for 19 years.
+
+```{r}
+Rpot <- brick("/Volumes/LACIE SHARE/Stanford CH4/upch4_local/grids/computed/Rpot.nc")
+msc_index <- create_msc_index(19)
+```
+
+Get `_msc`:
+
+```{r}
+Rpot_msc <- list()
+for (i in 1:12) {
+  Rpot_msc[[i]] <- calc(Rpot[[msc_index[[i]]]], fun = mean)
+}
+```
+
+Create raster stack:
+
+```{r}
+Rpot_msc <- stack(Rpot_msc)
+```
+
+Output `Rpot_msc.nc`:
+
+```{r}
+writeRaster(Rpot_msc, "/Volumes/LACIE SHARE/Stanford CH4/upch4_local/grids/computed/Rpot_msc.nc", format="CDF")
+```
+
