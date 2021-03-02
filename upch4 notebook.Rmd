@@ -865,6 +865,16 @@ head(canopyht)
 ```
 
 ##### Computed (Rpot)
+
+```{r}
+stack <- stack("/Volumes/LACIE SHARE/Stanford CH4/upch4_local/grids/computed/Rpot_msc.nc")
+Rpot <- as_tibble(raster::extract(stack, site.coords)) 
+Rpot <- cbind(sites, Rpot) %>% 
+  gather(key = "Month", value = "Rpot", 15:26) %>% 
+  mutate(Month = str_remove(Month, "X"))
+head(Rpot)
+```
+
 ##### Compound Topographic Index
 ##### Earth Environment
 ##### N and S Deposition
