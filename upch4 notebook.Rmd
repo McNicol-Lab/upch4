@@ -33,22 +33,18 @@ source("code/ggplot_theme.R")
       + Grid Preparation
           - Potential Radiation (computed)
           - MODIS
-          - PPFD_IN
-          - Temporal (not used)
       + Grid Extraction
-          - Extract Global Products
-              - Canopy Height
-              - Computed (not used)
-              - Compound Topographic Index
-              - Earth Environment
-              - N and S Deposition
-              - SoilGrids
-              - TerraClimate
-              - Fractional Vegetation Cover (VCF)
-              - Wetland Extent (WAD2M)
-              - WorldClim 2.0
-          - MODIS Processing
-          - Merge Gridded Data
+          - Canopy Height
+          - Computed (Rpot)
+          - Compound Topographic Index
+          - Earth Environment
+          - N and S Deposition
+          - SoilGrids
+          - TerraClimate
+          - Fractional Vegetation Cover (VCF)
+          - Wetland Extent (WAD2M)
+          - WorldClim 2.0
+      + Merge Gridded Data
       + Gridded Data Quality Control
   5. Finalize Training Data
       + Subset Wetlands, Dates
@@ -455,7 +451,7 @@ write.csv(daily_subset_meta,
 
 #### 4. Gridded Data Pre-Processing
 
-#### **Potential Radiation (RPot)**
+#### *Potential Radiation (RPot)*
 
 **Description**
 Get the mean seasonal cycle from Zutao Ouyang's 2001-2018 MATLAB output. Original citation for `Rpot` is [Peltola et al. 2019](10.5194/essd-11-1263-2019) where it was found to be a useful predictor of high latitude wetland FCH4.
@@ -501,7 +497,7 @@ Output `Rpot_msc.nc`:
 writeRaster(Rpot_msc, "/Volumes/LACIE SHARE/Stanford CH4/upch4_local/grids/computed/Rpot_msc.nc", format="CDF")
 ```
 
-#### **MODIS**
+#### *MODIS*
 
 **Description**
 Zutao Ouyang (Stanford University) extracted MODIS pixels at the FLUXNET-CH4 sites in April 2020, for 9 products:
@@ -841,3 +837,39 @@ write.csv(modis_frozen, "/Volumes/LACIE SHARE/Stanford CH4/upch4_local/modis/mod
 
 
 
+
+#### *Grid Extraction* 
+
+**Extract geospatial data at FLUXNET-CH4 sites and output a single geospatial .csv.**
+
+Load site metadata (ID, Latitude, Longitude), applicable to all extractions:
+
+```{r}
+sites <- read_csv("/Volumes/LACIE SHARE/Stanford CH4/upch4_local/fluxnet-ch4-data/metadata/fluxnet-ch4-site-metadata.csv") %>% 
+  mutate(ID = paste(substr(ID, 1, 2), substr(ID, 4, 6), sep = "")) 
+site.coords <- cbind(sites$Longitude, sites$Latitude) # (x, y)
+site.num <- length(site.coords[,1])
+```
+##### Global Canopy Height
+
+```{r}
+loc <- "/Volumes/LACIE SHARE/Stanford CH4/upch4_local/grids/global-canopy-height/"
+
+setwd(loc)
+raster.names <-list.files(loc, pattern = "tif$", full.names = FALSE)
+stack <- stack(raster.names)
+canopyht <- as_tibble(raster::extract(stack, site.coords)) 
+canopyht <- cbind(sites, canopyht) %>% 
+  rename(canopyht = Simard_Pinto_3DGlobalVeg_JGR)
+head(canopyht)
+```
+
+##### Computed (Rpot)
+##### Compound Topographic Index
+##### Earth Environment
+##### N and S Deposition
+##### SoilGrids
+##### TerraClimate
+##### Fractional Vegetation Cover (VCF)
+##### Wetland Extent (WAD2M)
+##### WorldClim 2.0
