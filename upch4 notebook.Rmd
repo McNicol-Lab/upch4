@@ -455,9 +455,10 @@ write.csv(daily_subset_meta, paste(loc, "fluxnet-ch4-data/daily_flat/daily_subse
 
 #### 4. Gridded Data Pre-Processing
 
-**Potential Radiation (RPot)**
+##### **Potential Radiation (RPot)**
 
-Get the mean seasonal cycle from Zutao Ouyang's 2001-2018 MATLAB output.
+**Description**
+Get the mean seasonal cycle from Zutao Ouyang's 2001-2018 MATLAB output. Original citation for `Rpot` is [Peltola et al. 2019](10.5194/essd-11-1263-2019) where it was found to be a useful predictor of high latitude wetland FCH4.
 
 Define a function to take a number of years and return an index of months:
 
@@ -499,4 +500,23 @@ Output `Rpot_msc.nc`:
 ```{r}
 writeRaster(Rpot_msc, "/Volumes/LACIE SHARE/Stanford CH4/upch4_local/grids/computed/Rpot_msc.nc", format="CDF")
 ```
+
+##### **MODIS Data Pre-processing**
+
+**Description**
+Zutao Ouyang (Stanford University) extracted MODIS pixels at the FLUXNET-CH4 sites in April 2020, for 9 products:
+ 
+  + Daytime Land Surface Temperature (`LSTD` from **MOD11A2**) 
+      - *(not used as it is a correlate of nighttime temp., and nighttime is more applicable to soil conditions)*
+  + Nighttime Land Surface Temperature (`LSTN` from **MOD11A2**)
+  + Normalized Difference Vegetation Index (`NDVI` from **MOD09A1**)
+  + Enhanced Vegetation Index (`EVI` from **MOD09A1**)
+  + Leaf Area Index (`LAI` from **MCD15A2H**)
+      - This is modeled, not directly measured.
+  + Long Short Water Index (`LSWI`  from **MOD09A1**)
+  + Simple Ratio Water Index (`SRWI` from **MOD09A1**)
+  + Normalized Difference Water Index (`NDWI` from **MOD09A1**)
+  + Normalized Difference Snow Index (`NDSI`  from **MOD11A2**)
+
+
 
