@@ -19,6 +19,15 @@ library(oce) # for time series transformations
 source("code/ggplot_theme.R")
 ```
 
+**NOTE: This work flow uses many large files so most data is stored locally and requires hard filepaths**
+The local file path used for all large files is: `/Volumes/LACIE SHARE/Stanford CH4/upch4_local/`.
+
+Set the local head directory:
+
+```{r}
+loc <- "/Volumes/LACIE SHARE/Stanford CH4/upch4_local/"
+```
+
 #### Workflow
 
   1. Objective of Study
@@ -145,15 +154,6 @@ $~$
 
 #### 3. FLUXNET-CH4 Pre-Processing
 
-**NOTE: This work flow uses many large files so most data is stored locally and requires hard filepaths**
-The local file path used for all large files is: `/Volumes/LACIE SHARE/Stanford CH4/upch4_local/`.
-
-##### Set the local head directory:
-
-```{r}
-loc <- "/Volumes/LACIE SHARE/Stanford CH4/upch4_local/"
-```
-
 ##### Local machine steps:
 
   + Create a copy of FLUXNET-CH4 data and name it `/fluxnet-ch4-data-original`
@@ -211,7 +211,7 @@ names(hh) <- site.names
 hh2 <- hh
 ```
 
-##### Look at all and date columns (to see date and time format):
+##### Look at all column names (including TIMESTAMP columns, to see date and time format):
 
 ```{r}
 names(hh[[1]])
@@ -274,7 +274,7 @@ for (i in 1:length(hh)){
 head(hh[[1]])
 ```
 
-##### Convert `-9999`- to `NA`:
+##### Convert missing values (`-9999`) to `NA`:
 
 ```{r}
 for (i in 1:length(hh)){
@@ -391,10 +391,10 @@ for (i in 1:length(daily)) {
 }
 ```
 
-#### 3. (cont.) (re)Load Daily Data
+#### 3. FLUXNET-CH4 Pre-Processing (cont.) 
+##### (re)Load Daily Data
 
 ```{r message = F, warning = F}
-loc <- "/Volumes/LACIE SHARE/Stanford CH4/upch4_local/"
 files <- list.files(paste(loc, "fluxnet-ch4-data/daily_upch4/", sep = ""))
 daily <- lapply(paste(loc,"fluxnet-ch4-data/daily_upch4/",files, sep = ""), read_csv)
 ```
@@ -435,8 +435,7 @@ head(daily_subset)
 Pulled from [FLUXNET-CH4 Site Metadata](https://docs.google.com/spreadsheets/d/1DN0huLs-vVM3g_XcF1hBQrTpkKaGhzuWwaacfbe4iCo/edit#gid=1384338468)
 
 ```{r}
-metadata <- read_csv("/Volumes/LACIE SHARE/Stanford CH4/upch4_local/fluxnet-ch4-data/metadata/fluxnet-ch4-site-metadata.csv") 
-  
+metadata <- read_csv(paste(loc, "fluxnet-ch4-data/metadata/fluxnet-ch4-site-metadata.csv", sep = "")) 
 daily_subset_meta <- metadata %>% 
   mutate(ID = paste(substr(ID,1,2),substr(ID,4,6), sep="")) %>% 
   right_join(daily_subset, by = ("ID")) 
