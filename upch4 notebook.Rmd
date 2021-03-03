@@ -886,7 +886,7 @@ Land Cover (2 variables)
 Topography (10 variables)
 See: [Appendix: All Predictors](https://docs.google.com/spreadsheets/d/1DN0huLs-vVM3g_XcF1hBQrTpkKaGhzuWwaacfbe4iCo/edit#gid=0). Search for `EarthEnv` under column `Gridded Product`.
 
-First do texture:
+###### First do texture:
 
 ```{r}
 raster.names <- list.files(paste(loc, "grids/earthenv/texture/", sep = ""), pattern = "tif$", full.names = FALSE)
@@ -895,7 +895,7 @@ earthenv_texture <- as_tibble(raster::extract(stack, site.coords))
 names(earthenv_texture) <- c("cont","corr","cv","diss","entr","even","homo","max","rang","shan","simp","std","unif","var")
 ```
 
-Then land cover (commented code for first-run creates `HD` - human development -  as the sum of LC7 and LC9):
+###### Then land cover (commented code for first-run creates `HD` - human development -  as the sum of LC7 and LC9):
 
 ```{r}
 raster.names <- list.files(paste(loc, "grids/earthenv/cover/", sep = ""), pattern = "tif$", full.names = FALSE)
@@ -909,7 +909,7 @@ earthenv_cover <- as_tibble(raster::extract(stack, site.coords))
 names(earthenv_cover) <- c("HD7", "HD9", "HD")
 ```
 
-Then Topography:
+###### Then Topography:
 
 ```{r}
 raster.names <- list.files(paste(loc, "grids/earthenv/topography/", sep = ""), pattern = "tif$", full.names = FALSE)
@@ -918,10 +918,65 @@ earthenv_topography <- as_tibble(raster::extract(stack, site.coords))
 names(earthenv_topography) <- c("east","elev","flat","hollow","north","pcurv","rough","slope","tcurv","tpi")
 ```
 
-Now combine:
+###### Now combine:
 
 ```{r}
 earthenv <- cbind(sites, earthenv_texture, earthenv_cover, earthenv_topography)
+```
+
+###### Look at data histograms:
+
+```{r}
+earthenv %>% 
+  gather(key = "var", value = "value", 15:41) %>% 
+  ggplot(aes(value)) + 
+  geom_histogram() + 
+  facet_wrap(~var, scales = 'free')
+```
+
+`cont`, `diss`, and `var` have extreme outliers (xmax = 10e+09)
+
+###### Replace extreme outliers with median
+
+```{r}
+earthenv <- earthenv %>% 
+  gather(key = "var", value = "value", 15:41) %>% 
+  group_by(var) %>% 
+  mutate(value = ifelse(value > 10^9, median(value, na.rm = TRUE), value)) %>% 
+  ungroup() %>% 
+  spread(key = "var", value = "value")
+```
+
+Visualize again above to check they are corrected.
+
+###### Also check for missing data:
+
+```{r}
+earthenv %>% 
+  gather(key = "var", value = "value", 15:41) %>% 
+  mutate(missing = is.na(value)) %>% 
+  group_by(ID) %>% 
+  summarize(total = n(),
+            missing = sum(missing)) %>% 
+  arrange(desc(missing))
+```
+
+###### There are two sites (USDPW and USWPT) with missing values. Plot the sites:
+
+```{r}
+plot(stack[[1]])
+points(site.coords[sites$ID %in% c("USDPW", "USWPT"), ])
+```
+
+###### Fill with nearby site values. 
+
+USDPW from USLA1
+
+USWPT from USOWC
+
+```{r}
+earthenv[earthenv$ID == "USDPW", is.na(earthenv[earthenv$ID == "USDPW", ]) ] <- earthenv[earthenv$ID == "USLA1", is.na(earthenv[earthenv$ID == "USDPW", ]) ] 
+earthenv[earthenv$ID == "USWPT", is.na(earthenv[earthenv$ID == "USWPT", ]) ] <- earthenv[earthenv$ID == "USOWC", is.na(earthenv[earthenv$ID == "USWPT", ]) ] 
 ```
 
 ##### N and S Deposition
