@@ -850,7 +850,7 @@ site.num <- length(site.coords[,1])
 
 ```{r}
 raster.names <- list.files(paste(loc, "grids/global-canopy-height/", sep = ""), pattern = "tif$", full.names = FALSE)
-stack <- stack(raster.names)
+stack <- stack(paste(loc, "grids/global-canopy-height/", raster.names, sep = ""))
 canopyht <- as_tibble(raster::extract(stack, site.coords)) 
 canopyht <- cbind(sites, canopyht) %>% 
   rename(canopyht = Simard_Pinto_3DGlobalVeg_JGR)
@@ -869,6 +869,16 @@ head(Rpot)
 ```
 
 ##### Compound Topographic Index
+
+```{r}
+raster.names <- list.files(paste(loc, "grids/geomorpho90m/", sep = ""), pattern = "tif$", full.names = FALSE)
+stack <- stack(paste(loc, "grids/geomorpho90m/", raster.names, sep = ""))
+cti <- as_tibble(raster::extract(stack, site.coords)) 
+cti <- cbind(sites, cti) %>% 
+  rename(cti = dtm_cti_merit.dem_m_250m_s0cm_2018_v1.0)
+head(cti)
+```
+
 ##### Earth Environment
 ##### N and S Deposition
 ##### SoilGrids
