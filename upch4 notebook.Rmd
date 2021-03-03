@@ -879,8 +879,71 @@ cti <- cbind(sites, cti) %>%
 head(cti)
 ```
 
-##### Earth Environment
+##### Earth Environment Texture, Land Cover and Topography
+
+Texture (14 variables)
+Land Cover (2 variables)
+Topography (10 variables)
+See: [Appendix: All Predictors](https://docs.google.com/spreadsheets/d/1DN0huLs-vVM3g_XcF1hBQrTpkKaGhzuWwaacfbe4iCo/edit#gid=0). Search for `EarthEnv` under column `Gridded Product`.
+
+First do texture:
+
+```{r}
+raster.names <- list.files(paste(loc, "grids/earthenv/texture/", sep = ""), pattern = "tif$", full.names = FALSE)
+stack <- stack(paste(loc, "grids/earthenv/texture/", raster.names, sep = ""))
+earthenv_texture <- as_tibble(raster::extract(stack, site.coords)) 
+names(earthenv_texture) <- c("cont","corr","cv","diss","entr","even","homo","max","rang","shan","simp","std","unif","var")
+```
+
+Then land cover (commented code for first-run creates `HD` - human development -  as the sum of LC7 and LC9):
+
+```{r}
+raster.names <- list.files(paste(loc, "grids/earthenv/cover/", sep = ""), pattern = "tif$", full.names = FALSE)
+stack <- stack(paste(loc, "grids/earthenv/cover/", raster.names, sep = ""))
+
+# # create `HD` (human development)
+# HD <- stack[[1]] + stack[[2]]
+# writeRaster(HD, paste(loc, "/grids/earthenv/cover/HD.tiff", overwrite = T))
+
+earthenv_cover <- as_tibble(raster::extract(stack, site.coords)) 
+names(earthenv_cover) <- c("HD7", "HD9", "HD")
+```
+
+Then Topography:
+
+```{r}
+raster.names <- list.files(paste(loc, "grids/earthenv/topography/", sep = ""), pattern = "tif$", full.names = FALSE)
+stack <- stack(paste(loc, "grids/earthenv/topography/", raster.names, sep = ""))
+earthenv_topography <- as_tibble(raster::extract(stack, site.coords)) 
+names(earthenv_topography) <- c("east","elev","flat","hollow","north","pcurv","rough","slope","tcurv","tpi")
+```
+
+Now combine:
+
+```{r}
+earthenv <- cbind(sites, earthenv_texture, earthenv_cover, earthenv_topography)
+```
+
 ##### N and S Deposition
+
+From [Lamarque et al. 2013](10.5194/acp-13-7997-2013):
+
+  - accmip_nhx_acchist_2000.nc
+  - accmip_noy_acchist_2000.nc
+  - accmip_sox_acchist_2000.nc
+
+```{r}
+raster.names <- list.files(paste(loc, "grids/ns-deposition/", sep = ""), pattern = "nc$", full.names = FALSE)
+stack <- stack(paste(loc, "grids/ns-deposition/", raster.names, sep = ""))
+plot(stack[[3]])
+ns_depo <- as_tibble(raster::extract(stack, site.coords)) 
+ns_depo <- cbind(sites, ns_depo) %>% 
+  rename(nx_depo = Dry.deposition.NH3.NH4,
+         ny_dep = Dry.deposition.NOy,
+         s_dep = Dry.deposition.SO2.SO4)
+head(ns_depo)
+```
+
 ##### SoilGrids
 ##### TerraClimate
 ##### Fractional Vegetation Cover (VCF)
