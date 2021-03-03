@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Load packages and ggplot theme:
 
-```{r}
+```{r message = F}
 library(tidyverse) 
 library(lubridate)
 library(raster)
@@ -126,12 +126,12 @@ $~$
 
 **FLUXNET-CH4 Data**
 
-The eddy covariance data used in this study are publicly available as part of the FLUXNET-CH4 community product V1.0 at [fluxnet.org](https://fluxnet.org/data/fluxnet-ch4-community-product/). The FLUXNET-CH4 synthesis activity is introduced in [Knox et al. 2019](10.1175/BAMS-D-18-0268.1) along with a detailed description of the eddy covariance post-processing steps including methane flux (FCH4) uncertainties. The first full (V1.0) database release (FLUXNET-CH4, hereafter) is described for 81 sites, and used for a wetland seasonality analysis in [Delwiche et al. in review](10.5194/essd-2020-307). **Data for this analysis were downloaded from fluxnet.org on Feb 22, 2021. [Download Manifest](https://docs.google.com/spreadsheets/d/1--_-XyBqsyiMIdc6JXqhilOOYFLeaY-UTMFhhI4Sd5M/edit#gid=0)**
+The eddy covariance data used in this study are publicly available as part of the FLUXNET-CH4 community product V1.0 at [fluxnet.org](https://fluxnet.org/data/fluxnet-ch4-community-product/). The FLUXNET-CH4 synthesis activity is introduced in [Knox et al. 2019](10.1175/BAMS-D-18-0268.1) along with a detailed description of the eddy covariance post-processing steps including methane flux (FCH4) uncertainties. The first full (V1.0) dataset release (FLUXNET-CH4, hereafter) is described for 81 sites and is used in a wetland seasonality analysis in [Delwiche et al. in review](10.5194/essd-2020-307). **Data for this CH4 Upscaling Project were downloaded from [fluxnet.org](www.fluxnet.org) on Feb 22, 2021. [Download Manifest](https://docs.google.com/spreadsheets/d/1--_-XyBqsyiMIdc6JXqhilOOYFLeaY-UTMFhhI4Sd5M/edit#gid=0)**
 
 Links:
 
-  - [FLUXNET-CH4 Site Metadata](https://docs.google.com/spreadsheets/d/1DN0huLs-vVM3g_XcF1hBQrTpkKaGhzuWwaacfbe4iCo/edit#gid=1384338468)
-  - Permission was received via email on Feb 22, 2021, to use Tier 2 Data Policy sites in this study (SE-St1 and RU-Vrk; PI Thomas Friborg)
+  - [FLUXNET-CH4 Site (81) Metadata](https://docs.google.com/spreadsheets/d/1DN0huLs-vVM3g_XcF1hBQrTpkKaGhzuWwaacfbe4iCo/edit#gid=1384338468)
+  - Permission was received via email on Feb 22, 2021, to use *Tier 2 Data Policy* sites in this study (SE-St1 and RU-Vrk; PI Thomas Friborg)
   - FLUXNET-CH4 data were used both for methane fluxes (FCH4; target variable) and tower-measured bio-meteorological variables (e.g., LE, GPP, TA; predictors)
       + Link to [FLUXNET.org variable descriptions](https://fluxnet.org/data/fluxnet-ch4-community-product/data-variables/)
   
@@ -139,7 +139,7 @@ $~$
   
 **Gridded Data (Predictors)**
 
-A summary of predictors (`Predictor Summary`) is available [here](https://docs.google.com/spreadsheets/d/1DN0huLs-vVM3g_XcF1hBQrTpkKaGhzuWwaacfbe4iCo/edit#gid=0), as well as an appendix (`Appendix: All Predictors`) table with all individual predictors. Candidate predictors were drawn from a mix of source classes (EC tower measurements, models, computations from observed data, or remote sensing) and information content groups (spatial-only or spatio-temporal) and at different temporal frequencies (Static, Yearly, Monthly, Weekly, or Half-hourly) . Using this information, we assigned each candidate predictor to a class (Generic, Climate, Biometeorological, Land Cover, Soil and Relief, or Greenness). For MODIS predictors, we computed the mean seasonal cycle (msc), and yearly mean, min, max, and amplitude parameters, as in [Tramontana et al. (2016)](10.5194/bg-13-4291-2016) and [Jung et al. (2020)](10.5194/bg-17-1343-2020). For derived TerraClimate soil moisture and actual evapotranspiration (aet) we computed the interannual range and annual seasonality. More information is provided in the manuscript.
+A summary of predictors (`Predictor Summary`) is available [here](https://docs.google.com/spreadsheets/d/1DN0huLs-vVM3g_XcF1hBQrTpkKaGhzuWwaacfbe4iCo/edit#gid=0), as well as an appendix table with all individual predictors (`Appendix: All Predictors`). Candidate predictors were drawn from a mix of source classes (EC tower measurements, global models, computations from observed data, or remote sensing (e.g. NASA MODIS)), different information content groups (Spatial-only or Spatio-temporal), and at different temporal frequencies (Static, Yearly, Monthly, Weekly, or Half-hourly). Using this information, we assigned each candidate predictor to a class (Generic, Climate, Biometeorological, Land Cover, Soil and Relief, or Greenness) to evaluate predictive power of particular classes, given the likelihood for redundancy in useful predictors across the full predictor set. For MODIS predictors, we computed the mean seasonal cycle (`_msc`), and yearly mean, min, max, and amplitude parameters, as in [Tramontana et al. (2016)](10.5194/bg-13-4291-2016) and [Jung et al. (2020)](10.5194/bg-17-1343-2020). For derived TerraClimate soil moisture and actual evapotranspiration (aet) we computed the interannual range and annual seasonality. More information on preprocessing of predictors is provided in the manuscript.
 
 $~$
 
