@@ -471,7 +471,7 @@ create_msc_index <- function(years) {
 Load in Rpot and create msc index for 19 years.
 
 ```{r}
-Rpot <- brick("/Volumes/LACIE SHARE/Stanford CH4/upch4_local/grids/computed/Rpot.nc")
+Rpot <- brick(paste(loc, "grids/computed/Rpot.nc", sep = ""))
 msc_index <- create_msc_index(19)
 ```
 
@@ -493,7 +493,7 @@ Rpot_msc <- stack(Rpot_msc)
 Output `Rpot_msc.nc`:
 
 ```{r}
-writeRaster(Rpot_msc, "/Volumes/LACIE SHARE/Stanford CH4/upch4_local/grids/computed/Rpot_msc.nc", format="CDF")
+writeRaster(Rpot_msc, paste(loc, "grids/computed/Rpot_msc.nc", sep = ""), format="CDF")
 ```
 
 #### *MODIS*
@@ -519,7 +519,7 @@ Zutao Ouyang (Stanford University) extracted MODIS pixels at the FLUXNET-CH4 sit
 ##### Get file local file names/paths for 8-day extracted MODIS data:
 
 ```{r}
-setwd("/Volumes/LACIE SHARE/Stanford CH4/upch4_local/modis/modis-extracted")
+setwd(paste(loc, "/modis/modis-extracted", sep = ""))
 files <- list.files()
 ```
 
@@ -532,7 +532,7 @@ modis.names <- c("LSTD", "EVI", "LAI", "LSWI", "NDSI", "NDVI", "NDWI", "LSTN", "
 ##### Read files:
 
 ```{r echo = F}
-modis <- lapply(paste("/Volumes/LACIE SHARE/Stanford CH4/upch4_local/modis/modis-extracted/", files, sep = ""), read_csv)
+modis <- lapply(paste(loc, "/modis/modis-extracted/", files, sep = ""), read_csv)
 names(modis) <- modis.names
 str(modis)
 ```
@@ -659,7 +659,7 @@ modis_dsp_nas %>%
          LSTN = LSTN - LSTN_dsp) %>% 
   dplyr::select(-ID) %>% 
   summarize_all(list(~sum(.))) %>% 
-  write.csv("/Volumes/LACIE SHARE/Stanford CH4/upch4_local/modis/modis-qc/despiking_na_effects.csv")
+  write.csv(paste(loc, "/modis/modis-qc/despiking_na_effects.csv")
 ```
 
 
@@ -808,7 +808,7 @@ for (i in 1:length(names)){
     geom_line(aes(Month, value_msc), col = 'purple', size = 2) +
     facet_wrap(~ID, scales = 'free', ncol = 9) +
     my_theme
-  ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/upch4_local/modis/modis-qc/", names[i], "_1.pdf", sep = ""),
+  ggsave(paste(loc, "/modis/modis-qc/", names[i], "_1.pdf", sep = ""),
          width = 50, height = 30, units = c("cm"), dpi = 300)
   
   # visualize 46-86
@@ -820,7 +820,7 @@ for (i in 1:length(names)){
     geom_line(aes(Month, value_msc), col = 'purple', size = 2) +
     facet_wrap(~ID, scales = 'free', ncol = 9) +
     my_theme
-  ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/upch4_local/modis/modis-qc/", names[i], "_2.pdf", sep = ""),
+  ggsave(paste(loc, "/modis/modis-qc/", names[i], "_2.pdf", sep = ""),
          width = 50, height = 30, units = c("cm"), dpi = 300)
   
 }
@@ -829,33 +829,27 @@ for (i in 1:length(names)){
 ##### Output processed MODIS data:
 
 ```{r}
-write.csv(modis_frozen, "/Volumes/LACIE SHARE/Stanford CH4/upch4_local/modis/modis-processed/modis-processed.csv",
+write.csv(modis_frozen, paste(loc, "/modis/modis-processed/modis-processed.csv",
           row.names = FALSE)
 ```
-
-
-
-
 
 #### *Grid Extraction* 
 
 **Extract geospatial data at FLUXNET-CH4 sites and output a single geospatial .csv.**
 
-Load site metadata (ID, Latitude, Longitude), applicable to all extractions:
+##### Load site metadata (ID, Latitude, Longitude), applicable to all extractions:
 
 ```{r}
-sites <- read_csv("/Volumes/LACIE SHARE/Stanford CH4/upch4_local/fluxnet-ch4-data/metadata/fluxnet-ch4-site-metadata.csv") %>% 
-  mutate(ID = paste(substr(ID, 1, 2), substr(ID, 4, 6), sep = "")) 
+sites <- read_csv(paste(loc, "fluxnet-ch4-data/metadata/fluxnet-ch4-site-metadata.csv", sep = "")) %>% 
+  mutate(ID = paste(substr(ID, 1, 2), substr(ID, 4, 6), sep = ""))
 site.coords <- cbind(sites$Longitude, sites$Latitude) # (x, y)
 site.num <- length(site.coords[,1])
 ```
+
 ##### Global Canopy Height
 
 ```{r}
-loc <- "/Volumes/LACIE SHARE/Stanford CH4/upch4_local/grids/global-canopy-height/"
-
-setwd(loc)
-raster.names <-list.files(loc, pattern = "tif$", full.names = FALSE)
+raster.names <- list.files(paste(loc, "grids/global-canopy-height/", sep = ""), pattern = "tif$", full.names = FALSE)
 stack <- stack(raster.names)
 canopyht <- as_tibble(raster::extract(stack, site.coords)) 
 canopyht <- cbind(sites, canopyht) %>% 
@@ -866,7 +860,7 @@ head(canopyht)
 ##### Computed (Rpot)
 
 ```{r}
-stack <- stack("/Volumes/LACIE SHARE/Stanford CH4/upch4_local/grids/computed/Rpot_msc.nc")
+stack <- stack(paste(loc, "grids/computed/Rpot_msc.nc", sep = ""))
 Rpot <- as_tibble(raster::extract(stack, site.coords)) 
 Rpot <- cbind(sites, Rpot) %>% 
   gather(key = "Month", value = "Rpot", 15:26) %>% 
