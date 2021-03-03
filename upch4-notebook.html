@@ -195,7 +195,7 @@ summary {
 </div>
 
 
-<p>Load packages:</p>
+<p>Load packages and ggplot theme:</p>
 <pre class="r"><code>library(tidyverse)</code></pre>
 <pre><code>## ── Attaching packages ─────────────────────────────────────── tidyverse 1.3.0 ──</code></pre>
 <pre><code>## ✓ ggplot2 3.3.3     ✓ purrr   0.3.4
@@ -205,6 +205,13 @@ summary {
 <pre><code>## ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
 ## x dplyr::filter() masks stats::filter()
 ## x dplyr::lag()    masks stats::lag()</code></pre>
+<pre class="r"><code>library(lubridate)</code></pre>
+<pre><code>## 
+## Attaching package: &#39;lubridate&#39;</code></pre>
+<pre><code>## The following objects are masked from &#39;package:base&#39;:
+## 
+##     date, intersect, setdiff, union</code></pre>
+<pre class="r"><code>source(&quot;code/ggplot_theme.R&quot;)</code></pre>
 <div id="workflow" class="section level2">
 <h2>Workflow</h2>
 <ol style="list-style-type: decimal">
@@ -408,6 +415,365 @@ one_site &lt;- read_csv(paste(loc, &quot;fluxnet-ch4-data/daily/&quot;, files[1]
 ## #   LE_F_ANNOPTLM &lt;dbl&gt;, NEE_F_ANNOPTLM &lt;dbl&gt;, FCH4_F_ANNOPTLM &lt;dbl&gt;,
 ## #   FCH4_F_ANNOPTLM_QC &lt;dbl&gt;</code></pre>
 <p>No, but there is a quality flag <code>_QC</code>. <code>1</code>= data gap shorter than 2 months, <code>3</code> = gap exceeds 2 months.</p>
+<p>Clear work space:</p>
+<pre class="r"><code>rm(one_site)</code></pre>
+<p>Get FLUXNET-CH4 site names:</p>
+<pre class="r"><code>site.names &lt;- paste( substr(files, 5, 6), substr(files, 8, 10), sep = &quot;&quot;)</code></pre>
+<p>Get all flux data:</p>
+<pre class="r"><code>daily &lt;- lapply(paste(loc, &quot;fluxnet-ch4-data/daily/&quot;, files, sep = &quot;&quot;), read_csv)</code></pre>
+<pre><code>## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.
+## 
+## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   .default = col_double()
+## )
+## ℹ Use `spec()` for the full column specifications.</code></pre>
+<pre class="r"><code>names(daily) &lt;- site.names
+# str(daily)</code></pre>
+<p>Create a pristine replicate:</p>
+<pre class="r"><code>daily2 &lt;- daily</code></pre>
+<p>Look at date columns:</p>
+<pre class="r"><code>names(daily[[1]])</code></pre>
+<pre><code>##  [1] &quot;TIMESTAMP&quot;          &quot;NEE&quot;                &quot;H&quot;                 
+##  [4] &quot;LE&quot;                 &quot;FCH4&quot;               &quot;USTAR&quot;             
+##  [7] &quot;SW_IN&quot;              &quot;SW_OUT&quot;             &quot;LW_IN&quot;             
+## [10] &quot;LW_OUT&quot;             &quot;NETRAD&quot;             &quot;PPFD_IN&quot;           
+## [13] &quot;PPFD_OUT&quot;           &quot;VPD&quot;                &quot;RH&quot;                
+## [16] &quot;PA&quot;                 &quot;TA&quot;                 &quot;P&quot;                 
+## [19] &quot;TS_1&quot;               &quot;TS_2&quot;               &quot;G&quot;                 
+## [22] &quot;WTD&quot;                &quot;GPP_NT&quot;             &quot;RECO_NT&quot;           
+## [25] &quot;GPP_DT&quot;             &quot;RECO_DT&quot;            &quot;WD&quot;                
+## [28] &quot;WS&quot;                 &quot;NEE_F&quot;              &quot;H_F&quot;               
+## [31] &quot;LE_F&quot;               &quot;FCH4_F&quot;             &quot;SW_IN_F&quot;           
+## [34] &quot;SW_OUT_F&quot;           &quot;LW_IN_F&quot;            &quot;LW_OUT_F&quot;          
+## [37] &quot;NETRAD_F&quot;           &quot;VPD_F&quot;              &quot;RH_F&quot;              
+## [40] &quot;PA_F&quot;               &quot;TA_F&quot;               &quot;P_F&quot;               
+## [43] &quot;WTD_F&quot;              &quot;WS_F&quot;               &quot;LE_F_ANNOPTLM&quot;     
+## [46] &quot;NEE_F_ANNOPTLM&quot;     &quot;FCH4_F_ANNOPTLM&quot;    &quot;FCH4_F_ANNOPTLM_QC&quot;</code></pre>
+<pre class="r"><code>head(daily[[1]]$TIMESTAMP)</code></pre>
+<pre><code>## [1] 20131206 20131207 20131208 20131209 20131210 20131211</code></pre>
+<p>Write and apply function to expand <code>TIMESTAMP</code> into<code>Year</code>, <code>Month</code>, <code>Week</code>, <code>Day</code>, and <code>DOY</code> variables to facilitate merging with other data:</p>
+<pre class="r"><code>fix_weeks &lt;- function(daily_data) {
+  daily_data &lt;- daily_data %&gt;% 
+  mutate(Year = as.numeric(substr(TIMESTAMP, 1, 4)),
+         Month = as.numeric(substr(TIMESTAMP, 5, 6)),
+         Day = as.numeric(substr(TIMESTAMP, 7, 8)),
+         Date = make_date(Year, Month, Day),
+         DOY = yday(Date),
+         Week = ceiling(DOY/7),
+         Week = ifelse(Week == 53, 52, Week)) %&gt;% 
+  dplyr::select(Year, Month, Week, Day, DOY, everything(), - Date, -TIMESTAMP)
+}
+
+daily &lt;- lapply(daily, fix_weeks)
+# daily[[11]] # check it worked</code></pre>
 </div>
 </div>
 

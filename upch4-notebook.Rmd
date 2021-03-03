@@ -990,6 +990,7 @@ From [Lamarque et al. 2013](10.5194/acp-13-7997-2013):
 ```{r}
 raster.names <- list.files(paste(loc, "grids/ns-deposition/", sep = ""), pattern = "nc$", full.names = FALSE)
 stack <- stack(paste(loc, "grids/ns-deposition/", raster.names, sep = ""))
+plot(stack[[3]])
 ns_depo <- as_tibble(raster::extract(stack, site.coords)) 
 ns_depo <- cbind(sites, ns_depo) %>% 
   rename(nx_depo = Dry.deposition.NH3.NH4,
