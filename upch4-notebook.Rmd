@@ -199,7 +199,7 @@ site.names <- paste( substr(files, 5, 6), substr(files, 8, 10), sep = "")
 
 ##### Get all **half-hourly** flux data: (this will take a few minutes)
 
-```{r echo = F}
+```{r echo = F, message = F, warning = F}
 hh <- lapply(paste(loc, "fluxnet-ch4-data/hh/", files, sep = ""), read_csv)
 names(hh) <- site.names
 # str(hh)
@@ -362,7 +362,7 @@ daily <- lapply(hh, compute_daily1)
 
 Get sum of precip.
 
-```{r warning = F}
+```{r warning = F, message = F}
 sum_precip <- function(hh_data) {
   hh_data <- hh_data %>% 
     group_by(ID, Year, DOY) %>% 
@@ -531,7 +531,7 @@ modis.names <- c("LSTD", "EVI", "LAI", "LSWI", "NDSI", "NDVI", "NDWI", "LSTN", "
 
 ##### Read files:
 
-```{r echo = F}
+```{r echo = F, warning = F, message = F}
 modis <- lapply(paste(loc, "/modis/modis-extracted/", files, sep = ""), read_csv)
 names(modis) <- modis.names
 str(modis)
@@ -736,7 +736,7 @@ modis_frozen <- modis_gapfilled %>%
 
 ##### Compute mean, min, max, amplitude:
 
-```{r message = F}
+```{r message = F, warning = F}
 modis_frozen <- modis_frozen %>% 
   group_by(ID, Year) %>% 
   mutate(NDSI_mean = mean(NDSI_F, na.rm=TRUE),
@@ -796,7 +796,7 @@ names_msc <- paste(names, "_msc", sep = "")
 
 ##### Create modis qcqa figures:
 
-```{r message = F}
+```{r message = F, warning = F}
 for (i in 1:length(names)){
   
   # visualize 1-45
