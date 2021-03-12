@@ -1013,6 +1013,105 @@ head(ns_depo)
 ```{r}
 raster.names <- list.files(paste(loc, "grids/soilgrids/", sep = ""), pattern = "tif$", full.names = FALSE)
 stack <- stack(paste(loc, "grids/soilgrids/", raster.names, sep = ""))
+# plot(stack[[3]])
+soilgrids <- as_tibble(raster::extract(stack, site.coords)) 
+soilgrids <- cbind(sites, soilgrids) %>% 
+  rename(awc = AWCh3_M_sl2_250m_ll,
+         bd = BLDFIE_M_sl2_250m_ll,
+         clay = CLYPPT_M_sl2_250m_ll,
+         hist = HISTPR_250m_ll,
+         ocd = OCDENS_M_sl2_250m_ll,
+         ph = PHIHOX_M_sl2_250m_ll)
+head(soilgrids)
+```
+
+###### Check for missing soilgrids data:
+
+```{r}
+soilgrids %>% 
+  gather(key = "var", value = "value", 15:20) %>% 
+  mutate(missing = is.na(value)) %>% 
+  group_by(ID) %>% 
+  summarize(total = n(),
+            missing = sum(missing)) %>% 
+  arrange(desc(missing))
+```
+###### Check locations of DEDgw and USDPW by cropping raster:
+
+```{r}
+# site.coords[sites$ID %in% c("DEDgw", "USDPW"),]
+DEDgw_bb <- c( "xmin" =  13.05427 - 0.1, "xmax" = 13.05427 + 0.1, 
+               "ymin" = 53.15141 - 0.1 , "ymax" =  53.15141 + 0.1)
+USDPW_bb <- c( "xmin" =  -81.43611 - 0.1, "xmax" = -81.43611 + 0.1,
+               "ymin" = 28.05206 - 0.1 , "ymax" =  28.05206 + 0.1)
+DEDgw_loc <- crop(stack[[1]], DEDgw_bb)
+USDPW_loc <- crop(stack[[1]], USDPW_bb)
+```
+
+###### First check DEDgw
+
+```{r}
+plot(DEDgw_loc)
+points(site.coords)
+```
+
+###### Then check USDPW
+
+```{r}
+plot(USDPW_loc)
+points(site.coords)
+```
+By chance these two sites fall on NA pixels, by being close to water bodies.
+
+###### Shift latitude by 0.005-degrees N
+
+```{r}
+sites.temp <- sites %>% 
+  filter(ID %in% c("DEDgw","USDPW")) %>% 
+  mutate(Latitude = Latitude + 0.005)
+site.coords.temp <- sites.temp %>% 
+  dplyr::select(Longitude, Latitude) %>% 
+  unname() %>% as.matrix()
+```
+
+###### Extract only these two lat-adjusted sites
+
+```{r}
+soilgrids.temp <- as_tibble(raster::extract(stack, site.coords.temp)) 
+soilgrids.temp <- cbind(sites.temp, soilgrids.temp) %>% 
+  rename(awc = AWCh3_M_sl2_250m_ll,
+         bd = BLDFIE_M_sl2_250m_ll,
+         clay = CLYPPT_M_sl2_250m_ll,
+         hist = HISTPR_250m_ll,
+         ocd = OCDENS_M_sl2_250m_ll,
+         ph = PHIHOX_M_sl2_250m_ll)
+head(soilgrids.temp)
+```
+###### Rejoin
+
+```{r}
+soilgrids <- soilgrids %>% 
+  bind_rows(soilgrids.temp) %>% 
+  arrange(ID)
+```
+
+
+```
+
+##### TerraClimate
+
+2 products:
+  
+  - Soil Moisture (soilwater and soilwaterR (range), soilwaterS (annual seasonality))
+  - Actual Evapotranspiration (aet and aetR, aetS)
+  
+###### Get Soil Moisture first
+  
+```{r}
+raster.names <- list.files(paste(loc, "grids/terraclimate/soil/", sep = ""), 
+                           pattern = "nc$", 
+                           full.names = FALSE)
+stack <- stack(paste(loc, "grids/terraclimate/soil/", raster.names, sep = ""))
 plot(stack[[3]])
 soilgrids <- as_tibble(raster::extract(stack, site.coords)) 
 soilgrids <- cbind(sites, soilgrids) %>% 
@@ -1025,7 +1124,6 @@ soilgrids <- cbind(sites, soilgrids) %>%
 head(soilgrids)
 ```
 
-##### TerraClimate
 ##### Fractional Vegetation Cover (VCF)
 ##### Wetland Extent (WAD2M)
 ##### WorldClim 2.0
