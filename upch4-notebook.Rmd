@@ -1000,6 +1000,31 @@ head(ns_depo)
 ```
 
 ##### SoilGrids
+
+6 products:
+
+  - BLDFIE_M_sl2_250m_II.tif (bulk density)
+  - OCDENS_M_sl2_250m_II.tif (organic carbon density)
+  - PHIHOX_M_sl2_250m_II.tif (soil pH)
+  - CLYPPT_M_sl2_250m_II.tif (proportion of clay particles)
+  - AWCh3_M_sl2_250m_II.tif (soil water holding capacity)
+  - HISTPR_250m_II.tif (histogram abundance)
+
+```{r}
+raster.names <- list.files(paste(loc, "grids/soilgrids/", sep = ""), pattern = "tif$", full.names = FALSE)
+stack <- stack(paste(loc, "grids/soilgrids/", raster.names, sep = ""))
+plot(stack[[3]])
+soilgrids <- as_tibble(raster::extract(stack, site.coords)) 
+soilgrids <- cbind(sites, soilgrids) %>% 
+  rename(awc = AWCh3_M_sl2_250m_ll,
+         bd = BLDFIE_M_sl2_250m_ll,
+         clay = CLYPPT_M_sl2_250m_ll,
+         hist = HISTPR_250m_ll,
+         ocd = OCDENS_M_sl2_250m_ll,
+         ph = PHIHOX_M_sl2_250m_ll)
+head(soilgrids)
+```
+
 ##### TerraClimate
 ##### Fractional Vegetation Cover (VCF)
 ##### Wetland Extent (WAD2M)
