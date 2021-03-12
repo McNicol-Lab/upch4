@@ -1171,9 +1171,6 @@ soilgrids <- soilgrids %>%
   arrange(ID)
 ```
 
-
-```
-
 ##### TerraClimate
 
 2 products:
@@ -1181,24 +1178,112 @@ soilgrids <- soilgrids %>%
   - Soil Moisture (soilwater and soilwaterR (range), soilwaterS (annual seasonality))
   - Actual Evapotranspiration (aet and aetR, aetS)
   
-###### Get Soil Moisture first
+###### Read Actual Evapotranspiration grids
   
+```{r, message = F, warning = F}
+raster.names <- list.files(paste(loc, "grids/terraclimate/aet/", sep = ""), pattern = "nc$", full.names = FALSE)
+stack <- stack(paste(loc, "grids/terraclimate/aet/", raster.names, sep = ""))
+plot(stack[[3]])
+```
+###### Extract Actual Evapotranspiration grids
+
 ```{r}
-raster.names <- list.files(paste(loc, "grids/terraclimate/soil/", sep = ""), 
-                           pattern = "nc$", 
-                           full.names = FALSE)
+# extract data at sites
+terraclimate.aet <- as_tibble(raster::extract(stack, site.coords))
+
+# create new name vector
+x <- c(as.character(c(1:216)))
+
+# rename to retain order
+terraclimate.aet <- terraclimate.aet %>% as_tibble() %>% 
+  rename_all(~x)
+
+# look at combined data
+terraclimate.aet <- cbind(sites,terraclimate.aet)
+head(terraclimate.aet)
+```
+
+###### Finalize Actual Evapotranspiration
+
+```{r}
+terraclimate.aet <- terraclimate.aet %>%
+  gather(key = Month, value = aet, 15:length(terraclimate.aet)) %>% 
+  mutate(Month = as.numeric(Month), 
+         aet = as.numeric(aet)) %>% 
+  arrange(ID, Month) %>% 
+  mutate(Year = floor((Month - 0.1) / 12 + 2001)) %>% 
+  group_by(ID, Year) %>% 
+  mutate(Month = 1:n()) %>% 
+  mutate(aetS = (aet - min(aet, na.rm = TRUE)) / (max(aet, na.rm = TRUE) - min(aet, na.rm = TRUE)),
+         aetR = max(aet)-min(aet))
+```
+
+###### Read Soil Water grids
+  
+```{r, message = F, warning = F}
+raster.names <- list.files(paste(loc, "grids/terraclimate/soil/", sep = ""), pattern = "nc$", full.names = FALSE)
 stack <- stack(paste(loc, "grids/terraclimate/soil/", raster.names, sep = ""))
 plot(stack[[3]])
-soilgrids <- as_tibble(raster::extract(stack, site.coords)) 
-soilgrids <- cbind(sites, soilgrids) %>% 
-  rename(awc = AWCh3_M_sl2_250m_ll,
-         bd = BLDFIE_M_sl2_250m_ll,
-         clay = CLYPPT_M_sl2_250m_ll,
-         hist = HISTPR_250m_ll,
-         ocd = OCDENS_M_sl2_250m_ll,
-         ph = PHIHOX_M_sl2_250m_ll)
-head(soilgrids)
 ```
+
+###### Extract Soil Water grids
+
+```{r}
+# extract data at sites
+terraclimate.soilwater <- as_tibble(raster::extract(stack, site.coords))
+
+# create new name vector
+x <- c(as.character(c(1:216)))
+
+# rename to retain order
+terraclimate.soilwater <- terraclimate.soilwater %>% as_tibble() %>% 
+  rename_all(~x)
+
+# look at combined data
+terraclimate.soilwater <- cbind(sites,terraclimate.soilwater)
+head(terraclimate.soilwater)
+```
+
+###### Finalize soilwater data
+
+```{r}
+terraclimate.soilwater <- terraclimate.soilwater %>%
+  gather(key = Month, value = soilwater, 15:length(terraclimate.soilwater)) %>% 
+  mutate(Month = as.numeric(Month),
+         soilwater = as.numeric(soilwater)) %>% 
+  arrange(ID, Month) %>% 
+  mutate(Year = floor((Month-0.1)/12+2001)) %>% 
+  group_by(ID, Year) %>% 
+  mutate(Month = 1:n()) %>% 
+  mutate(soilwaterS = (soilwater-min(soilwater,na.rm=TRUE))/(max(soilwater,na.rm=TRUE)-min(soilwater,na.rm=TRUE)),
+         soilwaterR = max(soilwater)-min(soilwater)) %>% 
+  mutate(soilwaterS = ifelse(soilwaterR == 0 & is.na(soilwaterS), 0.5, soilwaterS))
+
+```
+
+###### Combined aet and soilwater
+
+```{r}
+# combine both aet and soilwater
+terraclimate <- terraclimate.aet %>% 
+  left_join(terraclimate.soilwater) %>% 
+  dplyr::select(1:14, 17, 15, aet, aetS, aetR, soilwater, soilwaterS, soilwaterR)
+head(terraclimate)
+```
+
+###### Check for missing data
+
+```{r}
+terraclimate %>% 
+  gather(key = "var", value = "value", 15:20) %>% 
+  mutate(missing = is.na(value)) %>% 
+  group_by(ID) %>% 
+  summarize(total = n(),
+            missing = sum(missing)) %>% 
+  arrange(desc(missing))
+```
+
+
 
 ##### Fractional Vegetation Cover (VCF)
 ##### Wetland Extent (WAD2M)
