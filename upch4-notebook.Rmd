@@ -1087,11 +1087,12 @@ soilgrids.temp <- cbind(sites.temp, soilgrids.temp) %>%
          ph = PHIHOX_M_sl2_250m_ll)
 head(soilgrids.temp)
 ```
-###### Rejoin
+###### Rejoin soilgrids
 
 ```{r}
 soilgrids <- soilgrids %>% 
-  bind_rows(soilgrids.temp) %>% 
+  filter(!is.na(bd)) %>% 
+  bind_rows(soilgrids.temp) %>%
   arrange(ID)
 ```
 
