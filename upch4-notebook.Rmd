@@ -857,6 +857,19 @@ canopyht <- cbind(sites, canopyht) %>%
 head(canopyht)
 ```
 
+###### Check for missing data
+
+```{r}
+canopyht %>% 
+  mutate(missing = is.na(canopyht)) %>% 
+  group_by(ID) %>% 
+  summarize(total = n(),
+            missing = sum(missing)) %>% 
+  arrange(desc(missing))
+```
+
+No missing data
+
 ##### Computed (Rpot)
 
 ```{r}
@@ -868,6 +881,18 @@ Rpot <- cbind(sites, Rpot) %>%
 head(Rpot)
 ```
 
+###### Check for missing data
+
+```{r}
+Rpot %>% 
+  mutate(missing = is.na(Rpot)) %>% 
+  group_by(ID) %>% 
+  summarize(total = n(),
+            missing = sum(missing)) %>% 
+  arrange(desc(missing))
+```
+No missing data
+
 ##### Compound Topographic Index
 
 ```{r}
@@ -878,6 +903,22 @@ cti <- cbind(sites, cti) %>%
   rename(cti = dtm_cti_merit.dem_m_250m_s0cm_2018_v1.0)
 head(cti)
 ```
+
+No missing data
+
+###### Check for missing data
+
+```{r}
+cti %>% 
+  mutate(missing = is.na(cti)) %>% 
+  group_by(ID) %>% 
+  summarize(total = n(),
+            missing = sum(missing)) %>% 
+  arrange(desc(missing))
+
+```
+
+No missing data
 
 ##### Earth Environment Texture, Land Cover and Topography
 
@@ -987,17 +1028,51 @@ From [Lamarque et al. 2013](10.5194/acp-13-7997-2013):
   - accmip_noy_acchist_2000.nc
   - accmip_sox_acchist_2000.nc
 
-```{r}
+```{r message = F, warning = F}
 raster.names <- list.files(paste(loc, "grids/ns-deposition/", sep = ""), pattern = "nc$", full.names = FALSE)
 stack <- stack(paste(loc, "grids/ns-deposition/", raster.names, sep = ""))
-plot(stack[[3]])
-ns_depo <- as_tibble(raster::extract(stack, site.coords)) 
+stack[[1]]
+```
+
+###### Update extent (which runs 0, 360, -90, 90)
+
+```{r}
+x1 <- crop(stack, extent(180, 360, -90, 90))
+x2 <- crop(stack, extent(0, 180, -90, 90))   
+extent(x1) <- c(-180, 0, -90, 90)
+m <- merge(x1, x2)
+names(m) <- names(stack)
+```
+
+###### Check overlap of points
+
+```{r}
+m[[1]] %>% na_if(-9999) %>% plot() 
+```
+###### Extract ns data and sum n variables for total n (`nt_depo`)
+
+```{r}
+ns_depo <- as_tibble(raster::extract(m, site.coords)) 
 ns_depo <- cbind(sites, ns_depo) %>% 
   rename(nx_depo = Dry.deposition.NH3.NH4,
          ny_dep = Dry.deposition.NOy,
-         s_dep = Dry.deposition.SO2.SO4)
+         s_dep = Dry.deposition.SO2.SO4) %>% 
+  mutate(nt_depo = nx_depo + ny_dep)
 head(ns_depo)
 ```
+###### Check for missing data
+
+```{r}
+ns_depo %>% 
+  gather(key = "var", value = "value", 15:17) %>% 
+  mutate(missing = is.na(value)) %>% 
+  group_by(ID) %>% 
+  summarize(total = n(),
+            missing = sum(missing)) %>% 
+  arrange(desc(missing))
+```
+
+No missing data
 
 ##### SoilGrids
 
