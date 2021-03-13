@@ -534,7 +534,7 @@ modis.names <- c("LSTD", "EVI", "LAI", "LSWI", "NDSI", "NDVI", "NDWI", "LSTN", "
 ```{r echo = F, warning = F, message = F}
 modis <- lapply(paste(loc, "/modis/modis-extracted/", files, sep = ""), read_csv)
 names(modis) <- modis.names
-str(modis)
+# str(modis)
 ```
 
 ##### Look at head for first file:
@@ -542,14 +542,25 @@ str(modis)
 ```{r}
 head(modis[[1]])
 ```
-Files are not tidy (short and wide). There are **86** extracted sites (extra sites than in FLUXNET-CH4 V1.0). 
+Files are not tidy (short and wide). There are **86** extracted sites (extra sites than in FLUXNET-CH4 V1.0) but there should be **81**. 
+
+##### Correct issues in Site IDs (columan names) to match `fluxnet-ch4-site-metadata.csv`:
+
+```{r}
+for(i in 1:length(modis)){
+  modis[[i]] <- modis[[i]] %>% 
+    dplyr::select(-`CA-DBB`, -`RU-SAM`, -`SE-Sto`, -`US-Bgl`, -`US-Brw`) %>% 
+    rename(`JP-SwL` = `JP-Swl`, `PH-RiF` = `PH-RIf`, `US-ICs` = `US-Ics`, `US-MAC` = `MAERC`)
+}
+dim(modis[[1]])
+```
 
 ##### Use gather to make long and narrow, remove hyphen from ID:
 
 ```{r}
 for (i in 1:length(files)) {
   modis[[i]] <- modis[[i]] %>% 
-    gather(key = ID, value = "modis.name", 2:87) %>% 
+    gather(key = ID, value = "modis.name", 2:82) %>% 
     mutate(ID = paste(substr(ID, 1, 2), substr(ID, 4, 6), sep = "")) %>% 
     as_tibble()
 }
@@ -597,13 +608,12 @@ modis <- modis.2 %>% right_join(modis$NDSI)
 names(modis)[11] <- "NDSI"
 ```
 
-##### Convert `Date` into `Year` and `DOY`, correct `MARC` name (should be `US-MAC`), remove `LSTD`:
+##### Convert `Date` into `Year` and `DOY`, and remove `LSTD`:
 
 ```{r}
 modis <- modis %>% 
   mutate(Date = as.Date(Date, format = "%m/%d/%Y")) %>% 
-  mutate(ID = ifelse(ID == "MARC", "USMAC",ID),
-         DOY = yday(Date),
+  mutate(DOY = yday(Date),
          Date = as_date(Date),
          Week = ceiling(DOY/7),
          Week = ifelse(Week == 53, 52, Week),
@@ -1821,10 +1831,14 @@ ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Data QCQA/qaqc/Rpo
 ```
 
 First QAQC evaluation issues:
-  + Missing data for CADBB; JPSwl; PHRlf; RUSAM; SESto; USBgl; USBrw; USIcs
+
+  + Missing data for CADBB; JPSwl; PHRlf; RUSAM; SESto; USBgl; USBrw; USIcs 
   + 3 of these are site mis-matches between modis and geospatial data (CADBB, RUSAM, SESto, USBgl, USBrw do not exist in `fluxnet-ch4-site-metadata.csv`)
   + The others are possibly mis-matches in spelling (JPSwL, PHRlF, USICs is the correct spelling, in `fluxnet-ch4-site-metadata.csv`)
 
+Second QAQC evaluation:
+  
+  + No issues. Corrected modis input data site names.
 
 ## WorldClim Predictors
 wc <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/worldclim.csv")
