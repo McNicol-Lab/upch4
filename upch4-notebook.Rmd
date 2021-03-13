@@ -1851,7 +1851,7 @@ names(modis_geo)
 
 Need 85-103.
 
-###### Plot tempearture variables (wc1-11)
+###### Plot all worldclim
 
 ```{r}
 oldnames <- names(modis_geo)[85:103]
@@ -1879,24 +1879,38 @@ ggsave(paste(loc, "grids/extracted-qc/worldclim.pdf", sep = ""),
 
 Ranges look reasonable. No outliers.
 
-## EarthEnv Predictors
-EE <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/earthenv.csv")
+##### EarthEnv Predictors
 
-EE %>% 
-  gather(key = earthenvpred, value = value, 5:length(EE)) %>%
-  ggplot(aes(ID,value)) +
+Need 110-136
+
+###### Plot earthenv
+
+```{r}
+oldnames <- names(modis_geo)[110:136]
+newnames <- c(letters, "ab")
+
+names_key <- setNames(oldnames, newnames)
+
+modis_geo %>% 
+  rename_at(vars(oldnames), ~ newnames) %>% 
+  gather(key = "earthenv", value = "value", 110:136) %>% 
+   mutate(group = ifelse(Latitude > 60, "Boreal", NA),
+          group = ifelse(Latitude < 60 & Latitude > 30, "Temperate", group),
+          group = ifelse(Latitude < 30, "Tropical", group)) %>%
+  ggplot(aes(ID, value, color = group)) +
     geom_point() +
-    facet_wrap(~earthenvpred, scales = 'free') +
+    facet_wrap(~earthenv, scales = 'free', labeller = as_labeller(names_key)) +
   my_theme +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
-ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/earthenv_postqcqa.pdf",
-       width = 50, height = 30, units = c("cm"), dpi = 300)
-
+ggsave(paste(loc, "grids/extracted-qc/earthenv.pdf", sep = ""),
+       width = 30, height = 30, units = c("cm"), dpi = 300)
+```
 
 ## Terraclimate
-terraclimate <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/terraclimate.csv")
+
+```{r}
 
 terraclimate %>% 
   gather(key = terraclimatepred, value = value, 7:length(terraclimate)) %>%
@@ -1923,6 +1937,9 @@ terraclimate %>%
         axis.ticks.x=element_blank())
 ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/soilwater.pdf",
        width = 50, height = 30, units = c("cm"), dpi = 300)
+```
+
+
 
 # seasonality
 terraclimate %>% 
