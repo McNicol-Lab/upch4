@@ -870,21 +870,27 @@ canopyht %>%
 
 No missing data
 
+###### Write data
+
+```{r}
+write.csv(canopyht, paste(loc, "grids/extracted/", "canopyht.csv", sep = ""), row.names =  F)
+```
+
 ##### Computed (Rpot)
 
 ```{r}
 stack <- stack(paste(loc, "grids/computed/Rpot_msc.nc", sep = ""))
-Rpot <- as_tibble(raster::extract(stack, site.coords)) 
-Rpot <- cbind(sites, Rpot) %>% 
-  gather(key = "Month", value = "Rpot", 15:26) %>% 
+rpot <- as_tibble(raster::extract(stack, site.coords)) 
+rpot <- cbind(sites, rpot) %>% 
+  gather(key = "Month", value = "rpot", 15:26) %>% 
   mutate(Month = str_remove(Month, "X"))
-head(Rpot)
+head(rpot)
 ```
 
 ###### Check for missing data
 
 ```{r}
-Rpot %>% 
+rpot %>% 
   mutate(missing = is.na(Rpot)) %>% 
   group_by(ID) %>% 
   summarize(total = n(),
@@ -892,6 +898,12 @@ Rpot %>%
   arrange(desc(missing))
 ```
 No missing data
+
+###### Write data
+
+```{r}
+write.csv(rpot, paste(loc, "grids/extracted/", "rpot.csv", sep = ""), row.names =  F)
+```
 
 ##### Compound Topographic Index
 
@@ -919,6 +931,12 @@ cti %>%
 ```
 
 No missing data
+
+###### Write data
+
+```{r}
+write.csv(cti, paste(loc, "grids/extracted/", "cti.csv", sep = ""), row.names =  F)
+```
 
 ##### Earth Environment Texture, Land Cover and Topography
 
@@ -1020,6 +1038,12 @@ earthenv[earthenv$ID == "USDPW", c(is.na(earthenv[earthenv$ID == "USDPW", ])) ] 
 earthenv[earthenv$ID == "USWPT", c(is.na(earthenv[earthenv$ID == "USWPT", ])) ] <- earthenv[earthenv$ID == "USOWC", c(is.na(earthenv[earthenv$ID == "USWPT", ])) ] 
 ```
 
+###### Write data
+
+```{r}
+write.csv(earthenv, paste(loc, "grids/extracted/", "earthenv.csv", sep = ""), row.names =  F)
+```
+
 ##### N and S Deposition
 
 From [Lamarque et al. 2013](10.5194/acp-13-7997-2013):
@@ -1073,6 +1097,12 @@ ns_depo %>%
 ```
 
 No missing data
+
+###### Write data
+
+```{r}
+write.csv(ns_depo, paste(loc, "grids/extracted/", "ns_depo.csv", sep = ""), row.names =  F)
+```
 
 ##### SoilGrids
 
@@ -1162,6 +1192,7 @@ soilgrids.temp <- cbind(sites.temp, soilgrids.temp) %>%
          ph = PHIHOX_M_sl2_250m_ll)
 head(soilgrids.temp)
 ```
+
 ###### Rejoin soilgrids
 
 ```{r}
@@ -1169,6 +1200,12 @@ soilgrids <- soilgrids %>%
   filter(!is.na(bd)) %>% 
   bind_rows(soilgrids.temp) %>%
   arrange(ID)
+```
+
+###### Write data
+
+```{r}
+write.csv(soilgrids, paste(loc, "grids/extracted/", "soilgrids.csv", sep = ""), row.names =  F)
 ```
 
 ##### TerraClimate
@@ -1216,6 +1253,7 @@ terraclimate.aet <- terraclimate.aet %>%
   mutate(Month = 1:n()) %>% 
   mutate(aetS = (aet - min(aet, na.rm = TRUE)) / (max(aet, na.rm = TRUE) - min(aet, na.rm = TRUE)),
          aetR = max(aet)-min(aet))
+head(terraclimate.aet)
 ```
 
 ###### Read Soil Water grids
@@ -1258,7 +1296,7 @@ terraclimate.soilwater <- terraclimate.soilwater %>%
   mutate(soilwaterS = (soilwater-min(soilwater,na.rm=TRUE))/(max(soilwater,na.rm=TRUE)-min(soilwater,na.rm=TRUE)),
          soilwaterR = max(soilwater)-min(soilwater)) %>% 
   mutate(soilwaterS = ifelse(soilwaterR == 0 & is.na(soilwaterS), 0.5, soilwaterS))
-
+head(terraclimate.soilwater)
 ```
 
 ###### Combined aet and soilwater
@@ -1283,8 +1321,767 @@ terraclimate %>%
   arrange(desc(missing))
 ```
 
+No missing data
 
+###### Write data
+
+```{r}
+write.csv(terraclimate, paste(loc, "grids/extracted/", "terraclimate.csv", sep = ""), row.names =  F)
+```
 
 ##### Fractional Vegetation Cover (VCF)
+
+###### Read VCF grids
+  
+```{r, message = F, warning = F}
+raster.names <- list.files(paste(loc, "grids/VCF5KYR/", sep = ""), pattern = "tif$", full.names = FALSE)
+stack <- stack(paste(loc, "grids/VCF5KYR/", raster.names, sep = ""))
+plot(stack[[3]])
+```
+
+```{r}
+# extract data at sites
+vcf <- as_tibble(raster::extract(stack, site.coords))
+```
+
+###### Tiff names have year, however some years are missing. Create new name vector from years and data types:
+
+```{r}
+years_missing <- c(seq(1982,2016,1)) %>% as_tibble() %>% rename(Year = value) %>% 
+  cbind(c(1:35)) %>% as_tibble() %>% rename(Row = `c(1:35)`) %>% 
+  filter(Row %in% c(13, 19)) %>% dplyr::select(Year) %>% 
+  pull() 
+
+names_vcf <- c(seq(1982,2016,1)) %>% as_tibble() %>% rename(Year = value) %>% 
+  cbind(c(1:35)) %>% as_tibble() %>% rename(Row = `c(1:35)`) %>% 
+  filter(!Row %in% c(13, 19)) %>% dplyr::select(Year) %>% 
+  pull() %>% rep(each = 3) %>% as.character()
+
+suffix <- c("_tree","_shrub","_bare") %>% rep(33)
+
+names_vcf <- paste(names_vcf, suffix, sep="")
+```
+
+###### Rename to retain order of data, then add missing years as means of adjacent years, and extent time series by two years to 2018 (assuming no change):
+
+```{r}
+# rename to retain order
+vcf <- vcf %>% as_tibble() %>% 
+  rename_all(~names_vcf)
+
+# add in missing years
+vcf <- vcf %>% mutate(row = 1:n()) %>% 
+  group_by(row) %>% 
+        mutate(`1994_bare` = mean(c(`1993_bare`,`1995_bare`)), 
+               `1994_tree` = mean(c(`1993_tree`,`1995_tree`)), 
+               `1994_shrub` = mean(c(`1993_shrub`,`1995_shrub`)), 
+           
+               `2000_bare` = mean(c(`1999_bare`,`2001_bare`)), 
+               `2000_tree` = mean(c(`1999_tree`,`2001_tree`)), 
+               `2000_shrub` = mean(c(`1999_shrub`,`2001_shrub`)),
+               
+               `2017_bare` = `2016_bare`,
+               `2017_tree` = `2016_tree`,
+               `2017_shrub` = `2016_shrub`,
+
+               `2018_bare` = `2016_bare`,
+               `2018_tree` = `2016_tree`,
+               `2018_shrub` = `2016_shrub`) %>% ungroup() %>% 
+  dplyr::select(-row)
+```
+
+###### look at combined data
+
+```{r}
+vcf <- cbind(sites,vcf)
+head(vcf)
+```
+###### Finalize dataset: gather data split year and predictor
+
+```{r}
+vcf <- vcf %>%
+  gather(key = Year, value = value, 15:length(vcf)) %>% 
+  mutate(Predictor = substr(Year,6,10),
+         Year = substr(Year,1,4)) %>% 
+  spread(key = Predictor, value = value)
+head(vcf)
+```
+###### Plot data
+
+```{r}
+vcf %>% 
+  gather(key = "vcf_var", value = value, 16:18) %>% 
+  ggplot(aes(value)) + 
+  geom_histogram() +
+  facet_wrap(~vcf_var) +
+  my_theme
+```
+Data looks reasonable, all between 0 and 100.
+
+###### Check that trends look reasonable:
+
+```{r}
+vcf %>% 
+  gather(key = "vcf_var", value = value, 16:18) %>% 
+  ggplot(aes(Year, value, color = vcf_var)) + 
+  geom_point() +
+  facet_wrap(~ID) +
+  my_theme
+```
+
+US-AO3 looks weird (zeros)
+
+
+###### Replace USA03 with USA10 data, due to strange behavior:
+
+```{r}
+vcf[vcf$ID == "USA03", 16:18] <- vcf[vcf$ID == "USA10", 16:18]
+```
+
+###### Write data
+
+```{r}
+write.csv(vcf, paste(loc, "grids/extracted/", "vcf.csv", sep = ""), row.names =  F)
+```
+
 ##### Wetland Extent (WAD2M)
+
+###### Get rasters
+
+Use the coarser 0.5-degree map because 0.25-degree edge roughness causes more missing data
+
+```{r}
+setwd(loc)
+raster.names <-list.files(paste(loc, "grids/WAD2M/", sep = ""), pattern = "nc$", full.names = FALSE)
+stack <- stack(paste(loc, "grids/WAD2M/", sep = "", raster.names[2]))
+plot(stack[[7]])
+points(site.coords)
+```
+###### Extract data at sites and look at it
+
+```{r}
+wf <- as_tibble(raster::extract(stack, site.coords))
+wf <- cbind(sites,wf)
+head(wf)
+```
+
+###### Finalize WF Seasonality:
+
+  - Create date, month, and year columns from varnames
+  - Replace any missing data with zero 
+      + some sites are marine/rice paddy, or coastal  (false, need correction where freshwater wetland, see below)
+      + frozen high latitude locations in winter are assigned NA (real, no correction)
+  - Calculate seasonality
+
+```{r}
+wf <- wf %>%
+  gather(key = Month, value = WF, 15:length(wf)) %>% 
+  mutate(Month2 = Month,
+         Date = substr(Month2,2,11),
+         Year = substr(Month2,2,5),
+         Month = as.factor(as.integer(substr(Month2,7,8)))) %>% 
+  dplyr::select(-Month2) %>% 
+  mutate(Date = as.Date(Date, format = "%Y.%m.%d"),
+         DOY = yday(Date)) %>% 
+  group_by(ID, Year) %>% 
+  mutate(WF = replace_na(WF,0),
+         WFS = (WF-min(WF,na.rm=TRUE))/(max(WF,na.rm=TRUE)-min(WF,na.rm=TRUE))) %>% 
+  group_by(ID, Year) %>% 
+  mutate(WFR = max(WF)-min(WF)) %>% 
+  ungroup() %>% 
+  mutate(WFS = ifelse(WFR == 0 & is.na(WFS), 0.5, WFS)) %>% 
+  dplyr::select(1:14, Date, Year, Month, DOY, WF, WFS, WFR)
+```
+
+###### Look at data patterns
+
+```{r}
+wf %>% 
+  gather(key = "wf_var", value = "value", 19:21) %>% 
+  ggplot(aes(Date, value, color = wf_var)) +
+  geom_point() +
+  facet_wrap(~ID)
+```
+There are missing data for: "DEHte", "HKMPM", "JPSwL", "KRCRK", "NZKop", "USA10", "USBeo", "USBes", "USCRT", "USHRA", "USHRC", "USNC4", "USNGB"
+  
+Of these, "HKMPM", "JPSwL", "KRCRK", "USHRA", "USHRC", are either lakes, rice, or mangroves (i.e. cannot easily fill missing data)
+
+But these can be corrected: "DEHte", "NZKop", "USA10", "USBeo", "USBes", "USCRT","USNC4", "USNGB"
+
+###### Get bounding boxes for each correctable site
+
+```{r}
+coords_subset <- site.coords[sites$ID %in% c("DEHte", "NZKop", "USA10", "USBeo", "USBes", "USCRT","USNC4", "USNGB"),] 
+coords_subset_names <- sites$ID[sites$Latitude %in% coords_subset]
+
+bounding_box <- function(x) {
+  c("xmin" =  x[1] - 3, "xmax" = x[1] + 3, 
+               "ymin" = x[2] - 3 , "ymax" =  x[2] + 3)
+}
+
+bounding_boxes <- list()
+for(i in 1:nrow(coords_subset)){
+ bounding_boxes[[i]] <- bounding_box(coords_subset[i,])
+}
+
+bounding_boxes_maps <- list()
+for(i in 1:length(bounding_boxes)){
+  bounding_boxes_maps[[i]] <- crop(stack[[8]], bounding_boxes[[i]])
+}
+```
+
+###### Match up longitudes with site names:
+
+```{r}
+sites %>% 
+  filter(Longitude %in% coords_subset[,1])
+```
+
+###### Look at each site:
+
+```{r}
+for(i in 1:length(bounding_boxes)){
+  plot(bounding_boxes_maps[[i]])
+  points(coords_subset)
+}
+```
+
+Looks like moving all 1:6 and 8 south by 1 degree, and moving 7 west by 1 degree will help with extractions:
+
+###### Adjust lat/longs and reextract just these 8 sites
+
+```{r}
+site.coords.temp <- sites %>% 
+  filter(ID %in% c("DEHte", "NZKop", "USA10", "USBeo", "USBes", "USCRT", "USNGB")) %>% 
+  mutate(Latitude = ifelse(ID %in% c("DEHte", "NZKop", "USA10", "USBeo", "USBes", "USCRT","USNGB"), Latitude - 1, Latitude),
+         Longitude = ifelse(ID == "USNC4", Longitude - 1, Longitude)) %>% 
+  dplyr::select(Longitude, Latitude) %>% 
+  as.matrix() %>% unname()
+
+sites.temp <- sites %>% 
+  filter(ID %in% c("DEHte", "NZKop", "USA10", "USBeo", "USBes", "USCRT", "USNGB"))
+         
+wf.temp <- as_tibble(raster::extract(stack, site.coords.temp))
+wf.temp <- cbind(sites.temp, wf.temp)
+head(wf.temp)
+```
+
+###### Finalize WF Seasonality for temporary sites
+
+```{r}
+wf.temp <- wf.temp %>%
+  gather(key = Month, value = WF, 15:length(wf.temp)) %>% 
+  mutate(Month2 = Month,
+         Date = substr(Month2,2,11),
+         Year = substr(Month2,2,5),
+         Month = as.factor(as.integer(substr(Month2,7,8)))) %>% 
+  dplyr::select(-Month2) %>% 
+  mutate(Date = as.Date(Date, format = "%Y.%m.%d"),
+         DOY = yday(Date)) %>% 
+  group_by(ID, Year) %>% 
+  mutate(WF = replace_na(WF,0),
+         WFS = (WF-min(WF,na.rm=TRUE))/(max(WF,na.rm=TRUE)-min(WF,na.rm=TRUE))) %>% 
+  group_by(ID, Year) %>% 
+  mutate(WFR = max(WF)-min(WF)) %>% 
+  ungroup() %>% 
+  mutate(WFS = ifelse(WFR == 0 & is.na(WFS), 0.5, WFS)) %>% 
+  dplyr::select(1:14, Date, Year, Month, DOY, WF, WFS, WFR)
+```
+
+###### Rejoin data
+
+```{r}
+wf.rm <- wf %>% 
+  filter(!ID %in% c("DEHte", "NZKop", "USA10", "USBeo", "USBes", "USCRT", "USNGB"))
+
+wf <- wf.rm %>% 
+  bind_rows(wf.temp) %>% 
+  arrange(ID, Date)
+```
+###### Look at data patterns
+
+```{r}
+wf %>% 
+  gather(key = "wf_var", value = "value", 19:21) %>% 
+  ggplot(aes(Date, value, color = wf_var)) +
+  geom_point() +
+  facet_wrap(~ID)
+```
+
+Data are now complete (except rice paddies, lakes and mangroves which we cannot infer)
+
+###### Write data
+
+```{r}
+write.csv(wf, paste(loc, "grids/extracted/", "wf.csv", sep = ""), row.names =  F)
+```
+
 ##### WorldClim 2.0
+
+```{r warning = F}
+setwd(loc)
+raster.names <-list.files(paste(loc, "grids/worldclim/", sep = ""), pattern = "tif$", full.names = FALSE)
+stack <- stack(paste(loc, "grids/worldclim/", sep = "", raster.names))
+plot(stack[[7]])
+points(site.coords)
+```
+
+###### Extract worldclim data
+
+```{r}
+worldclim <- as_tibble(raster::extract(stack, site.coords)) 
+worldclim <- cbind(sites, worldclim) 
+head(worldclim)
+```
+###### Check for missing data
+
+```{r}
+worldclim %>% 
+  filter(is.na(wc2.0_bio_30s_02))
+```
+HKMPM data are missing. 
+
+###### Look at HKMPM location:
+
+```{r}
+coords_subset <- site.coords[sites$ID %in% c("HKMPM"),] 
+coords_subset_names <- sites$ID[sites$Latitude %in% coords_subset]
+
+bounding_boxes <- bounding_box(coords_subset)
+
+bounding_boxes_maps <- crop(stack[[1]], bounding_boxes)
+
+plot(bounding_boxes_maps)
+points(114.02924,  22.49817)
+```
+Can move onto nearby coastline by shifting west
+
+###### Shift HKMPM west:
+
+```{r}
+site.coords.temp <- sites %>% 
+  filter(ID %in% c("HKMPM")) %>% 
+  mutate(Longitude = Longitude + 0.05) %>% 
+  dplyr::select(Longitude, Latitude) %>% 
+  as.matrix() %>% unname()
+
+sites.temp <- sites %>% 
+  filter(ID %in% c("HKMPM")) 
+         
+worldclim.temp <- as_tibble(raster::extract(stack, site.coords.temp))
+worldclim.temp <- cbind(sites.temp, worldclim.temp)
+head(worldclim.temp)
+```
+###### Rejoin
+
+```{r}
+worldclim <- worldclim %>% 
+  filter(!ID == "HKMPM") %>% 
+  bind_rows(worldclim.temp) %>% 
+  arrange(ID)
+```
+
+###### Create new name vector to match 19 products
+```{r}
+newnames <- c("wc_mat", "wc_dtr", "wc_iso", "wc_ts",
+       "wc_mtqm", "wc_mtcm", "wc_tr", "wc_mtwtq",
+       "wc_mtdq", "wc_mtwq", "wc_mtcq", "wc_map",
+       "wc_pwtm", "wc_pdm", "wc_ps", "wc_pwtq",
+       "wc_pdq", "wc_pwq", "wc_pcq")
+
+oldnames <- names(worldclim)[15:33]
+worldclim <- worldclim %>% 
+ rename_at(vars(oldnames), ~ newnames)
+```
+###### Write worlclim data
+
+```{r}
+write.csv(worldclim, paste(loc, "grids/extracted/worldclim.csv", sep = ""), row.names = F)
+```
+
+
+#### *Grid Data Merge*
+
+###### Read in all .csv files
+
+```{r, warning = F}
+setwd(loc)
+csv.names <- list.files(paste(loc, "grids/extracted/", sep  = ""), pattern = "csv$", full.names = FALSE)
+geospatial <- lapply(paste(loc, "grids/extracted/", csv.names, sep = ""), read.csv) 
+names(geospatial) <- csv.names
+```
+
+###### Join static data
+
+```{r, message = F, warning = F}
+
+metadata_names <- names(geospatial$canopyht.csv)[2:14]
+
+remove_metadata <- function(x) {
+  x %>% 
+    dplyr::select(-metadata_names)
+}
+
+canopyht <- remove_metadata(geospatial$canopyht.csv)
+cti <- remove_metadata(geospatial$cti.csv)
+worldclim <- remove_metadata(geospatial$worldclim.csv)
+soilgrids <- remove_metadata(geospatial$soilgrids.csv)
+earthenv <- remove_metadata(geospatial$earthenv.csv)
+
+geospatial_data_static <- canopyht %>% 
+  left_join(cti) %>% 
+  left_join(worldclim) %>% 
+  left_join(soilgrids) %>% 
+  left_join(earthenv)
+
+```
+###### Join temporal data
+
+```{r}
+geospatial_data_temporal <- as_tibble(geospatial$wf.csv) %>% dplyr::select(-DOY, -Date) %>% # start with wetland fraction then add others
+  left_join(geospatial$terraclimate.csv) %>% 
+  left_join(geospatial$ns_depo.csv) %>% 
+  left_join(geospatial$vcf.csv) %>% 
+  left_join(geospatial$rpot) 
+```
+###### Merge static and temporal data
+
+```{r}
+geospatial_data <- geospatial_data_temporal %>% 
+  full_join(geospatial_data_static)
+```
+
+###### Look at `geospatial_data` NAs
+
+```{r}
+nas <- geospatial_data %>% 
+  group_by(ID, Latitude, Longitude) %>% 
+  summarize_all(~sum(is.na(.))) %>% 
+  dplyr::select(-Year, -Month) %>% 
+  ungroup() %>% 
+  gather(key = variable, value = NAs, 15:85) %>% 
+  filter(NAs > 0)
+nas
+```
+
+There is some missing data for 2000 for the Terraclimate temporal products.  Can impute at later step using caret.
+
+###### Write out NA file
+
+```{r}
+write.csv(nas, paste(loc, "/grids/extracted/extracted_nas.csv", sep = ""), row.names = FALSE)
+```
+
+###### Write out `geospatial_data` file
+
+```{r}
+write.csv(geospatial_data, paste(loc, "/grids/extracted-final/geospatial.csv", sep = ""), row.names = FALSE)
+```
+
+#### *Merge geospatial and modis data*
+
+```{r}
+geospatial_data <- read.csv(paste(loc, "grids/extracted-final/geospatial.csv", sep = "")) %>% as_tibble()
+
+modis_data <- read.csv(paste(loc, "modis/modis-processed/modis-processed.csv", sep = "")) %>% 
+  dplyr::select(-NDSI, -NDVI, -EVI, -LAI, -NDWI, -SRWI, -LSWI, -LSTN) %>% 
+  rename(NDSI = NDSI_F, NDVI = NDVI_F, EVI = EVI_F, LAI = LAI_F, NDWI = NDWI_F, SRWI = SRWI_F, LSWI = LSWI_F, LSTN = LSTN_F) %>% 
+  as_tibble()
+
+modis_geo <- modis_data %>% left_join(geospatial_data) %>% 
+  dplyr::select(ID, Site.Name, Data.Policy, Country, Latitude, Longitude, IGBP, Site.Classification, Upland.Class, DOI,
+                DOI.Reference, Site.Personnel, Base.File.Host, Upscaling, Year, Month, Week, everything()) 
+```
+
+###### Write out modis_geo data file
+
+```{r}
+write.csv(modis_geo, paste(loc, "training-data/modis_geospatial.csv", sep = ""), row.names = FALSE)
+```
+
+
+
+#### *QAQC Plots for all Predictors*
+
+## Computed Predictors
+computed <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/computed.csv")
+
+# plot sin.yr
+computed %>% 
+  ggplot(aes(Month, sin.yr)) +
+  geom_line() +
+  facet_wrap(~ID) +
+  mytheme
+ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Data QCQA/qaqc/sin.yr.pdf",
+       width = 30, height = 30, units = c("cm"), dpi = 300)
+
+# plot cos.yr
+computed %>% 
+  ggplot(aes(Month, cos.yr)) +
+  geom_line() +
+  facet_wrap(~ID) +
+  mytheme
+ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Data QCQA/qaqc/cos.yr.pdf",
+       width = 30, height = 30, units = c("cm"), dpi = 300)
+
+# plot dec.yr
+computed %>% 
+  ggplot(aes(Month, dec.yr)) +
+  geom_line() +
+  facet_wrap(~ID) +
+  mytheme
+ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Data QCQA/qaqc/dec.yr.pdf",
+       width = 30, height = 30, units = c("cm"), dpi = 300)
+
+# plot Rpot
+computed %>% 
+  ggplot(aes(Month, Rpot)) +
+  geom_line() +
+  facet_wrap(~ID) +
+  mytheme
+ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Data QCQA/qaqc/Rpot.pdf",
+       width = 30, height = 30, units = c("cm"), dpi = 300)
+
+
+## WorldClim Predictors
+wc <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/worldclim.csv")
+names_generic <- paste(letters)[1:19]
+wc <- wc %>% rename_at(5:23, ~names_generic)
+
+# plot tempearture variables (wc1-11)
+wc %>% 
+  gather(key = wc_var, value = value, 5:23) %>% 
+  mutate(group = ifelse(LAT > 60, "Boreal", NA),
+         group = ifelse(LAT < 60 & LAT > 30, "Temperate", group),
+         group = ifelse(LAT < 30, "Tropical", group)) %>% 
+  filter(wc_var < "l") %>% 
+    ggplot(aes(ID, value, color = group)) +
+    geom_point() +
+    facet_wrap(~wc_var, scales = 'free') +
+    mytheme +
+    theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Data QCQA/qaqc/wc.temp.pdf",
+         width = 30, height = 30, units = c("cm"), dpi = 300)
+
+# plot precip variables (wc12-19)
+wc %>% 
+  gather(key = wc_var, value = value, 5:23) %>% 
+  mutate(group = ifelse(LAT > 60, "Boreal", NA),
+         group = ifelse(LAT < 60 & LAT > 30, "Temperate", group),
+         group = ifelse(LAT < 30, "Tropical", group)) %>% 
+  filter(wc_var > "k") %>% 
+  ggplot(aes(ID, value, color = group)) +
+  geom_point() +
+  facet_wrap(~wc_var, scales = 'free') +
+  mytheme +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Data QCQA/qaqc/wc.precip.pdf",
+       width = 30, height = 30, units = c("cm"), dpi = 300)
+ 
+
+## EarthEnv Predictors
+EE <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/earthenv.csv")
+
+EE %>% 
+  gather(key = earthenvpred, value = value, 5:length(EE)) %>%
+  ggplot(aes(ID,value)) +
+    geom_point() +
+    facet_wrap(~earthenvpred, scales = 'free') +
+  mytheme +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/earthenv_postqcqa.pdf",
+       width = 50, height = 30, units = c("cm"), dpi = 300)
+
+
+## Terraclimate
+terraclimate <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/terraclimate.csv")
+
+terraclimate %>% 
+  gather(key = terraclimatepred, value = value, 7:length(terraclimate)) %>%
+  filter(terraclimatepred == "aet") %>% 
+  ggplot(aes(Month, value)) +
+  geom_point() +
+  facet_wrap(~ID, scales = 'free') +
+  mytheme +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/aet.pdf",
+       width = 50, height = 30, units = c("cm"), dpi = 300)
+
+terraclimate %>% 
+  gather(key = terraclimatepred, value = value, 7:length(terraclimate)) %>%
+  filter(terraclimatepred == "soilwater") %>% 
+  ggplot(aes(Month, value)) +
+  geom_point() +
+  facet_wrap(~ID, scales = 'free') +
+  mytheme +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/soilwater.pdf",
+       width = 50, height = 30, units = c("cm"), dpi = 300)
+
+# seasonality
+terraclimate %>% 
+  gather(key = terraclimatepred, value = value, 7:length(terraclimate)) %>%
+  filter(terraclimatepred == "aetS") %>% 
+  ggplot(aes(Month, value)) +
+  geom_point() +
+  facet_wrap(~ID, scales = 'free') +
+  mytheme +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/aetS.pdf",
+       width = 50, height = 30, units = c("cm"), dpi = 300)
+
+terraclimate %>% 
+  gather(key = terraclimatepred, value = value, 7:length(terraclimate)) %>%
+  filter(terraclimatepred == "soilwaterS") %>% 
+  ggplot(aes(Month, value)) +
+  geom_point() +
+  facet_wrap(~ID, scales = 'free') +
+  mytheme +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/soilwaterS.pdf",
+       width = 50, height = 30, units = c("cm"), dpi = 300)
+
+
+# range
+terraclimate %>% 
+  gather(key = terraclimatepred, value = value, 7:length(terraclimate)) %>%
+  filter(terraclimatepred == "aetR") %>% 
+  ggplot(aes(Year, value)) +
+  geom_point() +
+  facet_wrap(~ID, scales = 'free') +
+  mytheme +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/aetR.pdf",
+       width = 50, height = 30, units = c("cm"), dpi = 300)
+
+terraclimate %>% 
+  gather(key = terraclimatepred, value = value, 7:length(terraclimate)) %>%
+  filter(terraclimatepred == "soilwaterR") %>% 
+  ggplot(aes(Year, value)) +
+  geom_point() +
+  facet_wrap(~ID, scales = 'free') +
+  mytheme +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/soilwaterR.pdf",
+       width = 50, height = 30, units = c("cm"), dpi = 300)
+
+
+## vcf Predictors
+vcf <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/vcf.csv")
+
+# check full year (1994 and 2000)
+vcf %>% 
+  gather(key = vcfpred, value = value, 6:length(vcf)) %>%
+  filter(Year == 1994)
+
+vcf %>% 
+  gather(key = vcfpred, value = value, 6:length(vcf)) %>%
+  ggplot(aes(vcfpred,value)) +
+  geom_point() +
+  facet_wrap(~ID, scales = 'free') +
+  mytheme +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Data QCQA/qaqc/vcf_postqcqa.pdf",
+       width = 50, height = 30, units = c("cm"), dpi = 300)
+
+
+## cti Predictors
+cti <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/cti.csv")
+
+cti %>% 
+  ggplot(aes(ID,cti)) +
+  geom_point() +
+  geom_text(aes(label=ID), vjust = 1.5, hjust = 1) +
+  mytheme +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/cti.pdf",
+       width = 50, height = 30, units = c("cm"), dpi = 300)
+
+
+## wf Predictors
+wf <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/wf.csv")
+
+wf %>% 
+  filter(Year == 2010) %>% 
+  ggplot(aes(Month,wf)) +
+  geom_point() +
+  facet_wrap(~ID) +
+  mytheme +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Data QCQA/qaqc/WFS_postqcqa.pdf",
+       width = 50, height = 30, units = c("cm"), dpi = 300)
+
+
+## canopyht Predictors
+canopyht <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/canopyht.csv")
+
+canopyht %>% 
+  ggplot(aes(ID, canopyht)) +
+  geom_point() +
+  geom_text(aes(label = ID), hjust = 1.5, vjust = 1) +
+  mytheme +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/canopyht.pdf",
+       width = 50, height = 30, units = c("cm"), dpi = 300)
+
+
+## ns deposition Predictors
+nsdepo <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/nsdepo.csv")
+
+# look at range
+nsdepo %>% arrange(desc(nt_depo))
+
+nsdepo %>% 
+  gather(key = pollutant, value = rate, 5:8) %>% 
+  ggplot(aes(ID, log10(rate), color = pollutant)) +
+  geom_point() +
+  facet_wrap(~pollutant) +
+  geom_text(aes(label = ID)) +
+  mytheme +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/nsdepo.pdf",
+       width = 50, height = 30, units = c("cm"), dpi = 300)
+
+## sgrids Predictors
+sgrids <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/sgrids.csv")
+
+sgrids %>% 
+  gather(key = variable, value = value, 5:10) %>% 
+  ggplot(aes(ID, value, color = variable)) +
+  geom_point() +
+  facet_wrap(~variable, scales = 'free') +
+  geom_text(aes(label = ID)) +
+  mytheme +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/sgrids.pdf",
+       width = 50, height = 30, units = c("cm"), dpi = 300)
