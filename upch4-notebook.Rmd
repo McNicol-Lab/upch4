@@ -1824,10 +1824,11 @@ modis_geo %>%
   ggplot(aes(Month, rpot)) +
   geom_line() +
   facet_wrap(~ID) +
+  labs(y = expression("Potential Radiation at the top of the Atmosphere (W m"^{-2}*")")) +
+  scale_x_continuous(breaks = c(6, 12), labels = c(6, 12)) + 
   my_theme
-ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Data QCQA/qaqc/Rpot.pdf",
+ggsave(paste(loc, "grids/extracted-qc/rpot.pdf", sep = ""),
        width = 30, height = 30, units = c("cm"), dpi = 300)
-
 ```
 
 First QAQC evaluation issues:
@@ -1840,45 +1841,43 @@ Second QAQC evaluation:
   
   + No issues. Corrected modis input data site names.
 
-## WorldClim Predictors
-wc <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/worldclim.csv")
-names_generic <- paste(letters)[1:19]
-wc <- wc %>% rename_at(5:23, ~names_generic)
+##### WorldClim Predictors
 
-# plot tempearture variables (wc1-11)
-wc %>% 
-  gather(key = wc_var, value = value, 5:23) %>% 
-  mutate(group = ifelse(LAT > 60, "Boreal", NA),
-         group = ifelse(LAT < 60 & LAT > 30, "Temperate", group),
-         group = ifelse(LAT < 30, "Tropical", group)) %>% 
-  filter(wc_var < "l") %>% 
-    ggplot(aes(ID, value, color = group)) +
-    geom_point() +
-    facet_wrap(~wc_var, scales = 'free') +
-    my_theme +
-    theme(axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
-ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Data QCQA/qaqc/wc.temp.pdf",
-         width = 30, height = 30, units = c("cm"), dpi = 300)
+###### Get Indices
 
-# plot precip variables (wc12-19)
-wc %>% 
-  gather(key = wc_var, value = value, 5:23) %>% 
-  mutate(group = ifelse(LAT > 60, "Boreal", NA),
-         group = ifelse(LAT < 60 & LAT > 30, "Temperate", group),
-         group = ifelse(LAT < 30, "Tropical", group)) %>% 
-  filter(wc_var > "k") %>% 
+```{r}
+names(modis_geo)
+```
+
+Need 85-103.
+
+###### Plot tempearture variables (wc1-11)
+
+```{r}
+oldnames <- names(modis_geo)[85:103]
+newnames <- letters[1:19]
+
+names_key <- setNames(oldnames, newnames)
+
+modis_geo %>% 
+  rename_at(vars(oldnames), ~ newnames) %>% 
+  gather(key = "wc_var", value = "value", 85:103) %>% 
+   mutate(group = ifelse(Latitude > 60, "Boreal", NA),
+          group = ifelse(Latitude < 60 & Latitude > 30, "Temperate", group),
+          group = ifelse(Latitude < 30, "Tropical", group)) %>%
   ggplot(aes(ID, value, color = group)) +
   geom_point() +
-  facet_wrap(~wc_var, scales = 'free') +
-  my_theme +
+  facet_wrap(~wc_var, scales = "free", labeller = as_labeller(names_key)) +
+      my_theme +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
-ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Data QCQA/qaqc/wc.precip.pdf",
+
+ggsave(paste(loc, "grids/extracted-qc/worldclim.pdf", sep = ""),
        width = 30, height = 30, units = c("cm"), dpi = 300)
- 
+```
+
+Ranges look reasonable. No outliers.
 
 ## EarthEnv Predictors
 EE <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/earthenv.csv")
