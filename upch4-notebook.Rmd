@@ -876,7 +876,7 @@ No missing data
 write.csv(canopyht, paste(loc, "grids/extracted/", "canopyht.csv", sep = ""), row.names =  F)
 ```
 
-##### Computed (Rpot)
+##### Computed (rpot)
 
 ```{r}
 stack <- stack(paste(loc, "grids/computed/Rpot_msc.nc", sep = ""))
@@ -891,7 +891,7 @@ head(rpot)
 
 ```{r}
 rpot %>% 
-  mutate(missing = is.na(Rpot)) %>% 
+  mutate(missing = is.na(rpot)) %>% 
   group_by(ID) %>% 
   summarize(total = n(),
             missing = sum(missing)) %>% 
@@ -1799,48 +1799,31 @@ modis_geo <- modis_data %>% left_join(geospatial_data) %>%
 write.csv(modis_geo, paste(loc, "training-data/modis_geospatial.csv", sep = ""), row.names = FALSE)
 ```
 
-
-
 #### *QAQC Plots for all Predictors*
 
-## Computed Predictors
-computed <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/computed.csv")
+##### Read in `modis_geospatial.csv`:
 
-# plot sin.yr
-computed %>% 
-  ggplot(aes(Month, sin.yr)) +
+```{r}
+modis_geo <- read.csv(paste(loc, "training-data/modis_geospatial.csv", sep = ""))
+```
+
+##### Computed Predictors (rpot)
+
+```{r}
+modis_geo %>% 
+  ggplot(aes(Month, rpot)) +
   geom_line() +
   facet_wrap(~ID) +
-  mytheme
-ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Data QCQA/qaqc/sin.yr.pdf",
-       width = 30, height = 30, units = c("cm"), dpi = 300)
-
-# plot cos.yr
-computed %>% 
-  ggplot(aes(Month, cos.yr)) +
-  geom_line() +
-  facet_wrap(~ID) +
-  mytheme
-ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Data QCQA/qaqc/cos.yr.pdf",
-       width = 30, height = 30, units = c("cm"), dpi = 300)
-
-# plot dec.yr
-computed %>% 
-  ggplot(aes(Month, dec.yr)) +
-  geom_line() +
-  facet_wrap(~ID) +
-  mytheme
-ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Data QCQA/qaqc/dec.yr.pdf",
-       width = 30, height = 30, units = c("cm"), dpi = 300)
-
-# plot Rpot
-computed %>% 
-  ggplot(aes(Month, Rpot)) +
-  geom_line() +
-  facet_wrap(~ID) +
-  mytheme
+  my_theme
 ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Data QCQA/qaqc/Rpot.pdf",
        width = 30, height = 30, units = c("cm"), dpi = 300)
+
+```
+
+First QAQC evaluation issues:
+  + Missing data for CADBB; JPSwl; PHRlf; RUSAM; SESto; USBgl; USBrw; USIcs
+  + 3 of these are site mis-matches between modis and geospatial data (CADBB, RUSAM, SESto, USBgl, USBrw do not exist in `fluxnet-ch4-site-metadata.csv`)
+  + The others are possibly mis-matches in spelling (JPSwL, PHRlF, USICs is the correct spelling, in `fluxnet-ch4-site-metadata.csv`)
 
 
 ## WorldClim Predictors
@@ -1858,7 +1841,7 @@ wc %>%
     ggplot(aes(ID, value, color = group)) +
     geom_point() +
     facet_wrap(~wc_var, scales = 'free') +
-    mytheme +
+    my_theme +
     theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
@@ -1875,7 +1858,7 @@ wc %>%
   ggplot(aes(ID, value, color = group)) +
   geom_point() +
   facet_wrap(~wc_var, scales = 'free') +
-  mytheme +
+  my_theme +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
@@ -1891,7 +1874,7 @@ EE %>%
   ggplot(aes(ID,value)) +
     geom_point() +
     facet_wrap(~earthenvpred, scales = 'free') +
-  mytheme +
+  my_theme +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
@@ -1908,7 +1891,7 @@ terraclimate %>%
   ggplot(aes(Month, value)) +
   geom_point() +
   facet_wrap(~ID, scales = 'free') +
-  mytheme +
+  my_theme +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
@@ -1921,7 +1904,7 @@ terraclimate %>%
   ggplot(aes(Month, value)) +
   geom_point() +
   facet_wrap(~ID, scales = 'free') +
-  mytheme +
+  my_theme +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
@@ -1935,7 +1918,7 @@ terraclimate %>%
   ggplot(aes(Month, value)) +
   geom_point() +
   facet_wrap(~ID, scales = 'free') +
-  mytheme +
+  my_theme +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
@@ -1948,7 +1931,7 @@ terraclimate %>%
   ggplot(aes(Month, value)) +
   geom_point() +
   facet_wrap(~ID, scales = 'free') +
-  mytheme +
+  my_theme +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
@@ -1963,7 +1946,7 @@ terraclimate %>%
   ggplot(aes(Year, value)) +
   geom_point() +
   facet_wrap(~ID, scales = 'free') +
-  mytheme +
+  my_theme +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
@@ -1976,7 +1959,7 @@ terraclimate %>%
   ggplot(aes(Year, value)) +
   geom_point() +
   facet_wrap(~ID, scales = 'free') +
-  mytheme +
+  my_theme +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
@@ -1997,7 +1980,7 @@ vcf %>%
   ggplot(aes(vcfpred,value)) +
   geom_point() +
   facet_wrap(~ID, scales = 'free') +
-  mytheme +
+  my_theme +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
@@ -2012,7 +1995,7 @@ cti %>%
   ggplot(aes(ID,cti)) +
   geom_point() +
   geom_text(aes(label=ID), vjust = 1.5, hjust = 1) +
-  mytheme +
+  my_theme +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
@@ -2028,7 +2011,7 @@ wf %>%
   ggplot(aes(Month,wf)) +
   geom_point() +
   facet_wrap(~ID) +
-  mytheme +
+  my_theme +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
@@ -2043,7 +2026,7 @@ canopyht %>%
   ggplot(aes(ID, canopyht)) +
   geom_point() +
   geom_text(aes(label = ID), hjust = 1.5, vjust = 1) +
-  mytheme +
+  my_theme +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
@@ -2063,7 +2046,7 @@ nsdepo %>%
   geom_point() +
   facet_wrap(~pollutant) +
   geom_text(aes(label = ID)) +
-  mytheme +
+  my_theme +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
@@ -2079,7 +2062,7 @@ sgrids %>%
   geom_point() +
   facet_wrap(~variable, scales = 'free') +
   geom_text(aes(label = ID)) +
-  mytheme +
+  my_theme +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
