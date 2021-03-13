@@ -1908,94 +1908,114 @@ ggsave(paste(loc, "grids/extracted-qc/earthenv.pdf", sep = ""),
        width = 30, height = 30, units = c("cm"), dpi = 300)
 ```
 
-## Terraclimate
+##### Terraclimate Predictors
+
+Get 69-74.
+
+###### Plot the actual values
 
 ```{r}
-
-terraclimate %>% 
-  gather(key = terraclimatepred, value = value, 7:length(terraclimate)) %>%
-  filter(terraclimatepred == "aet") %>% 
-  ggplot(aes(Month, value)) +
-  geom_point() +
-  facet_wrap(~ID, scales = 'free') +
+# aet
+modis_geo %>% 
+     mutate(group = ifelse(Latitude > 60, "Boreal", NA),
+          group = ifelse(Latitude < 60 & Latitude > 30, "Temperate", group),
+          group = ifelse(Latitude < 30, "Tropical", group)) %>%
+  ggplot(aes(Month, aet, color = group)) +
+    geom_point(size = 0.5) +
+    facet_wrap(~ID, scales = 'free') +
   my_theme +
-  theme(axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
-ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/aet.pdf",
-       width = 50, height = 30, units = c("cm"), dpi = 300)
+  theme(axis.text.x=element_blank()) +
+  labs(y = "TerraClimate Actual Evapotranspiration (mm/month)")
+ggsave(paste(loc, "grids/extracted-qc/terraclimate-aet.pdf", sep = ""),
+       width = 30, height = 30, units = c("cm"), dpi = 300)
 
-terraclimate %>% 
-  gather(key = terraclimatepred, value = value, 7:length(terraclimate)) %>%
-  filter(terraclimatepred == "soilwater") %>% 
-  ggplot(aes(Month, value)) +
-  geom_point() +
-  facet_wrap(~ID, scales = 'free') +
+# soil water
+modis_geo %>% 
+     mutate(group = ifelse(Latitude > 60, "Boreal", NA),
+          group = ifelse(Latitude < 60 & Latitude > 30, "Temperate", group),
+          group = ifelse(Latitude < 30, "Tropical", group)) %>%
+  ggplot(aes(Month, soilwater, color = group)) +
+    geom_point(size = 0.5) +
+    facet_wrap(~ID) +
   my_theme +
-  theme(axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
-ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/soilwater.pdf",
-       width = 50, height = 30, units = c("cm"), dpi = 300)
+  theme(axis.text.x=element_blank()) +
+  labs(y = "TerraClimate Soil Moisture (mm/month)")
+ggsave(paste(loc, "grids/extracted-qc/terraclimate-soilwater.pdf", sep = ""),
+       width = 30, height = 30, units = c("cm"), dpi = 300)
+
 ```
 
+###### Plot the ranges
 
-
-# seasonality
-terraclimate %>% 
-  gather(key = terraclimatepred, value = value, 7:length(terraclimate)) %>%
-  filter(terraclimatepred == "aetS") %>% 
-  ggplot(aes(Month, value)) +
-  geom_point() +
-  facet_wrap(~ID, scales = 'free') +
+```{r}
+# aet
+modis_geo %>% 
+     mutate(group = ifelse(Latitude > 60, "Boreal", NA),
+          group = ifelse(Latitude < 60 & Latitude > 30, "Temperate", group),
+          group = ifelse(Latitude < 30, "Tropical", group)) %>%
+  ggplot(aes(Year, aetR, color = group)) +
+    geom_point(size = 0.5) +
+    facet_wrap(~ID) +
   my_theme +
-  theme(axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
-ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/aetS.pdf",
-       width = 50, height = 30, units = c("cm"), dpi = 300)
+  theme(axis.text.x=element_blank()) +
+  labs(y = "TerraClimate Actual Evapotranspiration Annual Range (mm)")
+ggsave(paste(loc, "grids/extracted-qc/terraclimate-aetR.pdf", sep = ""),
+       width = 30, height = 30, units = c("cm"), dpi = 300)
 
-terraclimate %>% 
-  gather(key = terraclimatepred, value = value, 7:length(terraclimate)) %>%
-  filter(terraclimatepred == "soilwaterS") %>% 
-  ggplot(aes(Month, value)) +
-  geom_point() +
-  facet_wrap(~ID, scales = 'free') +
+# soil water
+modis_geo %>% 
+     mutate(group = ifelse(Latitude > 60, "Boreal", NA),
+          group = ifelse(Latitude < 60 & Latitude > 30, "Temperate", group),
+          group = ifelse(Latitude < 30, "Tropical", group)) %>%
+  ggplot(aes(Year, soilwaterR, color = group)) +
+    geom_point(size = 0.5) +
+    facet_wrap(~ID) +
   my_theme +
-  theme(axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
-ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/soilwaterS.pdf",
-       width = 50, height = 30, units = c("cm"), dpi = 300)
+  theme(axis.text.x=element_blank()) +
+  labs(y = "TerraClimate Soil Moisture Annual Range (mm)")
+ggsave(paste(loc, "grids/extracted-qc/terraclimate-soilwaterR.pdf", sep = ""),
+       width = 30, height = 30, units = c("cm"), dpi = 300)
 
+```
 
-# range
-terraclimate %>% 
-  gather(key = terraclimatepred, value = value, 7:length(terraclimate)) %>%
-  filter(terraclimatepred == "aetR") %>% 
-  ggplot(aes(Year, value)) +
-  geom_point() +
-  facet_wrap(~ID, scales = 'free') +
+###### Plot the seasonality
+
+```{r}
+# aetS
+modis_geo %>% 
+     mutate(group = ifelse(Latitude > 60, "Boreal", NA),
+          group = ifelse(Latitude < 60 & Latitude > 30, "Temperate", group),
+          group = ifelse(Latitude < 30, "Tropical", group)) %>%
+  ggplot(aes(Month, aetS, color = group)) +
+    geom_point(size = 0.5) +
+    facet_wrap(~ID) +
   my_theme +
-  theme(axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
-ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/aetR.pdf",
-       width = 50, height = 30, units = c("cm"), dpi = 300)
+  theme(axis.text.x=element_blank()) +
+  labs(y = "TerraClimate Actual Evapotranspiration Annual Seasonality (unitless)")
+ggsave(paste(loc, "grids/extracted-qc/terraclimate-aetS.pdf", sep = ""),
+       width = 30, height = 30, units = c("cm"), dpi = 300)
 
-terraclimate %>% 
-  gather(key = terraclimatepred, value = value, 7:length(terraclimate)) %>%
-  filter(terraclimatepred == "soilwaterR") %>% 
-  ggplot(aes(Year, value)) +
-  geom_point() +
-  facet_wrap(~ID, scales = 'free') +
+# soil waterS
+modis_geo %>% 
+     mutate(group = ifelse(Latitude > 60, "Boreal", NA),
+          group = ifelse(Latitude < 60 & Latitude > 30, "Temperate", group),
+          group = ifelse(Latitude < 30, "Tropical", group)) %>%
+  ggplot(aes(Month, soilwaterS, color = group)) +
+    geom_point(size = 0.5) +
+    facet_wrap(~ID) +
   my_theme +
-  theme(axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
-ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/soilwaterR.pdf",
-       width = 50, height = 30, units = c("cm"), dpi = 300)
+  theme(axis.text.x=element_blank()) +
+  labs(y = "TerraClimate Soil Moisture Annual Seasonality (unitless)")
+ggsave(paste(loc, "grids/extracted-qc/terraclimate-soilwaterS.pdf", sep = ""),
+       width = 30, height = 30, units = c("cm"), dpi = 300)
 
+```
+
+QC issues:
+
+  + AET looks fine
+  + soilwater seasonality is very variable within some sites, and obviously wrong in locations where wetlands are not the dominant component of the pixel
+  (e.g., US-TW1 through US-Twt, which are delta marshes embedded in a dryland Mediterranean climate)
 
 ## vcf Predictors
 vcf <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/vcf.csv")
