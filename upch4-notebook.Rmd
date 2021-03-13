@@ -943,7 +943,7 @@ write.csv(cti, paste(loc, "grids/extracted/", "cti.csv", sep = ""), row.names = 
 Texture (14 variables)
 Land Cover (2 variables)
 Topography (10 variables)
-See: [Appendix: All Predictors](https://docs.google.com/spreadsheets/d/1DN0huLs-vVM3g_XcF1hBQrTpkKaGhzuWwaacfbe4iCo/edit#gid=0). Search for `EarthEnv` under column `Gridded Product`.
+See: [Appendix: All Predictors](https://docs.google.com/spreadsheets/d/1yBCIt5nFHVIb9v_0ExX8-4Svr0wlcmjD9vdp67hGtnQ/edit#gid=800847828). Search for `EarthEnv` under column `Gridded Product`.
 
 ###### First do texture:
 
