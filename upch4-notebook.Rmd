@@ -18,6 +18,7 @@ library(raster)
 library(oce) # for time series transformations
 library(geosphere)
 library(sf)
+library(caret)
 source("code/ggplot_theme.R")
 ```
 
@@ -440,7 +441,7 @@ Pulled from [FLUXNET-CH4 Site Metadata](https://docs.google.com/spreadsheets/d/1
 ```{r}
 metadata <- read_csv(paste(loc, "fluxnet-ch4-data/metadata/fluxnet-ch4-site-metadata.csv", sep = "")) 
 daily_subset_meta <- metadata %>% 
-  mutate(ID = paste(substr(ID,1,2),substr(ID,4,6), sep="")) %>% 
+  mutate(ID = paste(substr(ID, 1, 2),substr(ID, 4, 6), sep="")) %>% 
   right_join(daily_subset, by = ("ID")) 
 ```
 ##### Save subset, flattened, and metadata-appended daily FLUXNET-CH4 data
@@ -2274,7 +2275,7 @@ names(modis_geo)
 
 ```{r}
 flux_modis_geo_daily <- fluxes %>% left_join(modis_geo)
-write.csv(flux_modis_geo_daily, paste(loc, "/training-data/flux_modis_geo_daily.csv", sep = ""))
+write.csv(flux_modis_geo_daily, paste(loc, "/training-data/flux_modis_geo_daily.csv", sep = ""), row.names = F)
 names(flux_modis_geo_daily)
 ```
 
@@ -2321,8 +2322,17 @@ Fluxes QC:
 
 #### 5. (cont) Reload All Data (`flux_modis_geo_daily`)
 
+Remove redundant variable names:
+
+  - -Site.Name, -Data.Policy, -Site.Classification, -Upland.Class, -DOI.Reference, -Site.Personnel, -Base.File.Host
+  
+Also remove `Upland Class` which is not applicable to the wetland dataset.
+
 ```{r}
-all_data <- read_csv(paste(loc, "training-data/flux_modis_geo_daily.csv", sep = ""))
+all_data <- read_csv(paste(loc, "training-data/flux_modis_geo_daily.csv", sep = "")) %>% 
+  dplyr::select(-Site.Name, -Data.Policy, -Site.Classification, -Upland.Class, -DOI.Reference, -Site.Personnel, -Base.File.Host,
+                -`Upland Class`)
+names(all_data)
 ```
 
 
@@ -2381,26 +2391,76 @@ cluster_bysite <- all_data %>%
             count = sum(index),
             percent = count/total[1]*100) 
 
-
-
 # cluster names
 cluster_bycluster <- cluster_bysite %>% ungroup() %>% 
   mutate(total = sum(count)) %>% 
   group_by(Cluster) %>% 
   summarize(Class = Class[1],
-            Lat = mean(Lat),
-            Lon = mean(Lon),
+            Latitude = mean(Latitude),
+            Longitude = mean(Longitude),
             cluster_name = ID[1],
             count = sum(count),
             percent = count/total[1]*100) %>% 
-  mutate(Band = ifelse(Lat < 30, "Tropics",NA),
-         Band = ifelse(Lat < 60 & Lat > 30, "Temperate", Band),
-         Band = ifelse(Lat > 60, "Boreal", Band)) 
+  mutate(Band = ifelse(Latitude < 30, "Tropics",NA),
+         Band = ifelse(Latitude < 60 & Latitude > 30, "Temperate", Band),
+         Band = ifelse(Latitude > 60, "Boreal", Band)) 
 
 # output cluster stats
-cluster_bycluster %>% 
-  write.csv(., "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Clusters/SOIL/200709_cluster_stats.csv",
-            row.names=FALSE)
+write.csv(cluster_bysite, paste(loc, "/training-data/untitled folder/cluster_bysite.csv", sep = ""), row.names = F)
+write.csv(cluster_bycluster, paste(loc, "/training-data/untitled folder/cluster_bycluster.csv", sep = ""), row.names = F)
 ```
+
+
+##### Look at data, and extent of missing data
+
+```{r}
+str(all_data)
+```
+
+###### Why is SWC, PPFD_IN and Upland Class logical?
+
+```{r}
+all_data %>% 
+  group_by(ID) %>% 
+  summarize(TAmin = min(TA, na.rm = T),
+            SWCmin = min(SWC, na.rm = T),
+            SWCmax = max(SWC, na.rm = T),
+            PPFD_INmin = min(PPFD_IN, na.rm = T),
+            PPFD_INmax = max(PPFD_IN, na.rm = T),
+            Upland_Classmin = min(`Upland Class`, na.rm = T),
+            Upland_Classmax = max(`Upland Class`, na.rm = T))
+```
+
+They all contain either `Inf` or `-Inf`.
+
+###### Set all Inf or -Inf as NA
+
+```{r}
+all_data[all_data == Inf] <- NA
+all_data[all_data == -Inf] <- NA
+```
+
+ 
+###### Remove extraneous variables and non-class-double data and impute all predictors
+
+
+##### Look at Data 
+
+Using predict function will not work with mixed-classes.
+
+```{r}
+names(all_data)
+all_data_impute <- all_data %>% 
+  dplyr::select(-Cluster, -ID, -`Site Name`, -`Data Policy`, -Country, -IGBP, -`Site Classification`, -DOI,  -`DOI Reference`, -`Site Personnel`, 
+                -`Upland Class`, -`Base File Host`, -Upscaling, -FCH4, -FCH4_F_UNC, -imputed)
+impute_names <- all_data_impute %>% names()
+
+pp <- preProcess(all_data_impute, method = c("bagImpute"))
+all_data_impute_pp <- predict(pp, all_data_impute)
+all_data[impute_names] <- all_data_impute_pp
+
+```
+
+
 
 
