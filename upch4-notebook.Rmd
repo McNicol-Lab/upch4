@@ -169,7 +169,7 @@ $~$
 ```{r}
 # setwd(loc)
 # files <- list.files("fluxnet-ch4-data/daily/")
-# one_site <- read_csv(paste(loc, "fluxnet-ch4-data/daily/", files[1], sep = ""))
+# one_site <- read.csv(paste(loc, "fluxnet-ch4-data/daily/", files[1], sep = ""))
 # head(one_site)
 ```
 
@@ -188,7 +188,7 @@ Issue: **There is also no uncertainty (`_UNC`) estimate on the downloaded daily 
 ```{r}
 setwd(loc)
 files <- list.files("fluxnet-ch4-data/hh/")
-one_site <- read_csv(paste(loc, "fluxnet-ch4-data/hh/", files[1], sep = ""))
+one_site <- read.csv(paste(loc, "fluxnet-ch4-data/hh/", files[1], sep = ""))
 head(one_site)
 ```
 
@@ -204,7 +204,7 @@ site.names <- paste( substr(files, 5, 6), substr(files, 8, 10), sep = "")
 ##### Get all **half-hourly** flux data: (this will take a few minutes)
 
 ```{r echo = F, message = F, warning = F}
-hh <- lapply(paste(loc, "fluxnet-ch4-data/hh/", files, sep = ""), read_csv)
+hh <- lapply(paste(loc, "fluxnet-ch4-data/hh/", files, sep = ""), read.csv)
 names(hh) <- site.names
 # str(hh)
 ```
@@ -400,7 +400,7 @@ for (i in 1:length(daily)) {
 
 ```{r message = F, warning = F, echo = F}
 files <- list.files(paste(loc, "fluxnet-ch4-data/daily_upch4/", sep = ""))
-daily <- lapply(paste(loc,"fluxnet-ch4-data/daily_upch4/",files, sep = ""), read_csv)
+daily <- lapply(paste(loc,"fluxnet-ch4-data/daily_upch4/",files, sep = ""), read.csv)
 ```
 
 ##### Bind rows
@@ -439,7 +439,7 @@ head(daily_subset)
 Pulled from [FLUXNET-CH4 Site Metadata](https://docs.google.com/spreadsheets/d/1DN0huLs-vVM3g_XcF1hBQrTpkKaGhzuWwaacfbe4iCo/edit#gid=1384338468)
 
 ```{r}
-metadata <- read_csv(paste(loc, "fluxnet-ch4-data/metadata/fluxnet-ch4-site-metadata.csv", sep = "")) 
+metadata <- read.csv(paste(loc, "fluxnet-ch4-data/metadata/fluxnet-ch4-site-metadata.csv", sep = "")) 
 daily_subset_meta <- metadata %>% 
   mutate(ID = paste(substr(ID, 1, 2),substr(ID, 4, 6), sep="")) %>% 
   right_join(daily_subset, by = ("ID")) 
@@ -536,7 +536,7 @@ modis.names <- c("LSTD", "EVI", "LAI", "LSWI", "NDSI", "NDVI", "NDWI", "LSTN", "
 ##### Read files:
 
 ```{r echo = F, warning = F, message = F}
-modis <- lapply(paste(loc, "/modis/modis-extracted/", files, sep = ""), read_csv)
+modis <- lapply(paste(loc, "/modis/modis-extracted/", files, sep = ""), read.csv)
 names(modis) <- modis.names
 # str(modis)
 ```
@@ -854,7 +854,7 @@ write.csv(modis_frozen, paste(loc, "/modis/modis-processed/modis-processed.csv",
 ##### Load site metadata (ID, Latitude, Longitude), applicable to all extractions:
 
 ```{r}
-sites <- read_csv(paste(loc, "fluxnet-ch4-data/metadata/fluxnet-ch4-site-metadata.csv", sep = "")) %>% 
+sites <- read.csv(paste(loc, "fluxnet-ch4-data/metadata/fluxnet-ch4-site-metadata.csv", sep = "")) %>% 
   mutate(ID = paste(substr(ID, 1, 2), substr(ID, 4, 6), sep = ""))
 site.coords <- cbind(sites$Longitude, sites$Latitude) # (x, y)
 site.num <- length(site.coords[,1])
@@ -2267,8 +2267,8 @@ Looks fine!
 ##### Merge Flux and Geospatial Data
 
 ```{r}
-fluxes <- read_csv(paste(loc, "fluxnet-ch4-data/daily_flat/daily_subset_meta.csv", sep = ""))
-modis_geo <- read_csv(paste(loc, "training-data/modis_geospatial.csv", sep = ""))
+fluxes <- read.csv(paste(loc, "fluxnet-ch4-data/daily_flat/daily_subset_meta.csv", sep = ""))
+modis_geo <- read.csv(paste(loc, "training-data/modis_geospatial.csv", sep = ""))
 names(fluxes)
 names(modis_geo)
 ```
@@ -2329,7 +2329,7 @@ Remove redundant variable names:
 Also remove `Upland Class` which is not applicable to the wetland dataset.
 
 ```{r}
-all_data <- read_csv(paste(loc, "training-data/flux_modis_geo_daily.csv", sep = "")) %>% 
+all_data <- read.csv(paste(loc, "training-data/flux_modis_geo_daily.csv", sep = "")) %>% 
   dplyr::select(-Site.Name, -Data.Policy, -Site.Classification, -Upland.Class, -DOI.Reference, -Site.Personnel, -Base.File.Host,
                 -`Upland Class`)
 names(all_data)
