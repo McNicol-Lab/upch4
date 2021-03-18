@@ -56,6 +56,7 @@ loc <- "/Volumes/LACIE SHARE/Stanford CH4/upch4_local/"
       + Merge Gridded Data
       + Gridded Data Quality Control
   5. Finalize Training Data
+      + Merge Flux Data with Geospaital and MODIS Data
       + Subset Wetlands, Dates
       + Cluster Sites for Cross Validation
       + Finalize Data
@@ -2258,3 +2259,20 @@ ggsave(paste(loc, "grids/extracted-qc/soilgrids.pdf", sep = ""),
 ```
 
 Looks fine!
+#### 5. Finalize Training Data
+
+##### Merge Flux and Geospatial Data
+
+```{r}
+fluxes <- read_csv(paste(loc, "fluxnet-ch4-data/daily_flat/daily_subset_meta.csv", sep = ""))
+modis_geo <- read_csv(paste(loc, "training-data/modis_geospatial.csv", sep = ""))
+names(fluxes)
+names(modis_geo)
+```
+
+```{r}
+flux_modis_geo_daily <- fluxes %>% left_join(modis_geo)
+write.csv(flux_modis_geo_daily, paste(loc, "/training-data/flux_modis_geo_daily.csv", sep = ""))
+names(flux_modis_geo_daily)
+```
+
