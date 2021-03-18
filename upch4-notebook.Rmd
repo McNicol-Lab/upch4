@@ -2276,3 +2276,43 @@ write.csv(flux_modis_geo_daily, paste(loc, "/training-data/flux_modis_geo_daily.
 names(flux_modis_geo_daily)
 ```
 
+##### Output Flux QC Plots
+
+```{r}
+min(flux_modis_geo_daily$Year)
+max(flux_modis_geo_daily$Year)
+years <- c(2006:2018)
+
+# scales fixed
+for(i in 1:length(years)) {
+  flux_modis_geo_daily %>% 
+  filter(Year == years[i]) %>% 
+    mutate(obs_threshold = ifelse(imputed < 1, "yes", "no")) %>% 
+  ggplot(aes(DOY, FCH4, color = factor(obs_threshold))) + 
+    geom_point() +
+    facet_wrap(~ID) +
+    # scale_y_log10() +
+    labs(y = expression("FCH4 (nmol m"^{-2}*" s"^{-1}*")")) +
+  my_theme
+ggsave(paste(loc, "fluxnet-ch4-data/flux-qc/", years[i], "_fixed.pdf", sep = ""),
+       width = 30, height = 30, units = c("cm"), dpi = 300)
+}
+
+# scales free
+for(i in 1:length(years)) {
+  flux_modis_geo_daily %>% 
+  filter(Year == years[i]) %>% 
+    mutate(obs_threshold = ifelse(imputed < 1, "yes", "no")) %>% 
+  ggplot(aes(DOY, FCH4, color = factor(obs_threshold))) + 
+    geom_point() +
+    facet_wrap(~ID, scales = 'free') +
+    # scale_y_log10() +
+    labs(y = expression("FCH4 (nmol m"^{-2}*" s"^{-1}*")")) +
+  my_theme
+ggsave(paste(loc, "fluxnet-ch4-data/flux-qc/", years[i], "_free.pdf", sep = ""),
+       width = 30, height = 30, units = c("cm"), dpi = 300)
+}
+```
+
+
+
