@@ -2274,7 +2274,12 @@ names(modis_geo)
 ```
 
 ```{r}
-flux_modis_geo_daily <- fluxes %>% left_join(modis_geo)
+flux_modis_geo_daily <- fluxes %>% full_join(modis_geo)
+```
+
+##### Write merged dataset `flux_modis_geo_daily`:
+
+```{r}
 write.csv(flux_modis_geo_daily, paste(loc, "/training-data/flux_modis_geo_daily.csv", sep = ""), row.names = F)
 names(flux_modis_geo_daily)
 ```
@@ -2329,9 +2334,7 @@ Remove redundant variable names:
 Also remove `Upland Class` which is not applicable to the wetland dataset.
 
 ```{r}
-all_data <- read.csv(paste(loc, "training-data/flux_modis_geo_daily.csv", sep = "")) %>% 
-  dplyr::select(-Site.Name, -Data.Policy, -Site.Classification, -Upland.Class, -DOI.Reference, -Site.Personnel, -Base.File.Host,
-                -`Upland Class`)
+all_data <- read.csv(paste(loc, "training-data/flux_modis_geo_daily.csv", sep = "")) 
 names(all_data)
 ```
 
@@ -2384,7 +2387,7 @@ nsites <- length(levels(factor(all_data$ID)))
 cluster_bysite <- all_data %>% 
   mutate(index = 1, 
          total = length(index),
-         Class = `Site Classification`) %>% 
+         Class = `Site.Classification`) %>% 
   group_by(ID, Cluster, Latitude) %>% 
   summarize(Longitude = Longitude[1],
             Class = Class[1],
@@ -2417,42 +2420,32 @@ write.csv(cluster_bycluster, paste(loc, "/training-data/untitled folder/cluster_
 str(all_data)
 ```
 
-###### Why is SWC, PPFD_IN and Upland Class logical?
+###### Summarize missingness in predictors:
 
 ```{r}
 all_data %>% 
+   dplyr::select(-Cluster, -`Site.Name`, -`Data.Policy`, -Country, -IGBP, -`Site.Classification`, -DOI,  -`DOI.Reference`, -`Site.Personnel`, 
+                -`Upland.Class`, -`Base.File.Host`, -Upscaling, -FCH4, -FCH4_F_UNC, -imputed) %>% 
   group_by(ID) %>% 
-  summarize(TAmin = min(TA, na.rm = T),
-            SWCmin = min(SWC, na.rm = T),
-            SWCmax = max(SWC, na.rm = T),
-            PPFD_INmin = min(PPFD_IN, na.rm = T),
-            PPFD_INmax = max(PPFD_IN, na.rm = T),
-            Upland_Classmin = min(`Upland Class`, na.rm = T),
-            Upland_Classmax = max(`Upland Class`, na.rm = T))
+  summarize_all(list(~sum(is.na(.)) / n() )) %>% 
+  write.csv(paste(loc, "training-data/predictor_missingness.csv", sep = ""), row.names = F)
 ```
 
-They all contain either `Inf` or `-Inf`.
 
-###### Set all Inf or -Inf as NA
 
-```{r}
-all_data[all_data == Inf] <- NA
-all_data[all_data == -Inf] <- NA
-```
-
- 
 ###### Remove extraneous variables and non-class-double data and impute all predictors
-
-
-##### Look at Data 
 
 Using predict function will not work with mixed-classes.
 
+
+
 ```{r}
+
+
 names(all_data)
 all_data_impute <- all_data %>% 
-  dplyr::select(-Cluster, -ID, -`Site Name`, -`Data Policy`, -Country, -IGBP, -`Site Classification`, -DOI,  -`DOI Reference`, -`Site Personnel`, 
-                -`Upland Class`, -`Base File Host`, -Upscaling, -FCH4, -FCH4_F_UNC, -imputed)
+  dplyr::select(-Cluster, -ID, -`Site.Name`, -`Data.Policy`, -Country, -IGBP, -`Site.Classification`, -DOI,  -`DOI.Reference`, -`Site.Personnel`, 
+                -`Upland.Class`, -`Base.File.Host`, -Upscaling, -FCH4, -FCH4_F_UNC, -imputed)
 impute_names <- all_data_impute %>% names()
 
 pp <- preProcess(all_data_impute, method = c("bagImpute"))
