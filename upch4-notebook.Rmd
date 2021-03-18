@@ -450,7 +450,7 @@ write.csv(daily_subset_meta,
 
 #### 4. Gridded Data Pre-Processing
 
-#### *Potential Radiation (RPot)*
+#### *Create Potential Radiation (RPot)*
 
 **Description**
 Get the mean seasonal cycle from Zutao Ouyang's 2001-2018 MATLAB output. Original citation for `Rpot` is [Peltola et al. 2019](10.5194/essd-11-1263-2019) where it was found to be a useful predictor of high latitude wetland FCH4.
@@ -1686,6 +1686,7 @@ worldclim <- as_tibble(raster::extract(stack, site.coords))
 worldclim <- cbind(sites, worldclim) 
 head(worldclim)
 ```
+
 ###### Check for missing data
 
 ```{r}
@@ -2095,7 +2096,7 @@ ggsave(paste(loc, "grids/extracted-qc/vcf_var_sum.pdf", sep = ""),
 First QC passed: everything looks good, and cover types at each site sum to 100.
 
 
-#### CTI Predictors 
+##### CTI Predictors 
 
 ```{r}
 modis_geo %>% 
