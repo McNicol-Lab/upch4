@@ -926,7 +926,36 @@ cti <- cbind(sites, cti) %>%
 head(cti)
 ```
 
-No missing data
+No missing data. 
+
+After QC below, noticed USHRA has a high CTI value. Check on map:
+
+###### Check locations of USHRA and USHRC by cropping raster:
+
+```{r}
+# site.coords[sites$ID %in% c("DEDgw", "USDPW"),]
+USHRA_bb <- c( "xmin" =  -91.751735 - 0.1, "xmax" = -91.751735 + 0.1, 
+               "ymin" = 34.585208 - 0.1 , "ymax" =  34.585208 + 0.1)
+USHRC_bb <- c( "xmin" =  -91.751658 - 0.1, "xmax" = -91.751658 + 0.1, 
+               "ymin" = 34.588830 - 0.1 , "ymax" =  34.588830 + 0.1)
+USHRA_bb <- crop(stack[[1]], USHRA_bb)
+USHRC_bb <- crop(stack[[1]], USHRC_bb)
+```
+
+```{r}
+plot(USHRA_bb)
+points(site.coords)
+```
+
+Caused by HRA being apparently closer to a river/flow channel. No difference obvious in Google Earth images. Probably an issue with the CTI product.
+Given USHRA will become an outlier, I'll correct it to match the lower USHRC value.
+
+###### Correct USHRA to USHRC value
+
+```{r}
+cti[cti$ID == "USHRA", 15] <- cti[cti$ID == "USHRC", 15]
+```
+
 
 ###### Check for missing data
 
@@ -1910,7 +1939,7 @@ ggsave(paste(loc, "grids/extracted-qc/earthenv.pdf", sep = ""),
 
 ##### Terraclimate Predictors
 
-Get 69-74.
+Need 69-74.
 
 ###### Plot the actual values
 
@@ -2013,60 +2042,181 @@ ggsave(paste(loc, "grids/extracted-qc/terraclimate-soilwaterS.pdf", sep = ""),
 
 QC issues:
 
-  + AET looks fine
-  + soilwater seasonality is very variable within some sites, and obviously wrong in locations where wetlands are not the dominant component of the pixel
+  + `aet` looks fine
+  + `soilwater` seasonality is very variable within some sites, and obviously wrong in locations where wetlands are not the dominant component of the pixel
   (e.g., US-TW1 through US-Twt, which are delta marshes embedded in a dryland Mediterranean climate)
 
-## vcf Predictors
-vcf <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/vcf.csv")
+##### VCF Predictors 
 
-# check full year (1994 and 2000)
-vcf %>% 
-  gather(key = vcfpred, value = value, 6:length(vcf)) %>%
-  filter(Year == 1994)
+Need 79-81
 
-vcf %>% 
-  gather(key = vcfpred, value = value, 6:length(vcf)) %>%
-  ggplot(aes(vcfpred,value)) +
+```{r}
+modis_geo %>% 
+  gather(key = "vcf_var", value = "value", 79:81) %>% 
+   mutate(group = ifelse(Latitude > 60, "Boreal", NA),
+          group = ifelse(Latitude < 60 & Latitude > 30, "Temperate", group),
+          group = ifelse(Latitude < 30, "Tropical", group)) %>%
+  ggplot(aes(ID, value, color = group)) +
   geom_point() +
-  facet_wrap(~ID, scales = 'free') +
-  my_theme +
+  facet_wrap(~vcf_var, scales = "free") +
+      my_theme +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
-ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Data QCQA/qaqc/vcf_postqcqa.pdf",
-       width = 50, height = 30, units = c("cm"), dpi = 300)
+ggsave(paste(loc, "grids/extracted-qc/vcf.pdf", sep = ""),
+       width = 30, height = 30, units = c("cm"), dpi = 300)
+```
+
+###### Does each cover type (shrub, tree, bare) sum to 100?
+```{r}
+modis_geo %>% 
+  mutate(vcf_sum = bare + shrub + tree) %>% 
+    ggplot(aes(ID, vcf_sum)) +
+    geom_point() +
+    my_theme
+ggsave(paste(loc, "grids/extracted-qc/vcf_var_sum.pdf", sep = ""),
+       width = 30, height = 30, units = c("cm"), dpi = 300)
+```
+
+First QC passed: everything looks good, and cover types at each site sum to 100.
 
 
-## cti Predictors
-cti <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/cti.csv")
+#### CTI Predictors 
 
-cti %>% 
-  ggplot(aes(ID,cti)) +
+```{r}
+modis_geo %>% 
+  dplyr::select(ID, cti) %>% 
+  group_by(ID) %>% 
+  summarize(ID = ID[1], cti = cti[1]) %>% 
+  ggplot(aes(ID, cti, label = ID)) +
   geom_point() +
-  geom_text(aes(label=ID), vjust = 1.5, hjust = 1) +
-  my_theme +
+  geom_text(hjust = 0, nudge_x = 0.1) +
+      my_theme +
+  labs(y = "Compound Topographic Index (GeoMorpho90m") +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
-ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/cti.pdf",
-       width = 50, height = 30, units = c("cm"), dpi = 300)
+ggsave(paste(loc, "grids/extracted-qc/cti.pdf", sep = ""),
+       width = 30, height = 30, units = c("cm"), dpi = 300)
+```
 
+First QAQC issues:
 
-## wf Predictors
-wf <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/wf.csv")
+  - USHRA seems anomalously high. Go and check why in raster prep. 
+      + After inspection, corrected USHRA to USHRC value, given proximity and no visible diff. in sites. (i.e. CTI product issue)
+  - Other patterns seem to make sense, `CHDav` is in the alps and should have a low/negative CTI
 
-wf %>% 
-  filter(Year == 2010) %>% 
-  ggplot(aes(Month,wf)) +
-  geom_point() +
-  facet_wrap(~ID) +
+##### Wetland Fraction (WF) Predictors 
+
+66 (WF)
+67 (WFS)
+68 (WFR)
+
+###### Plot the actual values
+
+```{r}
+# aet
+modis_geo %>% 
+     mutate(group = ifelse(Latitude > 60, "Boreal", NA),
+          group = ifelse(Latitude < 60 & Latitude > 30, "Temperate", group),
+          group = ifelse(Latitude < 30, "Tropical", group)) %>%
+  ggplot(aes(Month, aet, color = group)) +
+    geom_point(size = 0.5) +
+    facet_wrap(~ID, scales = 'free') +
   my_theme +
-  theme(axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
-ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Data QCQA/qaqc/WFS_postqcqa.pdf",
-       width = 50, height = 30, units = c("cm"), dpi = 300)
+  theme(axis.text.x=element_blank()) +
+  labs(y = "TerraClimate Actual Evapotranspiration (mm/month)")
+ggsave(paste(loc, "grids/extracted-qc/terraclimate-aet.pdf", sep = ""),
+       width = 30, height = 30, units = c("cm"), dpi = 300)
+
+# soil water
+modis_geo %>% 
+     mutate(group = ifelse(Latitude > 60, "Boreal", NA),
+          group = ifelse(Latitude < 60 & Latitude > 30, "Temperate", group),
+          group = ifelse(Latitude < 30, "Tropical", group)) %>%
+  ggplot(aes(Month, soilwater, color = group)) +
+    geom_point(size = 0.5) +
+    facet_wrap(~ID) +
+  my_theme +
+  theme(axis.text.x=element_blank()) +
+  labs(y = "TerraClimate Soil Moisture (mm/month)")
+ggsave(paste(loc, "grids/extracted-qc/terraclimate-soilwater.pdf", sep = ""),
+       width = 30, height = 30, units = c("cm"), dpi = 300)
+
+```
+
+###### Plot the ranges
+
+```{r}
+# aet
+modis_geo %>% 
+     mutate(group = ifelse(Latitude > 60, "Boreal", NA),
+          group = ifelse(Latitude < 60 & Latitude > 30, "Temperate", group),
+          group = ifelse(Latitude < 30, "Tropical", group)) %>%
+  ggplot(aes(Year, aetR, color = group)) +
+    geom_point(size = 0.5) +
+    facet_wrap(~ID) +
+  my_theme +
+  theme(axis.text.x=element_blank()) +
+  labs(y = "TerraClimate Actual Evapotranspiration Annual Range (mm)")
+ggsave(paste(loc, "grids/extracted-qc/terraclimate-aetR.pdf", sep = ""),
+       width = 30, height = 30, units = c("cm"), dpi = 300)
+
+# soil water
+modis_geo %>% 
+     mutate(group = ifelse(Latitude > 60, "Boreal", NA),
+          group = ifelse(Latitude < 60 & Latitude > 30, "Temperate", group),
+          group = ifelse(Latitude < 30, "Tropical", group)) %>%
+  ggplot(aes(Year, soilwaterR, color = group)) +
+    geom_point(size = 0.5) +
+    facet_wrap(~ID) +
+  my_theme +
+  theme(axis.text.x=element_blank()) +
+  labs(y = "TerraClimate Soil Moisture Annual Range (mm)")
+ggsave(paste(loc, "grids/extracted-qc/terraclimate-soilwaterR.pdf", sep = ""),
+       width = 30, height = 30, units = c("cm"), dpi = 300)
+
+```
+
+###### Plot the seasonality
+
+```{r}
+# aetS
+modis_geo %>% 
+     mutate(group = ifelse(Latitude > 60, "Boreal", NA),
+          group = ifelse(Latitude < 60 & Latitude > 30, "Temperate", group),
+          group = ifelse(Latitude < 30, "Tropical", group)) %>%
+  ggplot(aes(Month, aetS, color = group)) +
+    geom_point(size = 0.5) +
+    facet_wrap(~ID) +
+  my_theme +
+  theme(axis.text.x=element_blank()) +
+  labs(y = "TerraClimate Actual Evapotranspiration Annual Seasonality (unitless)")
+ggsave(paste(loc, "grids/extracted-qc/terraclimate-aetS.pdf", sep = ""),
+       width = 30, height = 30, units = c("cm"), dpi = 300)
+
+# soil waterS
+modis_geo %>% 
+     mutate(group = ifelse(Latitude > 60, "Boreal", NA),
+          group = ifelse(Latitude < 60 & Latitude > 30, "Temperate", group),
+          group = ifelse(Latitude < 30, "Tropical", group)) %>%
+  ggplot(aes(Month, soilwaterS, color = group)) +
+    geom_point(size = 0.5) +
+    facet_wrap(~ID) +
+  my_theme +
+  theme(axis.text.x=element_blank()) +
+  labs(y = "TerraClimate Soil Moisture Annual Seasonality (unitless)")
+ggsave(paste(loc, "grids/extracted-qc/terraclimate-soilwaterS.pdf", sep = ""),
+       width = 30, height = 30, units = c("cm"), dpi = 300)
+
+```
+
+QC issues:
+
+  + `aet` looks fine
+  + `soilwater` seasonality is very variable within some sites, and obviously wrong in locations where wetlands are not the dominant component of the pixel
+  (e.g., US-TW1 through US-Twt, which are delta marshes embedded in a dryland Mediterranean climate)
+
 
 
 ## canopyht Predictors
