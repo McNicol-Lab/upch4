@@ -1661,7 +1661,7 @@ wf %>%
   facet_wrap(~ID, scale = 'free')
 ```
 
-Data are now complete (rice, marie and lake sites still ~0 but cannot be corrected, USNC4 was a wetland and has been corrected)
+Data are now complete (rice, mangrove, and lake sites still ~0 but cannot be corrected, USNC4 was a wetland and has been corrected)
 
 ###### Write data
 
@@ -2153,93 +2153,60 @@ WF QC:
 ###### Plot the ranges
 
 ```{r}
-# aet
+# WFR
 modis_geo %>% 
      mutate(group = ifelse(Latitude > 60, "Boreal", NA),
           group = ifelse(Latitude < 60 & Latitude > 30, "Temperate", group),
           group = ifelse(Latitude < 30, "Tropical", group)) %>%
-  ggplot(aes(Year, aetR, color = group)) +
-    geom_point(size = 0.5) +
-    facet_wrap(~ID) +
+  ggplot(aes(ID, WFR, color = group)) +
+    geom_point(size = 0.5, angle = 90) +
   my_theme +
-  theme(axis.text.x=element_blank()) +
-  labs(y = "TerraClimate Actual Evapotranspiration Annual Range (mm)")
-ggsave(paste(loc, "grids/extracted-qc/terraclimate-aetR.pdf", sep = ""),
-       width = 30, height = 30, units = c("cm"), dpi = 300)
-
-# soil water
-modis_geo %>% 
-     mutate(group = ifelse(Latitude > 60, "Boreal", NA),
-          group = ifelse(Latitude < 60 & Latitude > 30, "Temperate", group),
-          group = ifelse(Latitude < 30, "Tropical", group)) %>%
-  ggplot(aes(Year, soilwaterR, color = group)) +
-    geom_point(size = 0.5) +
-    facet_wrap(~ID) +
-  my_theme +
-  theme(axis.text.x=element_blank()) +
-  labs(y = "TerraClimate Soil Moisture Annual Range (mm)")
-ggsave(paste(loc, "grids/extracted-qc/terraclimate-soilwaterR.pdf", sep = ""),
-       width = 30, height = 30, units = c("cm"), dpi = 300)
-
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(y = "Wetland Fraction Range (WAD2M)")
+ggsave(paste(loc, "grids/extracted-qc/wad2m-wfr.pdf", sep = ""),
+       width = 40, height = 30, units = c("cm"), dpi = 300)
 ```
 
 ###### Plot the seasonality
 
 ```{r}
-# aetS
+# WFS
 modis_geo %>% 
      mutate(group = ifelse(Latitude > 60, "Boreal", NA),
           group = ifelse(Latitude < 60 & Latitude > 30, "Temperate", group),
           group = ifelse(Latitude < 30, "Tropical", group)) %>%
-  ggplot(aes(Month, aetS, color = group)) +
+  ggplot(aes(Month, WFS, color = group)) +
     geom_point(size = 0.5) +
-    facet_wrap(~ID) +
+    facet_wrap(~ID, scales = 'free') +
   my_theme +
-  theme(axis.text.x=element_blank()) +
-  labs(y = "TerraClimate Actual Evapotranspiration Annual Seasonality (unitless)")
-ggsave(paste(loc, "grids/extracted-qc/terraclimate-aetS.pdf", sep = ""),
+  theme(axis.text.x = element_blank()) +
+  labs(y = "Wetland Fraction Seasonality (WAD2M)")
+ggsave(paste(loc, "grids/extracted-qc/wad2m-wfs.pdf", sep = ""),
        width = 30, height = 30, units = c("cm"), dpi = 300)
-
-# soil waterS
-modis_geo %>% 
-     mutate(group = ifelse(Latitude > 60, "Boreal", NA),
-          group = ifelse(Latitude < 60 & Latitude > 30, "Temperate", group),
-          group = ifelse(Latitude < 30, "Tropical", group)) %>%
-  ggplot(aes(Month, soilwaterS, color = group)) +
-    geom_point(size = 0.5) +
-    facet_wrap(~ID) +
-  my_theme +
-  theme(axis.text.x=element_blank()) +
-  labs(y = "TerraClimate Soil Moisture Annual Seasonality (unitless)")
-ggsave(paste(loc, "grids/extracted-qc/terraclimate-soilwaterS.pdf", sep = ""),
-       width = 30, height = 30, units = c("cm"), dpi = 300)
-
 ```
 
-QC issues:
+##### canopyht Predictors
 
-  + `aet` looks fine
-  + `soilwater` seasonality is very variable within some sites, and obviously wrong in locations where wetlands are not the dominant component of the pixel
-  (e.g., US-TW1 through US-Twt, which are delta marshes embedded in a dryland Mediterranean climate)
-
-
-
-## canopyht Predictors
-canopyht <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/canopyht.csv")
-
-canopyht %>% 
-  ggplot(aes(ID, canopyht)) +
+```{r}
+modis_geo %>% 
+  dplyr::select(ID, canopyht) %>% 
+  group_by(ID) %>% 
+  summarize(ID = ID[1], canopyht = canopyht[1]) %>% 
+  ggplot(aes(ID, canopyht, label = ID)) +
   geom_point() +
-  geom_text(aes(label = ID), hjust = 1.5, vjust = 1) +
-  my_theme +
+  geom_text(hjust = 0, nudge_x = 0.1) +
+      my_theme +
+  labs(y = "Canpoy Height (m)") +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
-ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/canopyht.pdf",
-       width = 50, height = 30, units = c("cm"), dpi = 300)
+ggsave(paste(loc, "grids/extracted-qc/canopyht.pdf", sep = ""),
+       width = 30, height = 30, units = c("cm"), dpi = 300)
+```
 
+Looks OK!
 
-## ns deposition Predictors
+##### ns deposition Predictors
 nsdepo <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/nsdepo.csv")
 
 # look at range
