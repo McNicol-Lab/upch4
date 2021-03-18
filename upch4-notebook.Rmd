@@ -16,16 +16,18 @@ library(tidyverse)
 library(lubridate)
 library(raster)
 library(oce) # for time series transformations
+library(geosphere)
+library(sf)
 source("code/ggplot_theme.R")
 ```
 
 **NOTE: This work flow uses many large files so most data is stored locally and requires hard filepaths**
-The local file path used for all large files is: `/Volumes/LACIE SHARE/Stanford CH4/upch4_local/`.
+The local file path used for all large files is: `/Volumes/Samsung_T5/Stanford/upch4_local/`.
 
 Set the local head directory:
 
 ```{r}
-loc <- "/Volumes/LACIE SHARE/Stanford CH4/upch4_local/"
+loc <- "/Volumes/Samsung_T5/Stanford/upch4_local/"
 ```
 
 #### Workflow
@@ -2314,5 +2316,91 @@ ggsave(paste(loc, "fluxnet-ch4-data/flux-qc/", years[i], "_free.pdf", sep = ""),
 }
 ```
 
+Fluxes QC: 
+  - Remove `USSne` Data for 2016 (wetland not yet restored)
+
+#### 5. (cont) Reload All Data (`flux_modis_geo_daily`)
+
+```{r}
+all_data <- read_csv(paste(loc, "training-data/flux_modis_geo_daily.csv", sep = ""))
+```
+
+
+##### Adjust Site Data: remove USSne year 2016
+
+```{r}
+all_data <- all_data %>%  
+  mutate(remove = ifelse(ID == "USSne" & Year == 2016, 1, 0)) %>% 
+  filter(remove == 0) %>% dplyr::select(-remove)
+```
+
+
+##### Setup LOSOCV (cluster sites based on location)
+
+```{r}
+site_loc <- all_data %>% 
+  group_by(ID) %>% 
+  summarize(Latitude = Latitude[1],
+            Longitude = Longitude[1]) 
+
+x <- site_loc$Longitude
+y <- site_loc$Latitude
+xy <- SpatialPointsDataFrame(matrix(c(x, y), ncol = 2), 
+                             data.frame(ID = site_loc$ID),
+                             proj4string = CRS("+proj=longlat +ellps=WGS84 +datum=WGS84"))
+
+# calculate Euclidian distance 
+site_dist <- xy %>% distm()
+
+# cluster
+site_clusters <- hclust(as.dist(site_dist), method = 'complete')
+
+# define 300 km threshold
+d <- 300000
+xy$Cluster <- cutree(site_clusters, h=d) 
+xy <- xy %>% as_tibble() %>% 
+  dplyr::select(ID, Cluster)
+
+# rejoin folds
+all_data <- all_data %>% 
+  left_join(xy, by = c("ID")) %>%
+  dplyr::select(Cluster = Cluster, everything())
+
+# summarize folds and sites
+nclusters <- max(all_data$Cluster)
+nsites <- length(levels(factor(all_data$ID)))
+
+# check data count per site and cluster
+cluster_bysite <- all_data %>% 
+  mutate(index = 1, 
+         total = length(index),
+         Class = `Site Classification`) %>% 
+  group_by(ID, Cluster, Latitude) %>% 
+  summarize(Longitude = Longitude[1],
+            Class = Class[1],
+            count = sum(index),
+            percent = count/total[1]*100) 
+
+
+
+# cluster names
+cluster_bycluster <- cluster_bysite %>% ungroup() %>% 
+  mutate(total = sum(count)) %>% 
+  group_by(Cluster) %>% 
+  summarize(Class = Class[1],
+            Lat = mean(Lat),
+            Lon = mean(Lon),
+            cluster_name = ID[1],
+            count = sum(count),
+            percent = count/total[1]*100) %>% 
+  mutate(Band = ifelse(Lat < 30, "Tropics",NA),
+         Band = ifelse(Lat < 60 & Lat > 30, "Temperate", Band),
+         Band = ifelse(Lat > 60, "Boreal", Band)) 
+
+# output cluster stats
+cluster_bycluster %>% 
+  write.csv(., "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Clusters/SOIL/200709_cluster_stats.csv",
+            row.names=FALSE)
+```
 
 
