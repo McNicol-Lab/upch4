@@ -2206,37 +2206,54 @@ ggsave(paste(loc, "grids/extracted-qc/canopyht.pdf", sep = ""),
 
 Looks OK!
 
-##### ns deposition Predictors
-nsdepo <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/nsdepo.csv")
+##### NS Deposition Predictors
 
-# look at range
-nsdepo %>% arrange(desc(nt_depo))
+Get 75-78
 
-nsdepo %>% 
-  gather(key = pollutant, value = rate, 5:8) %>% 
-  ggplot(aes(ID, log10(rate), color = pollutant)) +
+```{r}
+modis_geo %>% 
+  gather(key = "ns_depo_var", value = "value", 75:78) %>% 
+   mutate(group = ifelse(Latitude > 60, "Boreal", NA),
+          group = ifelse(Latitude < 60 & Latitude > 30, "Temperate", group),
+          group = ifelse(Latitude < 30, "Tropical", group)) %>%
+  group_by(ID, ns_depo_var) %>% 
+  summarize(ID = ID[1], ns_depo_var = ns_depo_var[1], value = value[1], group = group[1]) %>% 
+  ggplot(aes(ID, value, color = group, label = ID)) +
   geom_point() +
-  facet_wrap(~pollutant) +
-  geom_text(aes(label = ID)) +
-  my_theme +
+  geom_text(hjust = 0, nudge_x = 0.5, size = 2) +
+  facet_wrap(~ns_depo_var, scales = "free") +
+      my_theme +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
-ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/nsdepo.pdf",
-       width = 50, height = 30, units = c("cm"), dpi = 300)
+ggsave(paste(loc, "grids/extracted-qc/ns_depo.pdf", sep = ""),
+       width = 30, height = 30, units = c("cm"), dpi = 300)
+```
 
-## sgrids Predictors
-sgrids <- read.csv("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Extractions/sgrids.csv")
+Looks fine. 
 
-sgrids %>% 
-  gather(key = variable, value = value, 5:10) %>% 
-  ggplot(aes(ID, value, color = variable)) +
+##### SoilGrids250m Predictors
+
+Get 104-109.
+
+```{r}
+modis_geo %>% 
+  gather(key = "soilgrids_var", value = "value", 104:109) %>% 
+   mutate(group = ifelse(Latitude > 60, "Boreal", NA),
+          group = ifelse(Latitude < 60 & Latitude > 30, "Temperate", group),
+          group = ifelse(Latitude < 30, "Tropical", group)) %>%
+  group_by(ID, soilgrids_var) %>% 
+  summarize(ID = ID[1], soilgrids_var = soilgrids_var[1], value = value[1], group = group[1]) %>% 
+  ggplot(aes(ID, value, color = group, label = ID)) +
   geom_point() +
-  facet_wrap(~variable, scales = 'free') +
-  geom_text(aes(label = ID)) +
-  my_theme +
+  geom_text(hjust = 0, nudge_x = 0.5, size = 2) +
+  facet_wrap(~soilgrids_var, scales = "free") +
+      my_theme +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
-ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Figures/qaqc/sgrids.pdf",
-       width = 50, height = 30, units = c("cm"), dpi = 300)
+ggsave(paste(loc, "grids/extracted-qc/soilgrids.pdf", sep = ""),
+       width = 30, height = 30, units = c("cm"), dpi = 300)
+```
+
+Looks fine!
