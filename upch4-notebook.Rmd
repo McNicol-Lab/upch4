@@ -2719,6 +2719,20 @@ ggsave(paste(loc, "/training-data/imputation-qc/P.png", sep = ""),
 
 ```
 
+##### Output: Write complete `all_data`
+
+```{r}
+write.csv(all_data, paste(loc, "/training-data/all_data.csv", sep = ""), row.names = F)
+```
+
+##### Output: Table of Final FLUXNET-CH4 Inputs
+
+```{r}
+names(all_data)[24:146] %>% write.csv(paste(loc, "/training-data/list_of_predictors.csv", sep = ""))
+```
+
+#### 6. Forward Feature Selection
+
 ##### Summarize clusters now that data have been filtered
 
 ```{r}
