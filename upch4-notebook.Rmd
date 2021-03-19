@@ -2766,8 +2766,8 @@ cluster_bycluster <- cluster_bysite %>% ungroup() %>%
          Band = ifelse(Latitude > 60, "Boreal", Band)) 
 
 # output cluster stats
-write.csv(cluster_bysite, paste(loc, "/training-data/untitled folder/cluster_bysite.csv", sep = ""), row.names = F)
-write.csv(cluster_bycluster, paste(loc, "/training-data/untitled folder/cluster_bycluster.csv", sep = ""), row.names = F)
+write.csv(cluster_bysite, paste(loc, "/training-data/clusters/cluster_bysite.csv", sep = ""), row.names = F)
+write.csv(cluster_bycluster, paste(loc, "/training-data/clusters/cluster_bycluster.csv", sep = ""), row.names = F)
 ```
 
 
