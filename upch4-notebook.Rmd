@@ -2768,10 +2768,12 @@ ggsave(paste(loc, "/training-data/imputation-qc/P.png", sep = ""),
 write.csv(all_data, paste(loc, "/training-data/all_data.csv", sep = ""), row.names = F)
 ```
 
-##### Output: Table of Final FLUXNET-CH4 Inputs
+##### Output: Table of Final FLUXNET-CH4 Inputs: 
+
+  + **Manually edit to create new file `list_of_predictors_metadata.csv` with class and information content variables
 
 ```{r}
-names(all_data)[24:146] %>% write.csv(paste(loc, "/training-data/list_of_predictors.csv", sep = ""))
+names(all_data)[23:ncol(all_data)] %>% write.csv(paste(loc, "/training-data/list_of_predictors.csv", sep = ""))
 ```
 
 #### 6. Forward Feature Selection
@@ -2837,6 +2839,225 @@ write.csv(cluster_bysite, paste(loc, "/training-data/clusters/cluster_bysite.csv
 write.csv(cluster_bycluster, paste(loc, "/training-data/clusters/cluster_bycluster.csv", sep = ""), row.names = F)
 ```
 
+##### Rank predictors using FFS (ALL)
 
+###### Read in predictor metadata
+
+```{r}
+pred.metadata <- read.csv(paste(loc, "/training-data/list_of_predictors_metadata.csv", sep = ""))
+```
+
+###### Select features
+
+```{r}
+feat <- pred.metadata$Predictor
+feat_l <- length(feat)
+data_l <- length(all_data$Cluster)
+```
+
+###### Create pairwise feat combinations for FFS
+
+```{r}
+feat_pairs_full <- combn(feat, 2, simplify = FALSE)
+length(feat_pairs_full)
+```
+
+###### Remove pairs of static predictors (unlikely to be informative)
+
+```{r}
+static.predictors <- pred.metadata %>% 
+  filter(Content == "Spatial") %>% 
+  dplyr::select(Predictor, Content)
+
+feat_pairs_n <- length(feat_pairs_full)
+
+feat_pairs_remove <- bind_cols(feat_pairs_full) %>% 
+  gather(key = "pair", value = "Predictor") %>% 
+  mutate(pair = str_remove(pair, "...")) %>% 
+  left_join(static.predictors) %>% 
+  filter(!is.na(Content)) %>% 
+  group_by(pair) %>% 
+  summarize(n_static = n()) %>% 
+  filter(n_static == 2) %>% 
+  dplyr::select(pair) %>% pull() %>% as.numeric()
+
+feat_pairs <- feat_pairs_full[-feat_pairs_remove]
+
+length(feat_pairs) 
+```
+
+###### Save `feat_pairs` to view
+
+```{r}
+bind_cols(feat_pairs) %>% 
+  gather(key = Pair, value = Predictor) %>% 
+  mutate(Pair = str_remove(Pair,'...')) %>% 
+  write.csv(paste(loc, "training-data/feat/feat_pairs.csv", sep = ""), row.names = FALSE)
+```
+
+#### 6. (cont.) FFS of first predictor pair
+
+##### Get fold number and fold names
+
+```{r}
+set.seed(23)
+
+# data inner folds 
+folds <- all_data %>% mutate(Cluster = as.factor(Cluster)) %>% dplyr::select(Cluster) %>% pull() %>% levels() %>% length()
+fold_names <- all_data %>% group_by(Cluster) %>% summarize(Name = ID[1]) 
+```
+
+##### Setup ML folds
+
+```{r}
+train_feat <- list()
+train_label <- list()
+validate_data <- list()
+
+for (i in 1:folds) {
+  train_label[[i]] <- all_data %>% filter(!Cluster == i) %>% dplyr::select(FCH4) %>% pull()
+  train_feat[[i]] <- all_data %>% filter(!Cluster == i) %>% dplyr::select(feat)
+  validate_data[[i]] <- all_data %>% filter(Cluster == i) %>% dplyr::select(Cluster, FCH4, feat)
+}
+
+folds_index <- list() # need list within list (each inner list has all fold site except LOSO fold)
+for (i in 1:folds) {
+  x <- list()
+  folds_index[[i]] <- x
+}
+
+for (i in 1:folds) {
+  for (j in 1:folds) {
+    folds_index[[i]][[j]] <- all_data %>% 
+      filter(!Cluster == i) %>% 
+      mutate(index = 1:n()) %>% 
+      filter(!Cluster == j) %>% 
+      dplyr::select(index) %>% 
+      pull()
+  }
+  folds_index[[i]] <- folds_index[[i]][-i]
+}
+
+```
+
+##### Train multiple RFs (with CV) for FFS to select the first pair
+
+```{r}
+# outer loop lists
+rf_metrics <- list()
+
+# initialize feature pairs
+feat_initial <- 2
+
+for(j in 1:10) {
+
+  # set up RF lists
+  tgrid <- list()
+  myControl <- list()
+  rf_model <- list()
+  rf_varimp <- list()
+  
+  for (i in 1:folds) {
+    
+    num.trees.rf <- ifelse(feat_initial < 5, 50, 100)
+    
+    ## Create tune-grid
+    tgrid <- expand.grid(
+      mtry = c(2),
+      splitrule = "variance", 
+      min.node.size = c(50)
+    )
+    
+    ## Create trainControl object
+    myControl <- trainControl(
+      method = "none",
+      classProbs = FALSE,
+      allowParallel = TRUE
+    )
+
+    ## train rf on folds
+    rf_model[[i]] <- train(
+      x = train_feat[[i]][,feat_pairs[[i]]], 
+      y = train_label[[i]],
+      num.trees = num.trees.rf, 
+      method = 'ranger',
+      trControl = myControl,
+      tuneGrid = tgrid,
+      metric = "MAE"
+    )
+    print(paste(i, "th fold", sep = ""))
+  }
+  
+  # get all hold out predictions
+  rf.pred <- list()
+  for (i in 1:15) {
+    rf.pred[[i]] <- validate_data[[16]] %>% 
+      filter(Cluster == i) %>%   
+      mutate(FCH4P = predict(rf_model[[i]], .),
+             index = 1:n())
+  }
+  rf.pred.all <- bind_rows(rf.pred)
+  
+  rf_metrics[[j]] <- ungroup(rf.pred.all) %>% 
+    summarize(samples = n(),
+              PMARE = 100/n() * sum(abs(FCH4 - FCH4P) / FCH4),
+              R2 = cor(FCH4P, FCH4)^2,
+              NSE = 1 - sum((FCH4 - FCH4P)^2) / sum((FCH4 - mean(FCH4))^2),
+              MAE = sum(abs(FCH4 - FCH4P))/n(),
+              nMAE = MAE/sd(FCH4),
+              MeanO = mean(FCH4),
+              MedO = median(FCH4),
+              sdO = sd(FCH4),
+              MeanP = mean(FCH4P),
+              MedP = median(FCH4P),
+              sdP = sd(FCH4P),
+              nSD = sdP/sdO,
+              Bias = mean(FCH4P - FCH4),
+              cBias = abs(Bias)/sum(abs(Bias))*100,
+              predictors = list(feat_pairs[[j]]) )
+
+  print(paste(j, "th pair", sep = ""))
+}
+
+```
+
+
+# parallel::stopCluster(cl)
+
+# combine and write out data
+rf_metrics_all <- bind_rows(rf_metrics) 
+# rf_metrics_all <- rf_metrics_subset %>% bind_rows(rf_metrics_all)
+
+# get length
+length(rf_metrics_all$samples)
+
+# look at metrics distribution
+rf_metrics_all %>% 
+  ggplot(aes(R2)) +
+  geom_histogram() + mytheme
+ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/FFS/FWET_RELIEF/200820_ffs_subset_canopyht_R2.png", sep = ""),
+       width = 8, height = 15, units = c("cm"), dpi = 300) 
+
+rf_metrics_all %>% 
+  ggplot(aes(MAE)) +
+  geom_histogram() + mytheme
+ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/FFS/FWET_RELIEF/200820_ffs_subset_canopyht_MAE.png", sep = ""),
+       width = 8, height = 15, units = c("cm"), dpi = 300) 
+
+# get the min MAE and amx R2 (are they the same?)
+rf_metrics_all %>% 
+  filter(R2 == max(R2))
+rf_metrics_all %>% 
+  filter(MAE == min(MAE))
+
+# look at top 10
+rf_metrics_all %>% 
+  arrange(MAE) %>% 
+  head(10) %>% view()
+
+# look at all
+view(rf_metrics_all)
+
+saveRDS(rf_metrics_all, "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/FFS/FWET_RELIEF/200820_ffs_subset_metrics.rds")
 
 
