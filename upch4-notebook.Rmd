@@ -2354,39 +2354,6 @@ all_data <- all_data %>%
   filter(remove == 0) %>% dplyr::select(-remove)
 ```
 
-##### Setup LOSOCV (cluster sites based on location)
-
-```{r}
-site_loc <- all_data %>% 
-  group_by(ID) %>% 
-  summarize(Latitude = Latitude[1],
-            Longitude = Longitude[1]) 
-
-x <- site_loc$Longitude
-y <- site_loc$Latitude
-xy <- SpatialPointsDataFrame(matrix(c(x, y), ncol = 2), 
-                             data.frame(ID = site_loc$ID),
-                             proj4string = CRS("+proj=longlat +ellps=WGS84 +datum=WGS84"))
-
-# calculate Euclidian distance 
-site_dist <- xy %>% distm()
-
-# cluster
-site_clusters <- hclust(as.dist(site_dist), method = 'complete')
-
-# define 300 km threshold
-d <- 300000
-xy$Cluster <- cutree(site_clusters, h=d) 
-xy <- xy %>% as_tibble() %>% 
-  dplyr::select(ID, Cluster)
-
-# rejoin folds
-all_data <- all_data %>% 
-  left_join(xy, by = c("ID")) %>%
-  dplyr::select(Cluster = Cluster, everything())
-```
-
-
 ##### Look at data, and extent of missing data
 
 ```{r}
@@ -2397,7 +2364,7 @@ str(all_data)
 
 ```{r}
 all_data %>% 
-   dplyr::select(-Cluster, -`Site.Name`, -`Data.Policy`, -Country, -IGBP, -`Site.Classification`, -DOI,  -`DOI.Reference`, -`Site.Personnel`, 
+   dplyr::select(-`Site.Name`, -`Data.Policy`, -Country, -IGBP, -`Site.Classification`, -DOI,  -`DOI.Reference`, -`Site.Personnel`, 
                 -`Upland.Class`, -`Base.File.Host`, -Upscaling, -FCH4, -FCH4_F_UNC, -imputed) %>% 
   group_by(ID) %>% 
   summarize_all(list(~sum(is.na(.)) / n() )) %>% 
@@ -2416,7 +2383,7 @@ all_data <- all_data %>%
   dplyr::select(-PPFD_IN, -NETRAD, -H, -RH, -USTAR, -WS, -TS, -SWC, -WTD, -LAI, -LAI_msc, -LAI_mean, -LAI_min, -LAI_max, -LAI_amp)
 
 all_data_impute <- all_data %>% 
-  dplyr::select(-Cluster, -ID, -`Site.Name`, -`Data.Policy`, -Country, -IGBP, -`Site.Classification`, -DOI,  -`DOI.Reference`, -`Site.Personnel`, 
+  dplyr::select(-ID, -`Site.Name`, -`Data.Policy`, -Country, -IGBP, -`Site.Classification`, -DOI,  -`DOI.Reference`, -`Site.Personnel`, 
                 -`Upland.Class`, -`Base.File.Host`, -Upscaling, -FCH4, -FCH4_F_UNC, -imputed) 
 
 impute_names <- all_data_impute %>% names()
@@ -2432,7 +2399,7 @@ all_data[impute_names[1:40]] <- all_data_impute_pp
 
 ```{r}
 all_data %>% 
-   dplyr::select(-Cluster, -`Site.Name`, -`Data.Policy`, -Country, -IGBP, -`Site.Classification`, -DOI,  -`DOI.Reference`, -`Site.Personnel`,
+   dplyr::select(-`Site.Name`, -`Data.Policy`, -Country, -IGBP, -`Site.Classification`, -DOI,  -`DOI.Reference`, -`Site.Personnel`,
                 -`Upland.Class`, -`Base.File.Host`, -Upscaling, -FCH4, -FCH4_F_UNC, -imputed) %>%
   group_by(ID) %>%
   summarize_all(list(~sum(is.na(.)) / n() )) %>% 
@@ -2455,7 +2422,7 @@ all_data[all_data$Year == 2016 & all_data$Month == 2 & all_data$Week == 8 , 57:1
 
 ```{r}
 all_data %>% 
-   dplyr::select(-Cluster, -`Site.Name`, -`Data.Policy`, -Country, -IGBP, -`Site.Classification`, -DOI,  -`DOI.Reference`, -`Site.Personnel`,
+   dplyr::select(-`Site.Name`, -`Data.Policy`, -Country, -IGBP, -`Site.Classification`, -DOI,  -`DOI.Reference`, -`Site.Personnel`,
                 -`Upland.Class`, -`Base.File.Host`, -Upscaling, -FCH4, -FCH4_F_UNC, -imputed) %>%
   group_by(ID) %>%
   summarize_all(list(~sum(is.na(.)) / n() )) %>% 
@@ -2800,6 +2767,38 @@ dim(all_data)
 all_data <- all_data %>% 
   filter(complete.cases(.))
 dim(all_data)
+```
+
+##### Setup LOSOCV (cluster sites based on location)
+
+```{r}
+site_loc <- all_data %>% 
+  group_by(ID) %>% 
+  summarize(Latitude = Latitude[1],
+            Longitude = Longitude[1]) 
+
+x <- site_loc$Longitude
+y <- site_loc$Latitude
+xy <- SpatialPointsDataFrame(matrix(c(x, y), ncol = 2), 
+                             data.frame(ID = site_loc$ID),
+                             proj4string = CRS("+proj=longlat +ellps=WGS84 +datum=WGS84"))
+
+# calculate Euclidian distance 
+site_dist <- xy %>% distm()
+
+# cluster
+site_clusters <- hclust(as.dist(site_dist), method = 'complete')
+
+# define 300 km threshold
+d <- 300000
+xy$Cluster <- cutree(site_clusters, h=d) 
+xy <- xy %>% as_tibble() %>% 
+  dplyr::select(ID, Cluster)
+
+# rejoin folds
+all_data <- all_data %>% 
+  left_join(xy, by = c("ID")) %>%
+  dplyr::select(Cluster = Cluster, everything())
 ```
 
 ##### Summarize clusters now that data have been filtered
