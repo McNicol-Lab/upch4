@@ -2393,7 +2393,7 @@ all_data <- all_data %>%
 str(all_data)
 ```
 
-###### Summarize missingness in predictors:
+##### Summarize missingness in predictors:
 
 ```{r}
 all_data %>% 
@@ -2405,9 +2405,11 @@ all_data %>%
 
 ```
 
-###### Remove extraneous variables and non-class-double data and impute the first 40 predictors
+##### Remove extraneous variables and non-class-double data and impute the first 40 predictors
 
 Using predict function will not work with mixed-classes.
+Most of the missing data are in the first EC tower and MODIS variables.
+
 
 ```{r}
 all_data <- all_data %>% 
@@ -2422,12 +2424,11 @@ impute_names <- all_data_impute %>% names()
 
 pp <- preProcess(all_data_impute[, 1:40], method = "bagImpute")
 all_data_impute_pp <- predict(pp, all_data_impute[, 1:40])
-
+rm(pp)
 all_data[impute_names[1:40]] <- all_data_impute_pp
-
 ```
 
-###### Summarize missingness after imputation in predictors:
+##### Summarize missingness after imputation in predictors:
 
 ```{r}
 all_data %>% 
@@ -2436,6 +2437,29 @@ all_data %>%
   group_by(ID) %>%
   summarize_all(list(~sum(is.na(.)) / n() )) %>% 
   write.csv(paste(loc, "training-data/missingness/predictor_missingness_after_impute.csv", sep = ""), row.names = F)
+```
+
+##### There are still some missing data, check where:
+
+```{r}
+all_data %>% 
+  filter(is.na(wc_mtdq))
+```
+##### Fix by set Month 2, Week 8 equal to Month 2 Week 7:
+
+```{r}
+all_data[all_data$Year == 2016 & all_data$Month == 2 & all_data$Week == 8 , 57:146] <- all_data[all_data$Year == 2016 & all_data$Month == 2 & all_data$Week == 7 , 57:146]
+```
+
+##### Summarize missingness after manual imputation in predictors:
+
+```{r}
+all_data %>% 
+   dplyr::select(-Cluster, -`Site.Name`, -`Data.Policy`, -Country, -IGBP, -`Site.Classification`, -DOI,  -`DOI.Reference`, -`Site.Personnel`,
+                -`Upland.Class`, -`Base.File.Host`, -Upscaling, -FCH4, -FCH4_F_UNC, -imputed) %>%
+  group_by(ID) %>%
+  summarize_all(list(~sum(is.na(.)) / n() )) %>% 
+  write.csv(paste(loc, "training-data/missingness/predictor_missingness_after_impute_after_manual.csv", sep = ""), row.names = F)
 ```
 
 ##### Add lagged variables
@@ -2752,10 +2776,11 @@ names(all_data)[24:146] %>% write.csv(paste(loc, "/training-data/list_of_predict
 
 #### 6. Forward Feature Selection
 
-##### Read in data
+##### Read in data and remove upland class
 
 ```{r}
-all_data <- read.csv(paste(loc, "/training-data/all_data.csv", sep = ""))
+all_data <- read.csv(paste(loc, "/training-data/all_data.csv", sep = "")) %>% 
+  dplyr::select(-`Upland.Class`)
 ```
 
 ##### Subset only days with at least one observation
@@ -2764,6 +2789,14 @@ all_data <- read.csv(paste(loc, "/training-data/all_data.csv", sep = ""))
 all_data <- all_data %>% 
   filter(imputed < 1) %>% 
   dplyr::select(-imputed)
+dim(all_data)
+```
+
+##### Remove other stray NAs using complete cases
+
+```{r}
+all_data <- all_data %>% 
+  filter(complete.cases(.))
 dim(all_data)
 ```
 
