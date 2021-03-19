@@ -2346,7 +2346,6 @@ all_data <- read.csv(paste(loc, "training-data/flux_modis_geo_daily.csv", sep = 
 names(all_data)
 ```
 
-
 ##### Adjust Site Data: remove USSne year 2016
 
 ```{r}
@@ -2444,149 +2443,169 @@ all_data %>%
 ```{r}
 all_data <- all_data %>% 
   group_by(ID) %>% 
-  mutate(rpot_LAG4 = lag(rpot, 4, default = median(rpot[1:4], na.rm=TRUE)), ## generic monthly seasonality (4,8,12)
-         rpot_LAG8 = lag(rpot, 8, default = median(rpot[1:8], na.rm=TRUE)), 
-         rpot_LAG12 = lag(rpot, 12, default = median(rpot[1:12], na.rm=TRUE)), 
-         rpot_LEAD4 = lead(rpot, 4, default = median(rpot[(length(rpot)-4):length(rpot)], na.rm=TRUE)), 
-         rpot_LEAD8 = lead(rpot, 8, default = median(rpot[(length(rpot)-8):length(rpot)], na.rm=TRUE)), 
-         rpot_LEAD12 = lead(rpot, 12, default = median(rpot[(length(rpot)-12):length(rpot)], na.rm=TRUE)), 
+  mutate(rpot_LAG30 = lag(rpot, 30, default = median(rpot[1:30], na.rm=TRUE)), ## generic monthly seasonality (30, 60, 90)
+         rpot_LAG60 = lag(rpot, 60, default = median(rpot[1:60], na.rm=TRUE)), 
+         rpot_LAG90 = lag(rpot, 90, default = median(rpot[1:90], na.rm=TRUE)), 
+         rpot_LEAD30 = lead(rpot, 30, default = median(rpot[(length(rpot)-30):length(rpot)], na.rm=TRUE)), 
+         rpot_LEAD60 = lead(rpot, 60, default = median(rpot[(length(rpot)-60):length(rpot)], na.rm=TRUE)), 
+         rpot_LEAD90 = lead(rpot, 90, default = median(rpot[(length(rpot)-90):length(rpot)], na.rm=TRUE)), 
          
-         WFS_LAG4 = lag(WFS, 4, default = median(WFS[1:4], na.rm=TRUE)), ## RS monthly seasonality (4,8,12)
-         WFS_LAG8 = lag(WFS, 8, default = median(WFS[1:8], na.rm=TRUE)), 
-         WFS_LAG12 = lag(WFS, 12, default = median(WFS[1:12], na.rm=TRUE)), 
-         WFS_LEAD4 = lead(WFS, 4, default = median(WFS[(length(WFS)-4):length(WFS)], na.rm=TRUE)), 
-         WFS_LEAD8 = lead(WFS, 8, default = median(WFS[(length(WFS)-8):length(WFS)], na.rm=TRUE)), 
-         WFS_LEAD12 = lead(WFS, 12, default = median(WFS[(length(WFS)-12):length(WFS)], na.rm=TRUE)),
+         WFS_LAG30 = lag(WFS, 30, default = median(WFS[1:30], na.rm=TRUE)), ## RS monthly seasonality (30, 60, 90)
+         WFS_LAG60 = lag(WFS, 60, default = median(WFS[1:60], na.rm=TRUE)), 
+         WFS_LAG90 = lag(WFS, 90, default = median(WFS[1:90], na.rm=TRUE)), 
+         WFS_LEAD30 = lead(WFS, 30, default = median(WFS[(length(WFS)-30):length(WFS)], na.rm=TRUE)), 
+         WFS_LEAD60 = lead(WFS, 60, default = median(WFS[(length(WFS)-60):length(WFS)], na.rm=TRUE)), 
+         WFS_LEAD90 = lead(WFS, 90, default = median(WFS[(length(WFS)-90):length(WFS)], na.rm=TRUE)),
          
-         LSTN_LAG1 = lag(LSTN, 1, default = median(LSTN[1:1], na.rm=TRUE)),  ## RS 1-day seasonality (1,2,3)
-         LSTN_LAG2 = lag(LSTN, 2, default = median(LSTN[1:2], na.rm=TRUE)), 
-         LSTN_LAG3 = lag(LSTN, 3, default = median(LSTN[1:3], na.rm=TRUE)), 
-         LSTN_LEAD1 = lead(LSTN, 1, default = median(LSTN[(length(LSTN)-1):length(LSTN)], na.rm=TRUE)), 
-         LSTN_LEAD2 = lead(LSTN, 2, default = median(LSTN[(length(LSTN)-2):length(LSTN)], na.rm=TRUE)), 
-         LSTN_LEAD3 = lead(LSTN, 3, default = median(LSTN[(length(LSTN)-3):length(LSTN)], na.rm=TRUE)),
+         LSTN_LAG7 = lag(LSTN, 7, default = median(LSTN[1:7], na.rm=TRUE)),  ## RS 7-day seasonality (7, 14, 21)
+         LSTN_LAG14 = lag(LSTN, 14, default = median(LSTN[1:14], na.rm=TRUE)), 
+         LSTN_LAG21 = lag(LSTN, 21, default = median(LSTN[1:21], na.rm=TRUE)), 
+         LSTN_LEAD7 = lead(LSTN, 7, default = median(LSTN[(length(LSTN)-7):length(LSTN)], na.rm=TRUE)), 
+         LSTN_LEAD14 = lead(LSTN, 14, default = median(LSTN[(length(LSTN)-14):length(LSTN)], na.rm=TRUE)), 
+         LSTN_LEAD21 = lead(LSTN, 21, default = median(LSTN[(length(LSTN)-21):length(LSTN)], na.rm=TRUE)),
          
-         NDSI_LAG1 = lag(NDSI, 1, default = median(NDSI[1:1], na.rm=TRUE)), 
-         NDSI_LAG2 = lag(NDSI, 2, default = median(NDSI[1:2], na.rm=TRUE)), 
-         NDSI_LAG3 = lag(NDSI, 3, default = median(NDSI[1:3], na.rm=TRUE)), 
-         NDSI_LEAD1 = lead(NDSI, 1, default = median(NDSI[(length(NDSI)-1):length(NDSI)], na.rm=TRUE)), 
-         NDSI_LEAD2 = lead(NDSI, 2, default = median(NDSI[(length(NDSI)-2):length(NDSI)], na.rm=TRUE)), 
-         NDSI_LEAD3 = lead(NDSI, 3, default = median(NDSI[(length(NDSI)-3):length(NDSI)], na.rm=TRUE)),
+         NDSI_LAG7 = lag(NDSI, 7, default = median(NDSI[1:7], na.rm=TRUE)), 
+         NDSI_LAG14 = lag(NDSI, 14, default = median(NDSI[1:14], na.rm=TRUE)), 
+         NDSI_LAG21 = lag(NDSI, 21, default = median(NDSI[1:21], na.rm=TRUE)), 
+         NDSI_LEAD7 = lead(NDSI, 7, default = median(NDSI[(length(NDSI)-7):length(NDSI)], na.rm=TRUE)), 
+         NDSI_LEAD14 = lead(NDSI, 14, default = median(NDSI[(length(NDSI)-14):length(NDSI)], na.rm=TRUE)), 
+         NDSI_LEAD21 = lead(NDSI, 21, default = median(NDSI[(length(NDSI)-21):length(NDSI)], na.rm=TRUE)),
          
-         NDVI_LAG1 = lag(NDVI, 1, default = median(NDVI[1:1], na.rm=TRUE)), 
-         NDVI_LAG2 = lag(NDVI, 2, default = median(NDVI[1:2], na.rm=TRUE)), 
-         NDVI_LAG3 = lag(NDVI, 3, default = median(NDVI[1:3], na.rm=TRUE)), 
-         NDVI_LEAD1 = lead(NDVI, 1, default = median(NDVI[(length(NDVI)-1):length(NDVI)], na.rm=TRUE)), 
-         NDVI_LEAD2 = lead(NDVI, 2, default = median(NDVI[(length(NDVI)-2):length(NDVI)], na.rm=TRUE)), 
-         NDVI_LEAD3 = lead(NDVI, 3, default = median(NDVI[(length(NDVI)-3):length(NDVI)], na.rm=TRUE)),
+         NDVI_LAG7 = lag(NDVI, 7, default = median(NDVI[1:7], na.rm=TRUE)), 
+         NDVI_LAG14 = lag(NDVI, 14, default = median(NDVI[1:14], na.rm=TRUE)), 
+         NDVI_LAG21 = lag(NDVI, 21, default = median(NDVI[1:21], na.rm=TRUE)), 
+         NDVI_LEAD7 = lead(NDVI, 7, default = median(NDVI[(length(NDVI)-7):length(NDVI)], na.rm=TRUE)), 
+         NDVI_LEAD14 = lead(NDVI, 14, default = median(NDVI[(length(NDVI)-14):length(NDVI)], na.rm=TRUE)), 
+         NDVI_LEAD21 = lead(NDVI, 21, default = median(NDVI[(length(NDVI)-21):length(NDVI)], na.rm=TRUE)),
          
-         EVI_LAG1 = lag(EVI, 1, default = median(EVI[1:1], na.rm=TRUE)), 
-         EVI_LAG2 = lag(EVI, 2, default = median(EVI[1:2], na.rm=TRUE)), 
-         EVI_LAG3 = lag(EVI, 3, default = median(EVI[1:3], na.rm=TRUE)), 
-         EVI_LEAD1 = lead(EVI, 1, default = median(EVI[(length(EVI)-1):length(EVI)], na.rm=TRUE)), 
-         EVI_LEAD2 = lead(EVI, 2, default = median(EVI[(length(EVI)-2):length(EVI)], na.rm=TRUE)), 
-         EVI_LEAD3 = lead(EVI, 3, default = median(EVI[(length(EVI)-3):length(EVI)], na.rm=TRUE)),
+         EVI_LAG7 = lag(EVI, 7, default = median(EVI[1:7], na.rm=TRUE)), 
+         EVI_LAG14 = lag(EVI, 14, default = median(EVI[1:14], na.rm=TRUE)), 
+         EVI_LAG21 = lag(EVI, 21, default = median(EVI[1:21], na.rm=TRUE)), 
+         EVI_LEAD7 = lead(EVI, 7, default = median(EVI[(length(EVI)-7):length(EVI)], na.rm=TRUE)), 
+         EVI_LEAD14 = lead(EVI, 14, default = median(EVI[(length(EVI)-14):length(EVI)], na.rm=TRUE)), 
+         EVI_LEAD21 = lead(EVI, 21, default = median(EVI[(length(EVI)-21):length(EVI)], na.rm=TRUE)),
          
-         NDWI_LAG1 = lag(NDWI, 1, default = median(NDWI[1:1], na.rm=TRUE)), 
-         NDWI_LAG2 = lag(NDWI, 2, default = median(NDWI[1:2], na.rm=TRUE)), 
-         NDWI_LAG3 = lag(NDWI, 3, default = median(NDWI[1:3], na.rm=TRUE)), 
-         NDWI_LEAD1 = lead(NDWI, 1, default = median(NDWI[(length(NDWI)-1):length(NDWI)], na.rm=TRUE)), 
-         NDWI_LEAD2 = lead(NDWI, 2, default = median(NDWI[(length(NDWI)-2):length(NDWI)], na.rm=TRUE)), 
-         NDWI_LEAD3 = lead(NDWI, 3, default = median(NDWI[(length(NDWI)-3):length(NDWI)], na.rm=TRUE)),
+         NDWI_LAG7 = lag(NDWI, 7, default = median(NDWI[1:7], na.rm=TRUE)), 
+         NDWI_LAG14 = lag(NDWI, 14, default = median(NDWI[1:14], na.rm=TRUE)), 
+         NDWI_LAG21 = lag(NDWI, 21, default = median(NDWI[1:21], na.rm=TRUE)), 
+         NDWI_LEAD7 = lead(NDWI, 7, default = median(NDWI[(length(NDWI)-7):length(NDWI)], na.rm=TRUE)), 
+         NDWI_LEAD14 = lead(NDWI, 14, default = median(NDWI[(length(NDWI)-14):length(NDWI)], na.rm=TRUE)), 
+         NDWI_LEAD21 = lead(NDWI, 21, default = median(NDWI[(length(NDWI)-21):length(NDWI)], na.rm=TRUE)),
          
-         SRWI_LAG1 = lag(SRWI, 1, default = median(SRWI[1:1], na.rm=TRUE)), 
-         SRWI_LAG2 = lag(SRWI, 2, default = median(SRWI[1:2], na.rm=TRUE)), 
-         SRWI_LAG3 = lag(SRWI, 3, default = median(SRWI[1:3], na.rm=TRUE)), 
-         SRWI_LEAD1 = lead(SRWI, 1, default = median(SRWI[(length(SRWI)-1):length(SRWI)], na.rm=TRUE)), 
-         SRWI_LEAD2 = lead(SRWI, 2, default = median(SRWI[(length(SRWI)-2):length(SRWI)], na.rm=TRUE)), 
-         SRWI_LEAD3 = lead(SRWI, 3, default = median(SRWI[(length(SRWI)-3):length(SRWI)], na.rm=TRUE)),
+         SRWI_LAG7 = lag(SRWI, 7, default = median(SRWI[1:7], na.rm=TRUE)), 
+         SRWI_LAG14 = lag(SRWI, 14, default = median(SRWI[1:14], na.rm=TRUE)), 
+         SRWI_LAG21 = lag(SRWI, 21, default = median(SRWI[1:21], na.rm=TRUE)), 
+         SRWI_LEAD7 = lead(SRWI, 7, default = median(SRWI[(length(SRWI)-7):length(SRWI)], na.rm=TRUE)), 
+         SRWI_LEAD14 = lead(SRWI, 14, default = median(SRWI[(length(SRWI)-14):length(SRWI)], na.rm=TRUE)), 
+         SRWI_LEAD21 = lead(SRWI, 21, default = median(SRWI[(length(SRWI)-21):length(SRWI)], na.rm=TRUE)),
          
-         LSWI_LAG1 = lag(LSWI, 1, default = median(LSWI[1:1], na.rm=TRUE)), 
-         LSWI_LAG2 = lag(LSWI, 2, default = median(LSWI[1:2], na.rm=TRUE)), 
-         LSWI_LAG3 = lag(LSWI, 3, default = median(LSWI[1:3], na.rm=TRUE)), 
-         LSWI_LEAD1 = lead(LSWI, 1, default = median(LSWI[(length(LSWI)-1):length(LSWI)], na.rm=TRUE)), 
-         LSWI_LEAD2 = lead(LSWI, 2, default = median(LSWI[(length(LSWI)-2):length(LSWI)], na.rm=TRUE)), 
-         LSWI_LEAD3 = lead(LSWI, 3, default = median(LSWI[(length(LSWI)-3):length(LSWI)], na.rm=TRUE)),
-         
-         
-         soilwater_LAG4 = lag(soilwater, 4, default = median(soilwater[1:4], na.rm=TRUE)),  ## MET monthly seasonality (4,8,12)
-         soilwater_LAG8 = lag(soilwater, 8, default = median(soilwater[1:8], na.rm=TRUE)), 
-         soilwater_LAG12 = lag(soilwater, 12, default = median(soilwater[1:12], na.rm=TRUE)), 
-         soilwater_LEAD4 = lead(soilwater, 4, default = median(soilwater[(length(soilwater)-4):length(soilwater)], na.rm=TRUE)), 
-         soilwater_LEAD8 = lead(soilwater, 8, default = median(soilwater[(length(soilwater)-8):length(soilwater)], na.rm=TRUE)), 
-         soilwater_LEAD12 = lead(soilwater, 12, default = median(soilwater[(length(soilwater)-12):length(soilwater)], na.rm=TRUE)),
-         
-         soilwaterS_LAG4 = lag(soilwaterS, 4, default = median(soilwaterS[1:4], na.rm=TRUE)),  
-         soilwaterS_LAG8 = lag(soilwaterS, 8, default = median(soilwaterS[1:8], na.rm=TRUE)), 
-         soilwaterS_LAG12 = lag(soilwaterS, 12, default = median(soilwaterS[1:12], na.rm=TRUE)), 
-         soilwaterS_LEAD4 = lead(soilwaterS, 4, default = median(soilwaterS[(length(soilwaterS)-4):length(soilwaterS)], na.rm=TRUE)), 
-         soilwaterS_LEAD8 = lead(soilwaterS, 8, default = median(soilwaterS[(length(soilwaterS)-8):length(soilwaterS)], na.rm=TRUE)), 
-         soilwaterS_LEAD12 = lead(soilwaterS, 12, default = median(soilwaterS[(length(soilwaterS)-12):length(soilwaterS)], na.rm=TRUE)),
-         
-         aet_LAG4 = lag(aet, 4, default = median(aet[1:4], na.rm=TRUE)), 
-         aet_LAG8 = lag(aet, 8, default = median(aet[1:8], na.rm=TRUE)), 
-         aet_LAG12 = lag(aet, 12, default = median(aet[1:12], na.rm=TRUE)), 
-         aet_LEAD4 = lead(aet, 4, default = median(aet[(length(aet)-4):length(aet)], na.rm=TRUE)), 
-         aet_LEAD8 = lead(aet, 8, default = median(aet[(length(aet)-8):length(aet)], na.rm=TRUE)), 
-         aet_LEAD12 = lead(aet, 12, default = median(aet[(length(aet)-12):length(aet)]), na.rm=TRUE),
-         
-         aetS_LAG4 = lag(aetS, 4, default = median(aetS[1:4], na.rm=TRUE)),  
-         aetS_LAG8 = lag(aetS, 8, default = median(aetS[1:8], na.rm=TRUE)), 
-         aetS_LAG12 = lag(aetS, 12, default = median(aetS[1:12], na.rm=TRUE)), 
-         aetS_LEAD4 = lead(aetS, 4, default = median(aetS[(length(aetS)-4):length(aetS)], na.rm=TRUE)), 
-         aetS_LEAD8 = lead(aetS, 8, default = median(aetS[(length(aetS)-8):length(aetS)], na.rm=TRUE)), 
-         aetS_LEAD12 = lead(aetS, 12, default = median(aetS[(length(aetS)-12):length(aetS)], na.rm=TRUE)),
+         LSWI_LAG7 = lag(LSWI, 7, default = median(LSWI[1:7], na.rm=TRUE)), 
+         LSWI_LAG14 = lag(LSWI, 14, default = median(LSWI[1:14], na.rm=TRUE)), 
+         LSWI_LAG21 = lag(LSWI, 21, default = median(LSWI[1:21], na.rm=TRUE)), 
+         LSWI_LEAD7 = lead(LSWI, 7, default = median(LSWI[(length(LSWI)-7):length(LSWI)], na.rm=TRUE)), 
+         LSWI_LEAD14 = lead(LSWI, 14, default = median(LSWI[(length(LSWI)-14):length(LSWI)], na.rm=TRUE)), 
+         LSWI_LEAD21 = lead(LSWI, 21, default = median(LSWI[(length(LSWI)-21):length(LSWI)], na.rm=TRUE)),
          
          
-         TA_LAG1 = lag(TA, 1, default = median(TA[1:1], na.rm=TRUE)),  ## MET daily seasonality (1,4)
-         TA_LAG4 = lag(TA, 4, default = median(TA[1:4], na.rm=TRUE)), 
+         soilwater_LAG30 = lag(soilwater, 30, default = median(soilwater[1:30], na.rm=TRUE)),  ## MET monthly seasonality (30, 60, 90)
+         soilwater_LAG60 = lag(soilwater, 60, default = median(soilwater[1:60], na.rm=TRUE)), 
+         soilwater_LAG90 = lag(soilwater, 90, default = median(soilwater[1:90], na.rm=TRUE)), 
+         soilwater_LEAD30 = lead(soilwater, 30, default = median(soilwater[(length(soilwater)-30):length(soilwater)], na.rm=TRUE)), 
+         soilwater_LEAD60 = lead(soilwater, 60, default = median(soilwater[(length(soilwater)-60):length(soilwater)], na.rm=TRUE)), 
+         soilwater_LEAD90 = lead(soilwater, 90, default = median(soilwater[(length(soilwater)-90):length(soilwater)], na.rm=TRUE)),
+         
+         soilwaterS_LAG30 = lag(soilwaterS, 30, default = median(soilwaterS[1:30], na.rm=TRUE)),  
+         soilwaterS_LAG60 = lag(soilwaterS, 60, default = median(soilwaterS[1:60], na.rm=TRUE)), 
+         soilwaterS_LAG90 = lag(soilwaterS, 90, default = median(soilwaterS[1:90], na.rm=TRUE)), 
+         soilwaterS_LEAD30 = lead(soilwaterS, 30, default = median(soilwaterS[(length(soilwaterS)-30):length(soilwaterS)], na.rm=TRUE)), 
+         soilwaterS_LEAD60 = lead(soilwaterS, 60, default = median(soilwaterS[(length(soilwaterS)-60):length(soilwaterS)], na.rm=TRUE)), 
+         soilwaterS_LEAD90 = lead(soilwaterS, 90, default = median(soilwaterS[(length(soilwaterS)-90):length(soilwaterS)], na.rm=TRUE)),
+         
+         aet_LAG30 = lag(aet, 30, default = median(aet[1:30], na.rm=TRUE)), 
+         aet_LAG60 = lag(aet, 60, default = median(aet[1:60], na.rm=TRUE)), 
+         aet_LAG90 = lag(aet, 90, default = median(aet[1:90], na.rm=TRUE)), 
+         aet_LEAD30 = lead(aet, 30, default = median(aet[(length(aet)-30):length(aet)], na.rm=TRUE)), 
+         aet_LEAD60 = lead(aet, 60, default = median(aet[(length(aet)-60):length(aet)], na.rm=TRUE)), 
+         aet_LEAD90 = lead(aet, 90, default = median(aet[(length(aet)-90):length(aet)]), na.rm=TRUE),
+         
+         aetS_LAG30 = lag(aetS, 30, default = median(aetS[1:30], na.rm=TRUE)),  
+         aetS_LAG60 = lag(aetS, 60, default = median(aetS[1:60], na.rm=TRUE)), 
+         aetS_LAG90 = lag(aetS, 90, default = median(aetS[1:90], na.rm=TRUE)), 
+         aetS_LEAD30 = lead(aetS, 30, default = median(aetS[(length(aetS)-30):length(aetS)], na.rm=TRUE)), 
+         aetS_LEAD60 = lead(aetS, 60, default = median(aetS[(length(aetS)-60):length(aetS)], na.rm=TRUE)), 
+         aetS_LEAD90 = lead(aetS, 90, default = median(aetS[(length(aetS)-90):length(aetS)], na.rm=TRUE)),
+         
+         
+         TA_LAG1 = lag(TA, 1, default = median(TA[1:1], na.rm=TRUE)),  ## MET daily seasonality (1, 3, 7)
+         TA_LAG3 = lag(TA, 3, default = median(TA[1:3], na.rm=TRUE)), 
+         TA_LAG7 = lag(TA, 7, default = median(TA[1:7], na.rm=TRUE)), 
          TA_LEAD1 = lead(TA, 1, default = median(TA[(length(TA)-1):length(TA)], na.rm=TRUE)), 
-         TA_LEAD4 = lead(TA, 4, default = median(TA[(length(TA)-4):length(TA)], na.rm=TRUE)), 
+         TA_LEAD3 = lead(TA, 3, default = median(TA[(length(TA)-3):length(TA)], na.rm=TRUE)), 
+         TA_LEAD7 = lead(TA, 7, default = median(TA[(length(TA)-7):length(TA)], na.rm=TRUE)), 
          
          SW_IN_LAG1 = lag(SW_IN, 1, default = median(SW_IN[1:1], na.rm=TRUE)),  
-         SW_IN_LAG4 = lag(SW_IN, 4, default = median(SW_IN[1:4], na.rm=TRUE)), 
+         SW_IN_LAG3 = lag(SW_IN, 3, default = median(SW_IN[1:3], na.rm=TRUE)),  
+         SW_IN_LAG7 = lag(SW_IN, 7, default = median(SW_IN[1:7], na.rm=TRUE)), 
          SW_IN_LEAD1 = lead(SW_IN, 1, default = median(SW_IN[(length(SW_IN)-1):length(SW_IN)], na.rm=TRUE)), 
-         SW_IN_LEAD4 = lead(SW_IN, 4, default = median(SW_IN[(length(SW_IN)-4):length(SW_IN)], na.rm=TRUE)), 
+         SW_IN_LEAD1 = lead(SW_IN, 3, default = median(SW_IN[(length(SW_IN)-3):length(SW_IN)], na.rm=TRUE)), 
+         SW_IN_LEAD7 = lead(SW_IN, 7, default = median(SW_IN[(length(SW_IN)-7):length(SW_IN)], na.rm=TRUE)), 
          
          LW_IN_LAG1 = lag(LW_IN, 1, default = median(LW_IN[1:1], na.rm=TRUE)), 
-         LW_IN_LAG4 = lag(LW_IN, 4, default = median(LW_IN[1:4], na.rm=TRUE)), 
+         LW_IN_LAG3 = lag(LW_IN, 3, default = median(LW_IN[1:3], na.rm=TRUE)), 
+         LW_IN_LAG7 = lag(LW_IN, 7, default = median(LW_IN[1:7], na.rm=TRUE)), 
          LW_IN_LEAD1 = lead(LW_IN, 1, default = median(LW_IN[(length(LW_IN)-1):length(LW_IN)], na.rm=TRUE)), 
-         LW_IN_LEAD4 = lead(LW_IN, 4, default = median(LW_IN[(length(LW_IN)-4):length(LW_IN)], na.rm=TRUE)), 
+         LW_IN_LEAD3 = lead(LW_IN, 3, default = median(LW_IN[(length(LW_IN)-3):length(LW_IN)], na.rm=TRUE)), 
+         LW_IN_LEAD7 = lead(LW_IN, 7, default = median(LW_IN[(length(LW_IN)-7):length(LW_IN)], na.rm=TRUE)), 
          
          PA_LAG1 = lag(PA, 1, default = median(PA[1:1], na.rm=TRUE)),  
-         PA_LAG4 = lag(PA, 4, default = median(PA[1:4], na.rm=TRUE)), 
-         PA_LEAD1 = lead(PA, 1, default = median(PA[(length(PA)-1):length(PA)], na.rm=TRUE)), 
-         PA_LEAD4 = lead(PA, 4, default = median(PA[(length(PA)-4):length(PA)], na.rm=TRUE)), 
+         PA_LAG3 = lag(PA, 3, default = median(PA[1:3], na.rm=TRUE)), 
+         PA_LAG7 = lag(PA, 7, default = median(PA[1:7], na.rm=TRUE)), 
+         PA_LEAD1 = lead(PA, 1, default = median(PA[(length(PA)-1):length(PA)], na.rm=TRUE)),
+         PA_LEAD3 = lead(PA, 3, default = median(PA[(length(PA)-3):length(PA)], na.rm=TRUE)),
+         PA_LEAD7 = lead(PA, 7, default = median(PA[(length(PA)-7):length(PA)], na.rm=TRUE)), 
          
-         VPD_LAG1 = lag(VPD, 1, default = median(VPD[1:1], na.rm=TRUE)),  
-         VPD_LAG4 = lag(VPD, 4, default = median(VPD[1:4], na.rm=TRUE)), 
-         VPD_LEAD1 = lead(VPD, 1, default = median(VPD[(length(VPD)-1):length(VPD)], na.rm=TRUE)), 
-         VPD_LEAD4 = lead(VPD, 4, default = median(VPD[(length(VPD)-4):length(VPD)], na.rm=TRUE)), 
+         VPD_LAG1 = lag(VPD, 1, default = median(VPD[1:1], na.rm=TRUE)), 
+         VPD_LAG3 = lag(VPD, 3, default = median(VPD[1:3], na.rm=TRUE)), 
+         VPD_LAG7 = lag(VPD, 7, default = median(VPD[1:7], na.rm=TRUE)), 
+         VPD_LEAD1 = lead(VPD, 1, default = median(VPD[(length(VPD)-1):length(VPD)], na.rm=TRUE)),
+         VPD_LEAD3 = lead(VPD, 3, default = median(VPD[(length(VPD)-3):length(VPD)], na.rm=TRUE)),
+         VPD_LEAD7 = lead(VPD, 7, default = median(VPD[(length(VPD)-7):length(VPD)], na.rm=TRUE)), 
          
          P_LAG1 = lag(P, 1, default = median(P[1:1], na.rm=TRUE)),  
-         P_LAG4 = lag(P, 4, default = median(P[1:4], na.rm=TRUE)), 
+         P_LAG3 = lag(P, 3, default = median(P[1:3], na.rm=TRUE)),  
+         P_LAG7 = lag(P, 7, default = median(P[1:7], na.rm=TRUE)), 
          P_LEAD1 = lead(P, 1, default = median(P[(length(P)-1):length(P)], na.rm=TRUE)), 
-         P_LEAD4 = lead(P, 4, default = median(P[(length(P)-4):length(P)], na.rm=TRUE)), 
+         P_LEAD3 = lead(P, 3, default = median(P[(length(P)-3):length(P)], na.rm=TRUE)),
+         P_LEAD7 = lead(P, 7, default = median(P[(length(P)-7):length(P)], na.rm=TRUE)), 
          
          
-         NEE_LAG1 = lag(NEE, 1, default = median(NEE[1:1], na.rm=TRUE)),  ## FLUX daily seasonality (1,4,4)
-         NEE_LAG4 = lag(NEE, 4, default = median(NEE[1:4], na.rm=TRUE)), 
+         NEE_LAG1 = lag(NEE, 1, default = median(NEE[1:1], na.rm=TRUE)),  ## FLUX daily seasonality (1, 3, 7)
+         NEE_LAG3 = lag(NEE, 3, default = median(NEE[1:3], na.rm=TRUE)),
+         NEE_LAG7 = lag(NEE, 7, default = median(NEE[1:7], na.rm=TRUE)), 
          NEE_LEAD1 = lead(NEE, 1, default = median(NEE[(length(NEE)-1):length(NEE)], na.rm=TRUE)), 
-         NEE_LEAD4 = lead(NEE, 4, default = median(NEE[(length(NEE)-4):length(NEE)], na.rm=TRUE)), 
+         NEE_LEAD3 = lead(NEE, 3, default = median(NEE[(length(NEE)-3):length(NEE)], na.rm=TRUE)), 
+         NEE_LEAD7 = lead(NEE, 7, default = median(NEE[(length(NEE)-7):length(NEE)], na.rm=TRUE)), 
          
          GPP_LAG1 = lag(GPP, 1, default = median(GPP[1:1], na.rm=TRUE)),  
-         GPP_LAG4 = lag(GPP, 4, default = median(GPP[1:4], na.rm=TRUE)), 
+         GPP_LAG3 = lag(GPP, 3, default = median(GPP[1:3], na.rm=TRUE)),
+         GPP_LAG7 = lag(GPP, 7, default = median(GPP[1:7], na.rm=TRUE)), 
          GPP_LEAD1 = lead(GPP, 1, default = median(GPP[(length(GPP)-1):length(GPP)], na.rm=TRUE)), 
-         GPP_LEAD4 = lead(GPP, 4, default = median(GPP[(length(GPP)-4):length(GPP)], na.rm=TRUE)), 
+         GPP_LEAD3 = lead(GPP, 3, default = median(GPP[(length(GPP)-3):length(GPP)], na.rm=TRUE)), 
+         GPP_LEAD7 = lead(GPP, 7, default = median(GPP[(length(GPP)-7):length(GPP)], na.rm=TRUE)), 
          
          RECO_LAG1 = lag(RECO, 1, default = median(RECO[1:1], na.rm=TRUE)),  
-         RECO_LAG4 = lag(RECO, 4, default = median(RECO[1:4], na.rm=TRUE)), 
+         RECO_LAG3 = lag(RECO, 3, default = median(RECO[1:3], na.rm=TRUE)),  
+         RECO_LAG7 = lag(RECO, 7, default = median(RECO[1:7], na.rm=TRUE)), 
          RECO_LEAD1 = lead(RECO, 1, default = median(RECO[(length(RECO)-1):length(RECO)], na.rm=TRUE)), 
-         RECO_LEAD4 = lead(RECO, 4, default = median(RECO[(length(RECO)-4):length(RECO)], na.rm=TRUE)), 
+         RECO_LEAD3 = lead(RECO, 3, default = median(RECO[(length(RECO)-3):length(RECO)], na.rm=TRUE)),
+         RECO_LEAD7 = lead(RECO, 7, default = median(RECO[(length(RECO)-7):length(RECO)], na.rm=TRUE)), 
          
-         LE_LAG1 = lag(LE, 1, default = median(LE[1:1], na.rm=TRUE)),  
-         LE_LAG4 = lag(LE, 4, default = median(LE[1:4], na.rm=TRUE)), 
+         LE_LAG1 = lag(LE, 1, default = median(LE[1:1], na.rm=TRUE)), 
+         LE_LAG3 = lag(LE, 3, default = median(LE[1:3], na.rm=TRUE)),
+         LE_LAG7 = lag(LE, 7, default = median(LE[1:7], na.rm=TRUE)), 
          LE_LEAD1 = lead(LE, 1, default = median(LE[(length(LE)-1):length(LE)], na.rm=TRUE)), 
-         LE_LEAD4 = lead(LE, 4, default = median(LE[(length(LE)-4):length(LE)], na.rm=TRUE))) %>% 
+         LE_LEAD3 = lead(LE, 3, default = median(LE[(length(LE)-3):length(LE)], na.rm=TRUE)), 
+         LE_LEAD7 = lead(LE, 7, default = median(LE[(length(LE)-7):length(LE)], na.rm=TRUE))) %>% 
   ungroup()
 ```
 
@@ -2733,6 +2752,21 @@ names(all_data)[24:146] %>% write.csv(paste(loc, "/training-data/list_of_predict
 
 #### 6. Forward Feature Selection
 
+##### Read in data
+
+```{r}
+all_data <- read.csv(paste(loc, "/training-data/all_data.csv", sep = ""))
+```
+
+##### Subset only days with at least one observation
+
+```{r}
+all_data <- all_data %>% 
+  filter(imputed < 1) %>% 
+  dplyr::select(-imputed)
+dim(all_data)
+```
+
 ##### Summarize clusters now that data have been filtered
 
 ```{r}
@@ -2769,5 +2803,7 @@ cluster_bycluster <- cluster_bysite %>% ungroup() %>%
 write.csv(cluster_bysite, paste(loc, "/training-data/clusters/cluster_bysite.csv", sep = ""), row.names = F)
 write.csv(cluster_bycluster, paste(loc, "/training-data/clusters/cluster_bycluster.csv", sep = ""), row.names = F)
 ```
+
+
 
 
