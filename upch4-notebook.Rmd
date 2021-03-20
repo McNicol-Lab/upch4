@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 Load packages and ggplot theme:
 
 ```{r message = F}
+rm(list=ls())
 library(tidyverse) 
 library(lubridate)
 library(raster)
@@ -19,6 +20,7 @@ library(oce) # for time series transformations
 library(geosphere)
 library(sf)
 library(caret)
+library(parallel)
 source("code/ggplot_theme.R")
 ```
 
@@ -2415,7 +2417,7 @@ all_data %>%
 ##### Fix by set Month 2, Week 8 equal to Month 2 Week 7:
 
 ```{r}
-all_data[all_data$Year == 2016 & all_data$Month == 2 & all_data$Week == 8 , 57:146] <- all_data[all_data$Year == 2016 & all_data$Month == 2 & all_data$Week == 7 , 57:146]
+all_data[all_data$Year == 2016 & all_data$Month == 2 & all_data$Week == 8 , 57:145] <- all_data[all_data$Year == 2016 & all_data$Month == 2 & all_data$Week == 7 , 57:145]
 ```
 
 ##### Summarize missingness after manual imputation in predictors:
@@ -2838,11 +2840,19 @@ write.csv(cluster_bysite, paste(loc, "/training-data/clusters/cluster_bysite.csv
 write.csv(cluster_bycluster, paste(loc, "/training-data/clusters/cluster_bycluster.csv", sep = ""), row.names = F)
 ```
 
-##### Rank predictors using FFS (ALL)
-
-###### Read in predictor metadata
+##### Output training data (with clusters)
 
 ```{r}
+write.csv(all_data, paste(loc, "training-data/final.csv", sep  = ""), row.names = F)
+```
+
+
+##### Rank predictors using FFS (ALL)
+
+###### Read in final data and predictor metadata
+
+```{r}
+all_data <- read.csv(paste(loc, "training-data/final.csv", sep = ""))
 pred.metadata <- read.csv(paste(loc, "/training-data/list_of_predictors_metadata.csv", sep = ""))
 ```
 
@@ -2942,6 +2952,10 @@ for (i in 1:folds) {
 ##### Train multiple RFs (with CV) for FFS to select the first pair
 
 ```{r}
+# set up cluster
+cl <- makeCluster(8, type = "FORK", outfile = "par_foreach_log_generic_cl4.txt")
+registerDoParallel(cl)
+
 # outer loop lists
 rf_metrics <- list()
 
