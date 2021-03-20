@@ -13,6 +13,7 @@ Load packages and ggplot theme:
 
 ```{r message = F}
 rm(list=ls())
+library(rlist)
 library(tidyverse) 
 library(lubridate)
 library(raster)
@@ -2946,16 +2947,112 @@ for (i in 1:folds) {
   }
   folds_index[[i]] <- folds_index[[i]][-i]
 }
+length(folds_index) == length(train_label) & length(folds_index) == length(train_feat)  & length(folds_index) == length(validate_data)
+```
+
+<!-- ##### Create filenames vector -->
+
+<!-- ```{r} -->
+<!-- pair_name <- paste("pair", 1:length(feat_pairs), sep = "") -->
+<!-- fold_name <- paste("fold", 1:folds, sep = "") -->
+<!-- file_name_df <- expand.grid(fold_name, pair_name)  -->
+<!-- file_name <- paste(file_name_df$Var2, file_name_df$Var1, sep = "_") -->
+<!-- ``` -->
+
+##### Create a new list to match up the 4 lists
+
+```{r}
+train_list <- list()
+for(i in 1:length(train_feat)){
+  train_list[[i]] <- list(train_feat[[i]], train_label[[i]], feat_pairs[[1]], validate_data[[i]], folds_index[[i]])
+  names(train_list[[i]]) <- c("train_feat", "train_label", "feat_pairs", "validate_data", "folds_index")
+}
+```
+
+##### Write Function: Train multiple RFs (with CV) for FFS to select the first pair
+
+```{r}
+fit_one_pair <- function(train_list){
+
+# initialize feature pairs
+feat_initial <- 2
+num.trees.rf <- ifelse(feat_initial < 5, 50, 100)
+    
+## Create tune-grid
+    tgrid <- expand.grid(
+      mtry = c(2),
+      splitrule = "variance", 
+      min.node.size = c(50)
+    )
+    
+    ## Create trainControl object
+    myControl <- trainControl(
+      method = "none",
+      classProbs = FALSE,
+      allowParallel = TRUE
+    )
+
+    ## train rf on folds 
+    rf_model <- train(
+      x = train_list$train_feat[,train_list$feat_pairs],
+      y = train_list$train_label,
+      num.trees = num.trees.rf,
+      method = 'ranger',
+      trControl = myControl,
+      tuneGrid = tgrid,
+      metric = "MAE"
+    )
+    
+
+  # get all hold out predictions
+  rf.pred <- train_list$validate_data %>%
+      mutate(FCH4P = predict(rf_model, .),
+             index = 1:n())
+  
+}
+```
+
+##### Write Function: Input feature pair
+
+```{r}
+
+rf.pred.all.outer <- list()
+fit_all_pairs <- function(feat_pairs){
+  
+  train_list <- list()
+    
+  for(i in 1:length(train_feat)){
+      
+    train_list[[i]] <- list(train_feat[[i]], train_label[[i]], feat_pairs, validate_data[[i]], folds_index[[i]])
+    names(train_list[[i]]) <- c("train_feat", "train_label", "feat_pairs", "validate_data", "folds_index")
+  }
+  
+  rf.pred.inner <- lapply(train_list, fit_one_pair)
+  rf.pred.all <<- bind_rows(rf.pred.inner) %>% dplyr::select(Cluster, feat_pairs[1], feat_pairs[2], FCH4, FCH4P)
+
+}
+```
+
+```{r}
+
+numCores <- detectCores()
+
+
+fit_all_pairs(feat_pairs[[1]])
+
+system.time(
+  normal_2 <- lapply(feat_pairs[1:4], fit_all_pairs)
+)
+
+system.time(
+mc_2 <- mclapply(feat_pairs[1:8], fit_all_pairs, mc.cores = numCores)
+)
+
 
 ```
 
-##### Train multiple RFs (with CV) for FFS to select the first pair
 
 ```{r}
-# set up cluster
-cl <- makeCluster(8, type = "FORK", outfile = "par_foreach_log_generic_cl4.txt")
-registerDoParallel(cl)
-
 # outer loop lists
 rf_metrics <- list()
 
