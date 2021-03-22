@@ -2851,7 +2851,7 @@ write.csv(all_data, paste(loc, "training-data/final.csv", sep  = ""), row.names 
 
 ##### Rank predictors using FFS (ALL)
 
-###### Read in final data and predictor metadata
+#### 6. (cont.) Read in final data and predictor metadata
 
 ```{r}
 all_data <- read.csv(paste(loc, "training-data/final.csv", sep = ""))
@@ -2951,31 +2951,63 @@ for (i in 1:folds) {
 length(folds_index) == length(train_label) & length(folds_index) == length(train_feat)  & length(folds_index) == length(validate_data)
 ```
 
-
-
+###### Run FFS First Pair in Parallel
 
 ```{r}
+set_index <- c(2001:4000)
+
 numCores <- detectCores()
 
-rm(mc_2)
-mc_2 <- mclapply(feat_pairs[1001:1300], fit_all_pairs, mc.cores = numCores)
+rf_pred <- mclapply(feat_pairs[set_index], fit_all_pairs, mc.cores = numCores)
 
- head(mc_2[[500]])
-
-for(i in 100:1000){
-  mc_2[[i]] <- mc_2[[i]] %>% 
-    mutate(feat_pair = i)
+for(i in 1:2000){
+  rf_pred[[i]] <- rf_pred[[i]] %>% 
+    mutate(feat_pair = set_index[i])
 }
 
-for(i in 1:1000){
-  write.csv(mc_2[[i]], paste(loc, "ffs/first-pair/rf-pred/rf_pred_", i, ".csv", sep = ""), row.names = F)
+for(i in 1:2000){
+  write.csv(rf_pred[[i]], paste(loc, "ffs/first-pair/rf-pred/rf_pred_", set_index[i], ".csv", sep = ""), row.names = F)
 }
-
-
 ```
 
 
 ```{r}
+rf.metrics <- list()
+
+rf_pred <- mclapply(paste(loc, "/ffs/first-pair/rf-pred/rf_pred_", i, ".csv", sep = ""), read.csv)
+
+for(i in 1:4000){
+  rf.metrics[[i]] <- read.csv(paste(loc, "/ffs/first-pair/rf-pred/rf_pred_", i, ".csv", sep = "")) %>% 
+  dplyr::select(FCH4, FCH4P) %>% 
+    summarize(samples = n(),
+              PMARE = 100/n() * sum(abs(FCH4 - FCH4P) / abs(FCH4)),
+              R2 = cor(FCH4P, FCH4)^2,
+              NSE = 1 - sum((FCH4 - FCH4P)^2) / sum((FCH4 - mean(FCH4))^2),
+              MAE = sum(abs(FCH4 - FCH4P))/n(),
+              nMAE = MAE/sd(FCH4),
+              MeanO = mean(FCH4),
+              MedO = median(FCH4),
+              sdO = sd(FCH4),
+              MeanP = mean(FCH4P),
+              MedP = median(FCH4P),
+              sdP = sd(FCH4P),
+              nSD = sdP/sdO,
+              Bias = mean(FCH4P - FCH4),
+              cBias = abs(Bias)/sum(abs(Bias))*100,
+              predictors = list(feat_pairs[[i]]) )
+}
+
+rf.metrics.all <- bind_rows(rf.metrics) %>% 
+  arrange(MAE) %>% 
+  rowwise() %>% 
+  mutate(pred1 = predictors[1],
+         pred2 = predictors[2]) %>% 
+  dplyr::select(-predictors)
+
+write.csv(rf.metrics.all, paste(loc, "/ffs/first-pair/rf-metrics/rf.metrics.all.csv", sep = ""), row.names = F)
+
+
+```
 # outer loop lists
 rf_metrics <- list()
 
