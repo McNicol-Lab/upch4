@@ -2970,15 +2970,19 @@ for(i in 1:2000){
 }
 ```
 
+# Compute FFS First Pair metrics  
+
+May need to read in `rf_pred` csv files again.
 
 ```{r}
 rf.metrics <- list()
 
-rf_pred <- mclapply(paste(loc, "/ffs/first-pair/rf-pred/rf_pred_", i, ".csv", sep = ""), read.csv)
+files <- list.files(paste(loc, "ffs/first-pair/rf-pred/", sep = ""))
+rf_pred <- lapply(read.csv, files)
 
-for(i in 1:4000){
-  rf.metrics[[i]] <- read.csv(paste(loc, "/ffs/first-pair/rf-pred/rf_pred_", i, ".csv", sep = "")) %>% 
-  dplyr::select(FCH4, FCH4P) %>% 
+compute_metrics <- function(rf_pred) {
+    rf_pred %>% 
+    dplyr::select(FCH4, FCH4P) %>% 
     summarize(samples = n(),
               PMARE = 100/n() * sum(abs(FCH4 - FCH4P) / abs(FCH4)),
               R2 = cor(FCH4P, FCH4)^2,
@@ -2996,6 +3000,8 @@ for(i in 1:4000){
               cBias = abs(Bias)/sum(abs(Bias))*100,
               predictors = list(feat_pairs[[i]]) )
 }
+
+rf.metrics <- lapply(rf_pred, compute_metrics)
 
 rf.metrics.all <- bind_rows(rf.metrics) %>% 
   arrange(MAE) %>% 
