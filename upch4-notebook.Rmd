@@ -24,6 +24,7 @@ library(caret)
 library(parallel)
 source("code/ggplot_theme.R")
 source("code/fit_all_pairs.R")
+source("code/fit_stepwise.R")
 ```
 
 **NOTE: This work flow uses many large files so most data is stored locally and requires hard filepaths**
@@ -2951,7 +2952,7 @@ for (i in 1:folds) {
 length(folds_index) == length(train_label) & length(folds_index) == length(train_feat)  & length(folds_index) == length(validate_data)
 ```
 
-###### Run FFS First Pair in Parallel
+##### Run FFS First Pair in Parallel
 
 ```{r}
 set_index <- c(2001:4000)
@@ -2970,7 +2971,7 @@ for(i in 1:2000){
 }
 ```
 
-# Compute FFS First Pair metrics  
+##### Compute FFS First Pair metrics  
 
 May need to read in `rf_pred` csv files again.
 
@@ -3012,66 +3013,99 @@ rf.metrics.all <- bind_rows(rf.metrics) %>%
 
 write.csv(rf.metrics.all, paste(loc, "/ffs/first-pair/rf-metrics/rf.metrics.all.csv", sep = ""), row.names = F)
 
-
 ```
-# outer loop lists
-rf_metrics <- list()
 
-# initialize feature pairs
-feat_initial <- 2
+##### Look at metrics distribution
 
-for(j in 1:10) {
+```{r}
+rf.metrics.all %>% 
+  ggplot(aes(R2)) +
+  geom_histogram() + my_theme
+ggsave(paste(loc, "ffs/first-pair/rf-metrics/R2_distribution.png", sep = ""),
+       width = 8, height = 15, units = c("cm"), dpi = 300) 
 
-  # set up RF lists
-  tgrid <- list()
-  myControl <- list()
-  rf_model <- list()
-  rf_varimp <- list()
-  
-  for (i in 1:folds) {
-    
-    num.trees.rf <- ifelse(feat_initial < 5, 50, 100)
-    
-    ## Create tune-grid
-    tgrid <- expand.grid(
-      mtry = c(2),
-      splitrule = "variance", 
-      min.node.size = c(50)
-    )
-    
-    ## Create trainControl object
-    myControl <- trainControl(
-      method = "none",
-      classProbs = FALSE,
-      allowParallel = TRUE
-    )
+rf.metrics.all %>% 
+  ggplot(aes(MAE)) +
+  geom_histogram() + my_theme
+ggsave(paste(loc, "ffs/first-pair/rf-metrics/MAE_distribution.png", sep = ""),
+       width = 8, height = 15, units = c("cm"), dpi = 300) 
+```
 
-    ## train rf on folds
-    rf_model[[i]] <- train(
-      x = train_feat[[i]][,feat_pairs[[i]]], 
-      y = train_label[[i]],
-      num.trees = num.trees.rf, 
-      method = 'ranger',
-      trControl = myControl,
-      tuneGrid = tgrid,
-      metric = "MAE"
-    )
-    print(paste(i, "th fold", sep = ""))
+##### get the min MAE and amx R2 (are they the same?)
+
+```{r}
+max(rf.metrics.all$R2)
+min(rf.metrics.all$MAE)
+rf.metrics.all
+```
+
+Yes both are for `canopyht` and `TA`.
+
+##### look at top 10 Predictor Pairs
+
+```{r}
+rf.metrics.all %>% 
+  arrange(MAE) %>% 
+  head(10) %>% 
+  dplyr::select(pred1, pred2)
+```
+##### Stepwise FFS (for first 20 steps, to avoid local minima)
+
+```{r}
+feat <- pred.metadata$Predictor
+feat_original <- feat
+data_l <- length(all_data$Cluster)
+
+
+feat_best <- c("TA", "canopyht")
+feat_best_index <- c(which(feat == "TA"), 
+                     which(feat == "canopyht"))
+
+feat <- feat[- c(feat_best_index) ]
+feat_l <- length(feat)
+```
+
+##### Setup ML folds
+
+```{r}
+train_feat <- list()
+train_label <- list()
+validate_data <- list()
+
+for (i in 1:folds) {
+  train_label[[i]] <- all_data %>% filter(!Cluster == i) %>% dplyr::select(FCH4) %>% pull()
+  train_feat[[i]] <- all_data %>% filter(!Cluster == i) %>% dplyr::select(feat_original)
+  validate_data[[i]] <- all_data %>% filter(Cluster == i) %>% dplyr::select(Cluster, FCH4, feat_original)
+}
+
+folds_index <- list() # need list within list (each inner list has all fold site except LOSO fold)
+for (i in 1:folds) {
+  x <- list()
+  folds_index[[i]] <- x
+}
+
+for (i in 1:folds) {
+  for (j in 1:folds) {
+    folds_index[[i]][[j]] <- all_data %>% 
+      filter(!Cluster == i) %>% 
+      mutate(index = 1:n()) %>% 
+      filter(!Cluster == j) %>% 
+      dplyr::select(index) %>% 
+      pull()
   }
-  
-  # get all hold out predictions
-  rf.pred <- list()
-  for (i in 1:15) {
-    rf.pred[[i]] <- validate_data[[16]] %>% 
-      filter(Cluster == i) %>%   
-      mutate(FCH4P = predict(rf_model[[i]], .),
-             index = 1:n())
-  }
-  rf.pred.all <- bind_rows(rf.pred)
-  
-  rf_metrics[[j]] <- ungroup(rf.pred.all) %>% 
+  folds_index[[i]] <- folds_index[[i]][-i]
+}
+length(folds_index) == length(train_label) & length(folds_index) == length(train_feat)  & length(folds_index) == length(validate_data)
+```
+
+##### Update compute metrics function (remove predictor list variable of length 2)
+
+```{r}
+compute_metrics <- function(rf_pred) {
+    rf_pred %>% 
+    dplyr::select(FCH4, FCH4P) %>% 
     summarize(samples = n(),
-              PMARE = 100/n() * sum(abs(FCH4 - FCH4P) / FCH4),
+              PMARE = 100/n() * sum(abs(FCH4 - FCH4P) / abs(FCH4)),
               R2 = cor(FCH4P, FCH4)^2,
               NSE = 1 - sum((FCH4 - FCH4P)^2) / sum((FCH4 - mean(FCH4))^2),
               MAE = sum(abs(FCH4 - FCH4P))/n(),
@@ -3084,51 +3118,215 @@ for(j in 1:10) {
               sdP = sd(FCH4P),
               nSD = sdP/sdO,
               Bias = mean(FCH4P - FCH4),
-              cBias = abs(Bias)/sum(abs(Bias))*100,
-              predictors = list(feat_pairs[[j]]) )
+              cBias = abs(Bias)/sum(abs(Bias))*100) 
+}
+```
 
-  print(paste(j, "th pair", sep = ""))
+##### Train multiple RFs (with CV) for FFS to select the next 20 best predictors
+
+```{r}
+
+feat_initial <- 2
+feat_best_row <- list()
+rf.metrics.all <- list()
+
+
+for(j in 2:20){
+  
+# create index for a list of features
+feat_l <- length(feat)
+set_index <- c(1:feat_l)
+feat_list <- as.list(feat)
+
+numCores <- detectCores()
+
+# call fit a stepwise function to train RFs using one additional predictor
+rf_pred <- mclapply(feat_list[set_index], fit_stepwise, mc.cores = numCores)
+
+
+for(i in 1:feat_l){
+  rf_pred[[i]] <- rf_pred[[i]] %>% 
+    mutate(feat_single = feat[i])
+}
+
+for(i in 1:feat_l){
+  write.csv(rf_pred[[i]], paste(loc, "ffs/stepwise/rf-pred/rf_pred_", set_index[i], "_", feat[i],  ".csv", sep = ""), row.names = F)
+}
+
+# call compute_metrics function
+rf.metrics <- lapply(rf_pred, compute_metrics)
+
+# bind rows and append feature column, then arrange by MAE
+rf.metrics.all[[j]] <- bind_rows(rf.metrics) %>% 
+  cbind(feat) %>% 
+  arrange(MAE) 
+
+# save the row of the best performing new predictor
+feat_best_row[[j]] <- rf.metrics.all %>% 
+    filter(MAE == min(MAE))
+  
+# get the specific predictor name
+feat_best_add <- feat_best_row[[j]] %>% 
+    dplyr::select(feat) %>% 
+    pull() %>% as.character()
+  
+# add to initial best_feat
+feat_best <- c(feat_best, feat_best_add)
+  
+# add one to feat_initial size
+feat_initial <- feat_initial + 1
+  
+# remove feat_best from feat
+feat_best_add_index <- which(feat == feat_best_add)
+feat <- feat[- feat_best_add_index ]
+  
+print(paste('added', feat_best_add))
+
 }
 
 ```
 
 
-# parallel::stopCluster(cl)
+```{r}
+feat_best_row_all <- bind_rows(feat_best_row)
 
-# combine and write out data
-rf_metrics_all <- bind_rows(rf_metrics) 
-# rf_metrics_all <- rf_metrics_subset %>% bind_rows(rf_metrics_all)
+write.csv(feat_best,
+          "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/FFS/FWET_ALL/200828_ffs_additional_predictors_k1_k10.csv",
+          row.names = FALSE)
 
-# get length
-length(rf_metrics_all$samples)
+write.csv(feat_best_row_all, 
+          "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/FFS/FWET_ALL/200828_ffs_additional_metrics_k1_k10.csv",
+          row.names = FALSE)
 
-# look at metrics distribution
-rf_metrics_all %>% 
-  ggplot(aes(R2)) +
-  geom_histogram() + mytheme
-ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/FFS/FWET_RELIEF/200820_ffs_subset_canopyht_R2.png", sep = ""),
-       width = 8, height = 15, units = c("cm"), dpi = 300) 
 
-rf_metrics_all %>% 
-  ggplot(aes(MAE)) +
-  geom_histogram() + mytheme
-ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/FFS/FWET_RELIEF/200820_ffs_subset_canopyht_MAE.png", sep = ""),
-       width = 8, height = 15, units = c("cm"), dpi = 300) 
+write.csv(rf_metrics_all,
+          "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/FFS/FWET_ALL/200828_ffs_k10_rf_metrics_all.csv",
+          row.names = FALSE)
 
-# get the min MAE and amx R2 (are they the same?)
-rf_metrics_all %>% 
-  filter(R2 == max(R2))
-rf_metrics_all %>% 
-  filter(MAE == min(MAE))
+```
 
-# look at top 10
-rf_metrics_all %>% 
-  arrange(MAE) %>% 
-  head(10) %>% view()
 
-# look at all
-view(rf_metrics_all)
 
-saveRDS(rf_metrics_all, "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/FFS/FWET_RELIEF/200820_ffs_subset_metrics.rds")
+# outer loop lists
+feat_best_row <- list()
+
+# initialize feature 
+feat_initial <- 6
+
+for (k in 8:10) {
+
+  rf_metrics <- list()
+  
+  for(j in 1:length(feat)) {
+    # for(j in 1:length(feat_pairs)) {
+    # set up RF lists
+    tgrid <- list()
+    myControl <- list()
+    rf_model <- list()
+    rf_varimp <- list()
+    
+    for (i in 1:folds) {
+      
+      num.trees.rf <- ifelse(feat_initial < 10, 100, 150)
+      
+      ## Create tune-grid
+      tgrid <- expand.grid(
+        mtry = c(2),
+        splitrule = "variance", 
+        min.node.size = c(50)
+      )
+      
+      ## Create trainControl object
+      myControl <- trainControl(
+        method = "none",
+        classProbs = FALSE,
+        allowParallel = TRUE
+      )
+      
+      ## train rf on folds
+      rf_model[[i]] <- train(
+        x = train_feat[[i]][,c(feat_best,feat[j])], 
+        y = train_label[[i]],
+        num.trees = num.trees.rf, 
+        method = 'ranger',
+        trControl = myControl,
+        tuneGrid = tgrid,
+        metric = "MAE"
+      )
+      print(i)
+    }
+    
+    # get all hold out predictions
+    rf.pred <- list()
+    for (i in 1:folds) {
+      rf.pred[[i]] <- validate_data[[i]] %>% 
+        filter(Cluster == i) %>%   
+        mutate(FCH4P = predict(rf_model[[i]], .),
+               index = 1:n())
+    }
+    rf.pred.all <- bind_rows(rf.pred)
+    
+    rf_metrics[[j]] <- ungroup(rf.pred.all) %>% 
+      summarize(samples = n(),
+                R2 = cor(FCH4P, FCH4)^2,
+                NSE = 1 - sum((FCH4 - FCH4P)^2) / sum((FCH4 - mean(FCH4))^2),
+                MAE = sum(abs(FCH4 - FCH4P))/n(),
+                nMAE = MAE/sd(FCH4),
+                MeanO = mean(FCH4),
+                MedO = median(FCH4),
+                sdO = sd(FCH4),
+                MeanP = mean(FCH4P),
+                MedP = median(FCH4P),
+                sdP = sd(FCH4P),
+                nSD = sdP/sdO,
+                Bias = mean(FCH4P - FCH4),
+                cBias = abs(Bias)/sum(abs(Bias))*100,
+                predictor = feat[j])
+    
+    print(paste('predictor ', j))
+    print(paste(k, 'th iteration'))
+    
+  }
+  
+  #bind all metrics for each
+  rf_metrics_all <- bind_rows(rf_metrics) 
+  
+  # save the row of the best performing new predictor
+  feat_best_row[[k]] <- rf_metrics_all %>% 
+    filter(MAE == min(MAE))
+  
+  # get the specific predictor name
+  feat_best_add <- feat_best_row[[k]] %>% 
+    dplyr::select(predictor) %>% 
+    pull() %>% as.character()
+  
+  # add to initial best_feat
+  feat_best <- c(feat_best,feat_best_add)
+  
+  # add one to feat_initial size
+  feat_initial <- feat_initial + 1
+  
+  # remove feat_best from feat
+  feat_best_add_index <- which(feat == feat_best_add)
+  feat <- feat[- feat_best_add_index ]
+  
+  print(paste('added ', feat_best_add))
+}
+
+feat_best_row_all <- bind_rows(feat_best_row)
+
+write.csv(feat_best,
+          "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/FFS/FWET_ALL/200828_ffs_additional_predictors_k1_k10.csv",
+          row.names = FALSE)
+
+write.csv(feat_best_row_all, 
+          "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/FFS/FWET_ALL/200828_ffs_additional_metrics_k1_k10.csv",
+          row.names = FALSE)
+
+
+write.csv(rf_metrics_all,
+          "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/FFS/FWET_ALL/200828_ffs_k10_rf_metrics_all.csv",
+          row.names = FALSE)
+
 
 
