@@ -3049,7 +3049,7 @@ rf.metrics.all %>%
   head(10) %>% 
   dplyr::select(pred1, pred2)
 ```
-##### Stepwise FFS (for first 20 steps, to avoid local minima)
+##### Stepwise FFS (for first 19 steps, to avoid local minima)
 
 ```{r}
 feat <- pred.metadata$Predictor
@@ -3122,7 +3122,7 @@ compute_metrics <- function(rf_pred) {
 }
 ```
 
-##### Train multiple RFs (with CV) for FFS to select the next 20 best predictors
+##### Train multiple RFs (with CV) for FFS to select the next 10 best predictors
 
 ```{r}
 
@@ -3131,7 +3131,7 @@ feat_best_row <- list()
 rf.metrics.all <- list()
 
 
-for(j in 2:20){
+for(j in 1:10){
   
 # create index for a list of features
 feat_l <- length(feat)
@@ -3150,7 +3150,7 @@ for(i in 1:feat_l){
 }
 
 for(i in 1:feat_l){
-  write.csv(rf_pred[[i]], paste(loc, "ffs/stepwise/rf-pred/rf_pred_", set_index[i], "_", feat[i],  ".csv", sep = ""), row.names = F)
+  write.csv(rf_pred[[i]], paste(loc, "ffs/stepwise/rf-pred/rf_pred_", j, "thstep_", set_index[i], "_", feat[i],  ".csv", sep = ""), row.names = F)
 }
 
 # call compute_metrics function
