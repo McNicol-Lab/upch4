@@ -3131,7 +3131,7 @@ feat_best_row <- list()
 rf.metrics.all <- list()
 
 
-for(j in 1:10){
+for(j in :10){
   
 # create index for a list of features
 feat_l <- length(feat)
@@ -3162,7 +3162,7 @@ rf.metrics.all[[j]] <- bind_rows(rf.metrics) %>%
   arrange(MAE) 
 
 # save the row of the best performing new predictor
-feat_best_row[[j]] <- rf.metrics.all %>% 
+feat_best_row[[j]] <- rf.metrics.all[[j]] %>% 
     filter(MAE == min(MAE))
   
 # get the specific predictor name
