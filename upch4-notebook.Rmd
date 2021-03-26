@@ -2947,18 +2947,18 @@ length(folds_index) == length(train_label) & length(folds_index) == length(train
 ##### Run FFS First Pair in Parallel
 
 ```{r}
-set_index <- c(1:5000)
+set_index <- c(1:2)
 
 numCores <- detectCores()
 
 rf_pred <- mclapply(feat_pairs[set_index], fit_all_pairs, mc.cores = numCores)
 
-for(i in 1:5000){
+for(i in 1:2){
   rf_pred[[i]] <- rf_pred[[i]] %>% 
     mutate(feat_pair = set_index[i])
 }
 
-for(i in 1:5000){
+for(i in 1:2){
   write.csv(rf_pred[[i]], paste(loc, "ffs/first-pair/rf-pred/rf_pred_", set_index[i], ".csv", sep = ""), row.names = F)
 }
 ```
