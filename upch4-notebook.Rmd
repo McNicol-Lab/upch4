@@ -2944,21 +2944,26 @@ for (i in 1:folds) {
 length(folds_index) == length(train_label) & length(folds_index) == length(train_feat)  & length(folds_index) == length(validate_data)
 ```
 
-##### Run FFS First Pair in Parallel
+##### Run FFS First Pair in Parallel (need to re-run at some point)
 
 ```{r}
-set_index <- c(1:2)
+set_index <- c(1:3)
 
-numCores <- detectCores()
+# numCores <- detectCores()
 
-rf_pred <- mclapply(feat_pairs[set_index], fit_all_pairs, mc.cores = numCores)
+best_pair <- c("TA", "canopyht")
+best_pair <- list(best_pair)
 
-for(i in 1:2){
+feat_pairs[[1]]
+
+rf_pred <- lapply(best_pair, fit_all_pairs)
+
+for(i in 1:10){
   rf_pred[[i]] <- rf_pred[[i]] %>% 
     mutate(feat_pair = set_index[i])
 }
 
-for(i in 1:2){
+for(i in 1:10){
   write.csv(rf_pred[[i]], paste(loc, "ffs/first-pair/rf-pred/rf_pred_", set_index[i], ".csv", sep = ""), row.names = F)
 }
 ```
@@ -3116,6 +3121,10 @@ compute_metrics <- function(rf_pred) {
 
 ##### Train multiple RFs (with CV) for FFS to select the next 10 best predictors
 
+[1] "added wc_pwtq"
+[2] "added wc_tr"
+[3] "added wc_mat"
+
 ```{r}
 
 feat_initial <- 2
@@ -3123,7 +3132,7 @@ feat_best_row <- list()
 rf.metrics.all <- list()
 
 
-for(j in :10){
+for(j in 1:3){
   
 # create index for a list of features
 feat_l <- length(feat)
@@ -3133,7 +3142,7 @@ feat_list <- as.list(feat)
 numCores <- detectCores()
 
 # call fit a stepwise function to train RFs using one additional predictor
-rf_pred <- mclapply(feat_list[set_index], fit_stepwise, mc.cores = numCores)
+rf_pred <- mclapply(feat_list[set_index], fit_stepwise, mc.cores = 4)
 
 
 for(i in 1:feat_l){
