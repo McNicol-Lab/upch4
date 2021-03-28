@@ -3054,7 +3054,7 @@ rf.metrics.all %>%
   head(10) %>% 
   dplyr::select(pred1, pred2)
 ```
-##### Stepwise FFS (for first 19 steps, to avoid local minima)
+##### Stepwise FFS (for first 13 steps, to avoid local minima)
 
 ```{r}
 feat <- pred.metadata$Predictor
@@ -3083,24 +3083,7 @@ for (i in 1:folds) {
   validate_data[[i]] <- all_data %>% filter(Cluster == i) %>% dplyr::select(Cluster, FCH4, feat_original)
 }
 
-folds_index <- list() # need list within list (each inner list has all fold site except LOSO fold)
-for (i in 1:folds) {
-  x <- list()
-  folds_index[[i]] <- x
-}
-
-for (i in 1:folds) {
-  for (j in 1:folds) {
-    folds_index[[i]][[j]] <- all_data %>% 
-      filter(!Cluster == i) %>% 
-      mutate(index = 1:n()) %>% 
-      filter(!Cluster == j) %>% 
-      dplyr::select(index) %>% 
-      pull()
-  }
-  folds_index[[i]] <- folds_index[[i]][-i]
-}
-length(folds_index) == length(train_label) & length(folds_index) == length(train_feat)  & length(folds_index) == length(validate_data)
+length(train_label) & length(folds_index) == length(train_feat)  & length(folds_index) == length(validate_data)
 ```
 
 ##### Update compute metrics function (remove predictor list variable of length 2)
@@ -3134,7 +3117,7 @@ feat_initial <- 2
 feat_best_row <- list()
 rf.metrics.all <- list()
 
-for(k in 1:14){
+for(k in 2:10){
   
 # create index for a list of features
 feat_l <- length(feat)
@@ -3145,7 +3128,6 @@ numCores <- detectCores()
 
 # call fit a stepwise function to train RFs using one additional predictor
 rf_pred <- mclapply(feat_list, fit_stepwise, mc.cores = 6)
-
 
 for(l in 1:feat_l){
   rf_pred[[l]] <- rf_pred[[l]] %>% 
@@ -3189,10 +3171,17 @@ print(paste('added', feat_best_add))
 
 ```
 
+##### Save all output from stepwise FFS
 
 ```{r}
 feat_best_row_all <- bind_rows(feat_best_row)
 
+for(i in 1:length(rf.metrics.all)) {
+  rf.metrics.all[[i]] <- rf.metrics.all[[i]] %>% 
+    mutate(iteration = i)
+}
+rf_metrics_all <- bind_rows(rf.metrics.all)
+  
 write.csv(feat_best,
           paste(loc, "ffs/stepwise/feat_best.csv", sep = ""),
           row.names = FALSE)
@@ -3201,135 +3190,9 @@ write.csv(feat_best_row_all,
           paste(loc, "ffs/stepwise/feat_best_row_all.csv", sep = ""),
           row.names = FALSE)
 
-
 write.csv(rf_metrics_all,
-          "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/FFS/FWET_ALL/200828_ffs_k10_rf_metrics_all.csv",
+          paste(loc, "ffs/stepwise/rf_metrics_all.csv", sep = ""),
           row.names = FALSE)
 
 ```
-
-
-
-# outer loop lists
-feat_best_row <- list()
-
-# initialize feature 
-feat_initial <- 6
-
-for (k in 8:10) {
-
-  rf_metrics <- list()
-  
-  for(j in 1:length(feat)) {
-    # for(j in 1:length(feat_pairs)) {
-    # set up RF lists
-    tgrid <- list()
-    myControl <- list()
-    rf_model <- list()
-    rf_varimp <- list()
-    
-    for (i in 1:folds) {
-      
-      num.trees.rf <- ifelse(feat_initial < 10, 100, 150)
-      
-      ## Create tune-grid
-      tgrid <- expand.grid(
-        mtry = c(2),
-        splitrule = "variance", 
-        min.node.size = c(50)
-      )
-      
-      ## Create trainControl object
-      myControl <- trainControl(
-        method = "none",
-        classProbs = FALSE,
-        allowParallel = TRUE
-      )
-      
-      ## train rf on folds
-      rf_model[[i]] <- train(
-        x = train_feat[[i]][,c(feat_best,feat[j])], 
-        y = train_label[[i]],
-        num.trees = num.trees.rf, 
-        method = 'ranger',
-        trControl = myControl,
-        tuneGrid = tgrid,
-        metric = "MAE"
-      )
-      print(i)
-    }
-    
-    # get all hold out predictions
-    rf.pred <- list()
-    for (i in 1:folds) {
-      rf.pred[[i]] <- validate_data[[i]] %>% 
-        filter(Cluster == i) %>%   
-        mutate(FCH4P = predict(rf_model[[i]], .),
-               index = 1:n())
-    }
-    rf.pred.all <- bind_rows(rf.pred)
-    
-    rf_metrics[[j]] <- ungroup(rf.pred.all) %>% 
-      summarize(samples = n(),
-                R2 = cor(FCH4P, FCH4)^2,
-                NSE = 1 - sum((FCH4 - FCH4P)^2) / sum((FCH4 - mean(FCH4))^2),
-                MAE = sum(abs(FCH4 - FCH4P))/n(),
-                nMAE = MAE/sd(FCH4),
-                MeanO = mean(FCH4),
-                MedO = median(FCH4),
-                sdO = sd(FCH4),
-                MeanP = mean(FCH4P),
-                MedP = median(FCH4P),
-                sdP = sd(FCH4P),
-                nSD = sdP/sdO,
-                Bias = mean(FCH4P - FCH4),
-                cBias = abs(Bias)/sum(abs(Bias))*100,
-                predictor = feat[j])
-    
-    print(paste('predictor ', j))
-    print(paste(k, 'th iteration'))
-    
-  }
-  
-  #bind all metrics for each
-  rf_metrics_all <- bind_rows(rf_metrics) 
-  
-  # save the row of the best performing new predictor
-  feat_best_row[[k]] <- rf_metrics_all %>% 
-    filter(MAE == min(MAE))
-  
-  # get the specific predictor name
-  feat_best_add <- feat_best_row[[k]] %>% 
-    dplyr::select(predictor) %>% 
-    pull() %>% as.character()
-  
-  # add to initial best_feat
-  feat_best <- c(feat_best,feat_best_add)
-  
-  # add one to feat_initial size
-  feat_initial <- feat_initial + 1
-  
-  # remove feat_best from feat
-  feat_best_add_index <- which(feat == feat_best_add)
-  feat <- feat[- feat_best_add_index ]
-  
-  print(paste('added ', feat_best_add))
-}
-
-feat_best_row_all <- bind_rows(feat_best_row)
-
-write.csv(feat_best,
-          "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/FFS/FWET_ALL/200828_ffs_additional_predictors_k1_k10.csv",
-          row.names = FALSE)
-
-write.csv(feat_best_row_all, 
-          "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/FFS/FWET_ALL/200828_ffs_additional_metrics_k1_k10.csv",
-          row.names = FALSE)
-
-
-write.csv(rf_metrics_all,
-          "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/FFS/FWET_ALL/200828_ffs_k10_rf_metrics_all.csv",
-          row.names = FALSE)
-
-
 
