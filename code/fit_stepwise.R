@@ -4,8 +4,8 @@ fit_stepwise <- function(feat_single){
   
   for(i in 1:length(train_feat)){
     
-    train_list[[i]] <- list(train_feat[[i]], train_label[[i]], feat_single, validate_data[[i]], folds_index[[i]])
-    names(train_list[[i]]) <- c("train_feat", "train_label", "feat_single", "validate_data", "folds_index")
+    train_list[[i]] <- list(train_feat[[i]], train_label[[i]], feat_single, feat_best, validate_data[[i]])
+    names(train_list[[i]]) <- c("train_feat", "train_label", "feat_single", "feat_best", "validate_data")
   }
   
   
