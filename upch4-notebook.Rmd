@@ -3342,3 +3342,72 @@ for (i in 1:folds) {
 saveRDS(rf_model, paste(loc, "ensembles/cv/best6.rds", sep = "")) # local dir.
 ```
 
+##### Look at r2 and MAE for all models 
+
+```{r}
+mean_MAE <- c()
+mean_r2 <- c()
+tune_r2 <- list()
+tune_MAE <- list()
+tune_r2se <- list()
+tune_MAEse <- list()
+for (i in 1:length(rf_model)){
+  mean_MAE[i] <- sqrt(rf_model[[i]]$finalModel$prediction.error) # final model, out of bag metrics
+  mean_r2[i] <- rf_model[[i]]$finalModel$r.squared
+  tune_r2[[i]] <- rf_model[[i]]$results[,c(5)] # inner-fold cross validation metrics
+  tune_MAE[[i]] <- rf_model[[i]]$results[,c(4)]
+  tune_r2se[[i]] <- rf_model[[i]]$results[,c(6)]
+  tune_MAEse[[i]] <- rf_model[[i]]$results[,c(4)]
+  
+}
+mean(mean_MAE); mean(mean_r2) # final model for the fold, out of bag metrics
+
+
+tune_r2s <- cbind(rf_model[[1]]$results[,c(1,3)],bind_cols(tune_r2)) %>%  
+  gather(key = "fold", value = "R2", 3:22)
+tune_MAEs <- cbind(rf_model[[1]]$results[,c(1,3)],bind_cols(tune_MAE)) %>% 
+  gather(key = "fold", value = "MAE", 3:22)
+
+mean(tune_MAEs$MAE); mean(tune_r2s$R2)  # inner MAE and R2
+
+metrics <- c("final_fold_oob_MAE", "final_fold_oob_R2", "inner_cv_MAE", "inner_cv_R2")
+values <- c(mean(mean_MAE), mean(mean_r2), mean(tune_MAEs$MAE), mean(tune_r2s$R2) )
+
+as_tibble(cbind(metrics, values)) %>% 
+  write.csv(paste(loc, "ensembles/cv/best6_cv_metrics.csv", sep = ""),
+            row.names = F)
+```
+
+##### Get all hold out predictions
+
+```{r}
+rf.pred <- list()
+for (i in 1:folds) {
+  rf.pred[[i]] <- data %>% 
+    filter(Cluster== i) %>%   
+    mutate(FCH4P = predict(rf_model[[i]], .),
+           index = 1:n())
+}
+rf.pred.all <- bind_rows(rf.pred)
+
+write.csv(rf.pred.all, 
+          paste(loc, "predictions/cv/best6_pred.csv", sep = ""),
+          row.names = F)
+```
+
+##### Quick look at pred vs obs
+
+```{r}
+class_col_vector <- rep(c("#E78AC3","#F1E2CC","#33A02C","#377EB8","#E41A1C","#999999"),10)
+
+rf.pred.all %>% 
+  ggplot(aes(FCH4, FCH4P)) +
+  geom_abline(slope = 1) +
+  geom_point(alpha = 0.2) +
+  xlab(label = expression("FCH4 (nmol m"^{-2}*" s"^{-1}*")")) +
+  ylab(label = expression("FCH4P (nmol m"^{-2}*" s"^{-1}*")")) +
+  my_theme
+ggsave(paste(loc, "predictions/cv/best6_pvo.png", sep = ""),
+       width = 15, height = 8, units = c("cm"), dpi = 300)
+```
+
