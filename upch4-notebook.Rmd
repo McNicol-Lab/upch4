@@ -3243,4 +3243,102 @@ ggsave(paste(loc, "ffs/stepwise/MAE_evolve.png", sep = ""),
 
 ```
 
+#### 7. Cross Validation
+
+##### Read in training data
+
+```{r}
+data <- read.csv(paste(loc, "training-data/final.csv", sep = ""))
+```
+
+##### Read in feat list from FFS results
+
+```{r}
+feat <- read.csv(paste(loc, "ffs/stepwise/feat_best_row_final.csv", sep = "")) %>%
+  dplyr::select(feat) %>% pull() %>% as.character()
+feat <- c("TA", "canopyht", feat[2:length(feat)])
+feat <- feat[1:6] # select best
+feat_l <- length(feat)
+```
+
+##### Finalize label and feat data
+
+```{r}
+data_l <- length(data$Cluster)
+
+folds <- data %>% dplyr::select(Cluster) %>% max()
+fold_names <- data %>% group_by(Cluster) %>% summarize(Name = ID[1]) 
+
+# set up folds
+train_feat <- list()
+train_label <- list()
+test_data <- list()
+
+for (i in 1:folds) {
+  train_label[[i]] <- data %>% filter(!Cluster == i) %>% dplyr::select(FCH4) %>% pull()
+  train_feat[[i]] <- data %>% filter(!Cluster == i) %>% dplyr::select(feat)
+  test_data[[i]] <- data %>% filter(Cluster == i) %>% dplyr::select(Cluster, FCH4, feat)
+}
+
+folds_index <- list() # need list within list (each inner list has all fold site except LOSO fold)
+for (i in 1:folds) {
+  x <- list()
+  folds_index[[i]] <- x
+}
+
+for (i in 1:folds) {
+  for (j in 1:folds) {
+    folds_index[[i]][[j]] <- data %>% 
+      filter(!Cluster == i) %>% 
+      mutate(index = 1:n()) %>% 
+      filter(!Cluster == j) %>% 
+      dplyr::select(index) %>% 
+      pull()
+  }
+  folds_index[[i]] <- folds_index[[i]][-i]
+}
+```
+
+##### Train RF
+
+```{r}
+tgrid <- list()
+myControl <- list()
+
+## Create tune-grid
+tgrid <- expand.grid(
+  mtry = c(2, 4, 6),
+  splitrule = "variance", 
+  min.node.size = c(5, 50, 100)
+)
+
+rf_model <- list()
+for (i in 1:folds) {
+  
+  ## Create trainControl object
+  myControl <- trainControl(
+    method = "cv",
+    allowParallel = TRUE,
+    verboseIter = TRUE, 
+    returnData = FALSE,
+    index = folds_index[[i]]
+  )
+  
+  ## train rf on folds
+  rf_model[[i]] <- train(
+    x = train_feat[[i]], 
+    y = train_label[[i]],
+    num.trees = 100, # start at 10xfeat, drop to 100
+    method = 'ranger',
+    trControl = myControl,
+    tuneGrid = tgrid,
+    importance = 'permutation',
+    metric = "MAE"
+  )
+  print(i)
+}
+
+# save loocv model ensemble
+saveRDS(rf_model, paste(loc, "ensembles/cv/best6.rds", sep = "")) # local dir.
+```
 
