@@ -3942,6 +3942,40 @@ msc_data <- bind_rows(msc, msc_class, msc_climate, msc_id)
 write.csv(msc_data, paste(loc, "predictions/cv/msc.csv", sep = ""),
           row.names = F)
 
+### WITHOUT US-OWC
+# by-ID
+msc_wo_usowc <- ungroup(rf.pred.all) %>% 
+  filter(!ID == "USOWC") %>% 
+  group_by(ID, Month) %>%
+  summarize(MeanO = mean(FCH4, na.rm=TRUE),
+            MeanP = mean(FCH4P, na.rm=TRUE),
+            MedO = median(FCH4, na.rm=TRUE),
+            MedP = median(FCH4P, na.rm=TRUE),
+            IGBP = IGBP[1],
+            Class = NA) %>%  
+  ungroup() %>% 
+  summarize(Name = "msc global",
+            Samples = n(),
+            R2 = cor(MeanP, MeanO)^2,
+            NSE = 1 - sum((MeanO - MeanP)^2) / sum((MeanO - mean(MeanO))^2),
+            MAE = sum(abs(MeanO - MeanP))/n(),
+            nMAE = MAE/sd(MeanO),
+            MeanFCH4 = mean(MeanO),
+            MedFCH4 = median(MeanO),
+            sdFCH4 = sd(MeanO),
+            MeanFCH4P = mean(MeanP),
+            MedFCH4P = median(MeanP),
+            sdFCH4P = sd(MeanP),
+            nSD = sdFCH4P/sdFCH4,
+            Bias = mean(MeanP - MeanO),
+            Class = NA) %>% 
+  ungroup() %>% 
+  mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
+
+write.csv(msc_wo_usowc,
+          paste(loc, "predictions/cv/msc_wo_usowc.csv", sep = ""), 
+          row.names = F)
+
 # plot histogram of msc performance: R2
 msc_data %>% 
   filter(Name == "msc ID",
