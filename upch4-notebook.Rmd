@@ -22,6 +22,7 @@ library(geosphere)
 library(sf)
 library(caret)
 library(parallel)
+library(RColorBrewer)
 source("code/ggplot_theme.R")
 source("code/fit_all_pairs.R")
 source("code/fit_stepwise.R")
@@ -2849,7 +2850,6 @@ write.csv(cluster_bycluster, paste(loc, "/training-data/clusters/cluster_byclust
 write.csv(all_data, paste(loc, "training-data/final.csv", sep  = ""), row.names = F)
 ```
 
-
 ##### Rank predictors using FFS (ALL)
 
 #### 6. (cont.) Read in final data and predictor metadata
@@ -3411,3 +3411,921 @@ ggsave(paste(loc, "predictions/cv/best6_pvo.png", sep = ""),
        width = 15, height = 8, units = c("cm"), dpi = 300)
 ```
 
+##### Read csv
+
+```{r}
+rf.pred.all <- read.csv(paste(loc, "predictions/cv/best6_pred.csv", sep = ""))
+```
+
+##### Get nice plot colors
+
+```{r}
+qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+col_vector = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+col_vector_values = sample(col_vector, length(levels(factor(rf.pred.all$Cluster))), replace=FALSE)
+col_vector_values[1:6]
+
+class_col_vector <- c("#E78AC3","#F1E2CC","#33A02C","#377EB8","#E41A1C","#999999")
+```
+
+##### Create a Climate-by-latitude class
+
+```{r}
+rf.pred.all <- rf.pred.all %>% 
+  mutate(Climate = ifelse(Latitude > 70 | Latitude < -70, "1", NA),
+         Climate = ifelse(Latitude < 70 & Latitude > 50 | Latitude > -70 & Latitude < -50, "2", Climate),
+         Climate = ifelse(Latitude < 50 & Latitude > 23 | Latitude > -50 & Latitude < -23, "3", Climate),
+         Climate = ifelse(Latitude < 23 & Latitude > 0 | Latitude > -23 & Latitude < 0, "4", Climate)) %>% 
+  rename(Class = Site.Classification)
+```
+
+##### Look at FCH4 predictions histograms
+
+```{r}
+rf.pred.all %>% 
+  dplyr::select(FCH4,FCH4P) %>% 
+  gather(key = "Flux", value = "Value", 1:2) %>% 
+  ggplot(aes(Value, fill = Flux)) +
+  geom_histogram(aes(Value), fill = 'black') +
+  geom_histogram(alpha = 0.3) +
+  scale_color_manual(values = class_col_vector) +
+  facet_wrap(~Flux) +
+  my_theme
+ggsave(paste(loc, "predictions/cv/simple_histograms.png", sep = ""),
+       width = 20, height = 10, units = c("cm"), dpi = 300)
+```
+
+##### Trying using bias correction (notice histograms show a loss of very high and very low fluxes)
+
+```{r}
+splinemod <- smooth.spline(y=rf.pred.all$FCH4, x=rf.pred.all$FCH4P, spar = 2)
+plot(rf.pred.all$FCH4P,rf.pred.all$FCH4, xlim = c(0,1000), ylim = c(0,1000))
+abline(0,1,col = 'blue')
+lines(splinemod, col="white", lwd=5)
+
+```
+
+There is no real effect. 
+
+##### Visualize bias (in residuals)
+
+```{r}
+ungroup(rf.pred.all) %>% 
+  mutate(index = 1:n()) %>% 
+  ggplot(aes(x = NULL, y = FCH4P - FCH4, fill = Class)) +
+  geom_abline(intercept = 0) +
+  geom_boxplot(width = 2, alpha = 0.8) + my_theme + 
+  theme(axis.line.x = element_blank(), axis.title.x = element_blank(), 
+        axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+  ylab(label = expression("Error (nmol m"^{-2}*" s"^{-1}*")")) +
+  scale_fill_manual(values = class_col_vector) 
+ggsave(paste(loc, "predictions/cv/residuals_error.pdf", sep = ""),
+       width = 13, height = 9, units = c("cm"), dpi = 300)
+```
+
+###### Global Metrics
+
+```{r}
+global <- ungroup(rf.pred.all) %>% 
+  # filter(!ID == "USOWC") %>%
+  summarize(samples = n(),
+            R2 = cor(FCH4P, FCH4)^2,
+            NSE = 1 - sum((FCH4 - FCH4P)^2) / sum((FCH4 - mean(FCH4))^2),
+            MAE = sum(abs(FCH4 - FCH4P))/n(),
+            nMAE = MAE/sd(FCH4),
+            MeanO = mean(FCH4),
+            MedO = median(FCH4),
+            sdO = sd(FCH4),
+            MeanP = mean(FCH4P),
+            MedP = median(FCH4P),
+            sdP = sd(FCH4P),
+            nSD = sdP/sdO,
+            Bias = mean(FCH4P - FCH4),
+            cBias = abs(Bias)/sum(abs(Bias))*100) 
+
+global_ID <- ungroup(rf.pred.all) %>% 
+  group_by(ID) %>% 
+  summarize(samples = n(),
+            R2 = cor(FCH4P, FCH4)^2,
+            NSE = 1 - sum((FCH4 - FCH4P)^2) / sum((FCH4 - mean(FCH4))^2),
+            MAE = sum(abs(FCH4 - FCH4P))/n(),
+            nMAE = MAE/sd(FCH4),
+            MeanO = mean(FCH4),
+            MedO = median(FCH4),
+            sdO = sd(FCH4),
+            MeanP = mean(FCH4P),
+            MedP = median(FCH4P),
+            sdP = sd(FCH4P),
+            nSD = sdP/sdO,
+            Bias = mean(FCH4P - FCH4),
+            cBias = abs(Bias)/sum(abs(Bias))*100) 
+
+global_ID_monthly <- ungroup(rf.pred.all) %>% 
+  group_by(ID, Month) %>% 
+  summarize(samples = n(),
+            R2 = cor(FCH4P, FCH4)^2,
+            NSE = 1 - sum((FCH4 - FCH4P)^2) / sum((FCH4 - mean(FCH4))^2),
+            MAE = sum(abs(FCH4 - FCH4P))/n(),
+            nMAE = MAE/sd(FCH4),
+            MeanO = mean(FCH4),
+            MedO = median(FCH4),
+            sdO = sd(FCH4),
+            MeanP = mean(FCH4P),
+            MedP = median(FCH4P),
+            sdP = sd(FCH4P),
+            nSD = sdP/sdO,
+            Bias = mean(FCH4P - FCH4),
+            cBias = abs(Bias)/sum(abs(Bias))*100) 
+
+global <- bind_rows(global, global_ID, global_ID_monthly)
+
+write.csv(global, paste(loc, "predictions/cv/global.csv", sep = ""),
+          row.names = F)
+
+# global without USOWC
+global_wo_usowc <- ungroup(rf.pred.all) %>% 
+  # filter(!ID == "USOWC") %>%
+  summarize(samples = n(),
+            R2 = cor(FCH4P, FCH4)^2,
+            NSE = 1 - sum((FCH4 - FCH4P)^2) / sum((FCH4 - mean(FCH4))^2),
+            MAE = sum(abs(FCH4 - FCH4P))/n(),
+            nMAE = MAE/sd(FCH4),
+            MeanO = mean(FCH4),
+            MedO = median(FCH4),
+            sdO = sd(FCH4),
+            MeanP = mean(FCH4P),
+            MedP = median(FCH4P),
+            sdP = sd(FCH4P),
+            nSD = sdP/sdO,
+            Bias = mean(FCH4P - FCH4),
+            cBias = abs(Bias)/sum(abs(Bias))*100) 
+
+write.csv(global_wo_usowc,
+          paste(loc, "predictions/cv/global_wo_usowc.csv", sep = ""), 
+          row.names = F)
+
+```
+
+###### Site-mean metrics
+
+```{r}
+## performance metrics broken down by site-means, seasonal cycle and weekly/daily anomalies
+# site-means
+# by-ID
+sitemean <- ungroup(rf.pred.all) %>% 
+  group_by(ID) %>%
+  # filter(!ID == "USOWC") %>%
+  summarize(MeanO = mean(FCH4, na.rm=TRUE),
+            MeanP = mean(FCH4P, na.rm=TRUE),
+            MedO = median(FCH4, na.rm=TRUE),
+            MedP = median(FCH4P, na.rm=TRUE),
+            IGBP = IGBP[1],
+            Class = NA) %>% 
+  ungroup() %>% 
+  summarize(Name = "Site means",
+            Samples = n(),
+            R2 = cor(MeanP, MeanO)^2,
+            NSE = 1 - sum((MeanO - MeanP)^2) / sum((MeanO - mean(MeanO))^2),
+            MAE = sum(abs(MeanO - MeanP))/n(),
+            nMAE = MAE/sd(MeanO),
+            MeanFCH4 = mean(MeanO),
+            MedFCH4 = median(MeanO),
+            sdFCH4 = sd(MeanO),
+            MeanFCH4P = mean(MeanP),
+            MedFCH4P = median(MeanP),
+            sdFCH4P = sd(MeanP),
+            nSD = sdFCH4P/sdFCH4,
+            Bias = mean(MeanP - MeanO),
+            Class = NA) %>% 
+  ungroup() %>% 
+  mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
+
+# by-ID, grouped by Class 
+sitemean_class <- ungroup(rf.pred.all) %>% 
+  group_by(ID) %>%
+  summarize(MeanO = mean(FCH4, na.rm=TRUE),
+            MeanP = mean(FCH4P, na.rm=TRUE),
+            MedO = median(FCH4, na.rm=TRUE),
+            MedP = median(FCH4P, na.rm=TRUE),
+            Class = Class[1]) %>%  
+  ungroup() %>% 
+  group_by(Class) %>% 
+  summarize(Name = "Site means Class",
+            Samples = n(),
+            R2 = cor(MeanP, MeanO)^2,
+            NSE = 1 - sum((MeanO - MeanP)^2) / sum((MeanO - mean(MeanO))^2),
+            MAE = sum(abs(MeanO - MeanP))/n(),
+            nMAE = MAE/sd(MeanO),
+            MeanFCH4 = mean(MeanO),
+            MedFCH4 = median(MeanO),
+            sdFCH4 = sd(MeanO),
+            MeanFCH4P = mean(MeanP),
+            MedFCH4P = median(MeanP),
+            sdFCH4P = sd(MeanP),
+            nSD = sdFCH4P/sdFCH4,
+            Bias = mean(MeanP - MeanO)) %>% 
+  ungroup() %>% 
+  mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
+
+# by-ID, grouped by Climate 
+sitemean_climate <- ungroup(rf.pred.all) %>% 
+  group_by(ID) %>%
+  summarize(MeanO = mean(FCH4, na.rm=TRUE),
+            MeanP = mean(FCH4P, na.rm=TRUE),
+            MedO = median(FCH4, na.rm=TRUE),
+            MedP = median(FCH4P, na.rm=TRUE),
+            Climate = Climate[1],
+            Class = NA) %>%  
+  ungroup() %>% 
+  group_by(Climate) %>% 
+  summarize(Name = "Site means Climate",
+            Samples = n(),
+            R2 = cor(MeanP, MeanO)^2,
+            NSE = 1 - sum((MeanO - MeanP)^2) / sum((MeanO - mean(MeanO))^2),
+            MAE = sum(abs(MeanO - MeanP))/n(),
+            nMAE = MAE/sd(MeanO),
+            MeanFCH4 = mean(MeanO),
+            MedFCH4 = median(MeanO),
+            sdFCH4 = sd(MeanO),
+            MeanFCH4P = mean(MeanP),
+            MedFCH4P = median(MeanP),
+            sdFCH4P = sd(MeanP),
+            nSD = sdFCH4P/sdFCH4,
+            Bias = mean(MeanP - MeanO), 
+            Class = NA) %>% 
+  ungroup() %>% 
+  mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
+
+# metrics (by-site for component)
+sitemean_id <- ungroup(rf.pred.all) %>% 
+  group_by(ID) %>%
+  summarize(MeanO = mean(FCH4, na.rm=TRUE),
+            MeanP = mean(FCH4P, na.rm=TRUE),
+            MedO = median(FCH4, na.rm=TRUE),
+            MedP = median(FCH4P, na.rm=TRUE),
+            Class = Class[1]) %>%  
+  ungroup() %>% 
+  group_by(ID) %>% 
+  summarize(Name = "Site means ID",
+            Samples = n(),
+            R2 = cor(MeanP, MeanO)^2,
+            NSE = 1 - sum((MeanO - MeanP)^2) / sum((MeanO - mean(MeanO))^2),
+            MAE = sum(abs(MeanO - MeanP))/n(),
+            nMAE = MAE/sd(MeanO),
+            MeanFCH4 = mean(MeanO),
+            MedFCH4 = median(MeanO),
+            sdFCH4 = sd(MeanO),
+            MeanFCH4P = mean(MeanP),
+            MedFCH4P = median(MeanP),
+            sdFCH4P = sd(MeanP),
+            nSD = sdFCH4P/sdFCH4,
+            Bias = mean(MeanP - MeanO),
+            Class = Class[1]) %>% 
+  ungroup() %>% 
+  mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
+
+# join sitemean
+sitemean_data <- bind_rows(sitemean, sitemean_class, sitemean_climate, sitemean_id)
+write.csv(sitemean_data, paste(loc, "predictions/cv/sitemean.csv", sep = ""),
+          row.names = F)
+
+
+## METRICS WITHOUT USOWC
+sitemean_wo_usowc <- ungroup(rf.pred.all) %>% 
+  group_by(ID) %>%
+  filter(!ID == "USOWC") %>%
+  summarize(MeanO = mean(FCH4, na.rm=TRUE),
+            MeanP = mean(FCH4P, na.rm=TRUE),
+            MedO = median(FCH4, na.rm=TRUE),
+            MedP = median(FCH4P, na.rm=TRUE),
+            IGBP = IGBP[1],
+            Class = NA) %>% 
+  ungroup() %>% 
+  summarize(Name = "Site means",
+            Samples = n(),
+            R2 = cor(MeanP, MeanO)^2,
+            NSE = 1 - sum((MeanO - MeanP)^2) / sum((MeanO - mean(MeanO))^2),
+            MAE = sum(abs(MeanO - MeanP))/n(),
+            nMAE = MAE/sd(MeanO),
+            MeanFCH4 = mean(MeanO),
+            MedFCH4 = median(MeanO),
+            sdFCH4 = sd(MeanO),
+            MeanFCH4P = mean(MeanP),
+            MedFCH4P = median(MeanP),
+            sdFCH4P = sd(MeanP),
+            nSD = sdFCH4P/sdFCH4,
+            Bias = mean(MeanP - MeanO),
+            Class = NA) %>% 
+  ungroup() %>% 
+  mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
+
+write.csv(sitemean_wo_usowc,
+          paste(loc, "predictions/cv/sitemean_wo_usowc.csv", sep = ""), 
+          row.names = F)
+
+```
+
+##### Other sitemean plots
+
+```{r}
+
+# plot histogram of site year performance: BIAS
+sitemean_data %>% 
+  filter(Name == "Site means ID") %>% 
+  dplyr::select(ID, Class, MAE, nMAE, Bias, cBias) %>% 
+  gather(key = "Metric", value = "Score", 3:6) %>% 
+  filter(Metric %in% c("Bias", "cBias")) %>% 
+  ggplot(aes(Score, fill = Class)) +
+  geom_histogram() +
+  facet_wrap(~Metric, scales = 'free', ncol = 1) +
+  scale_fill_manual(values = rep(class_col_vector,8)) +
+  my_theme
+ggsave(paste(loc, "predictions/cv/sitemean_histogram_bias.png", sep = ""),
+       width = 13, height = 24, units = c("cm"), dpi = 300)
+
+# plot histogram of site year performance: MAE
+sitemean_data %>% 
+  filter(Name == "Site means ID") %>% 
+  dplyr::select(ID, Class, MAE, nMAE, Bias, cBias) %>% 
+  gather(key = "Metric", value = "Score", 3:6) %>% 
+  filter(Metric %in% c("MAE", "nMAE")) %>% 
+  ggplot(aes(Score, fill = Class)) +
+  geom_histogram() +
+  facet_wrap(~Metric, scales = 'free', ncol = 1) +
+  scale_fill_manual(values = rep(class_col_vector,8)) +
+  my_theme
+ggsave(paste(loc, "predictions/cv/sitemean_histogram_mae.png", sep = ""),
+       width = 13, height = 24, units = c("cm"), dpi = 300)
+
+# global site-mean comparison
+ungroup(rf.pred.all) %>% 
+  # group_by(ID, Year) %>% 
+  group_by(ID) %>% 
+  summarize(MeanO = mean(FCH4, na.rm=TRUE),
+            MeanP = mean(FCH4P, na.rm=TRUE),
+            MedO = median(FCH4, na.rm=TRUE),
+            MedP = median(FCH4P, na.rm=TRUE),
+            Class = Class[1]) %>% 
+  ggplot(aes(MeanO, MeanP, col = Class)) +
+  # scale_x_log10(limits = c(6,700)) +
+  # scale_y_log10(limits = c(6,700)) +
+  geom_point(size = 4, alpha = 0.85) +
+  geom_abline(slope = 1, intercept = 0, colour = 'grey') +
+  scale_color_manual(values = class_col_vector) +
+  my_theme +
+  labs(x= expression('Obs. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'), y = expression('Pred. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'))
+ggsave(paste(loc, "predictions/cv/sitemean_pvo.png", sep = ""),
+       width = 20, height = 13, units = c("cm"), dpi = 300)
+
+# global site-mean comparison log10
+ungroup(rf.pred.all) %>% 
+  # group_by(ID, Year) %>% 
+  group_by(ID) %>% 
+  summarize(MeanO = mean(FCH4, na.rm=TRUE),
+            MeanP = mean(FCH4P, na.rm=TRUE),
+            MedO = median(FCH4, na.rm=TRUE),
+            MedP = median(FCH4P, na.rm=TRUE),
+            Class = Class[1]) %>% 
+  ggplot(aes(MeanO, MeanP, col = Class)) +
+  scale_x_log10(limits = c(6,700)) +
+  scale_y_log10(limits = c(6,700)) +
+  geom_point(size = 4, alpha = 0.85) +
+  geom_abline(slope = 1, intercept = 0, colour = 'grey') +
+  scale_color_manual(values = class_col_vector) +
+  my_theme +
+  labs(x= expression('Obs. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'), y = expression('Pred. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'))
+ggsave(paste(loc, "predictions/cv/sitemean_pvo_log10.png", sep = ""),
+       width = 20, height = 20, units = c("cm"), dpi = 300)
+
+# by Climate/class
+ungroup(rf.pred.all) %>% 
+  # group_by(ID, Year) %>% 
+  group_by(ID, Year) %>% 
+  summarize(MeanO = mean(FCH4, na.rm=TRUE),
+            MeanP = mean(FCH4P, na.rm=TRUE),
+            MedO = median(FCH4, na.rm=TRUE),
+            MedP = median(FCH4P, na.rm=TRUE),
+            Class = Class[1],
+            Climate = Climate[1]) %>% 
+  ggplot(aes(MeanO, MeanP, col = Class)) +
+  # scale_x_log10(limits = c(3,600)) +
+  # scale_y_log10(limits = c(3,600)) +
+  geom_point(size = 3, alpha = 0.85) +
+  geom_abline(slope = 1, intercept = 0, colour = 'grey') +
+  scale_color_manual(values = class_col_vector) +
+  facet_wrap(~Climate, scales = 'free', ncol = 1) +
+  my_theme +
+  labs(x= expression('Obs. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'), y = expression('Pred. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'))
+ggsave(paste(loc, "predictions/cv/sitemean_pvo_climate.png", sep = ""),
+       width = 13, height = 36, units = c("cm"), dpi = 300)
+```
+
+##### Mean seasonal cycle
+
+```{r}
+# by-ID
+msc <- ungroup(rf.pred.all) %>% 
+  group_by(ID, Month) %>%
+  summarize(MeanO = mean(FCH4, na.rm=TRUE),
+            MeanP = mean(FCH4P, na.rm=TRUE),
+            MedO = median(FCH4, na.rm=TRUE),
+            MedP = median(FCH4P, na.rm=TRUE),
+            IGBP = IGBP[1],
+            Class = NA) %>%  
+  ungroup() %>% 
+  summarize(Name = "msc global",
+            Samples = n(),
+            R2 = cor(MeanP, MeanO)^2,
+            NSE = 1 - sum((MeanO - MeanP)^2) / sum((MeanO - mean(MeanO))^2),
+            MAE = sum(abs(MeanO - MeanP))/n(),
+            nMAE = MAE/sd(MeanO),
+            MeanFCH4 = mean(MeanO),
+            MedFCH4 = median(MeanO),
+            sdFCH4 = sd(MeanO),
+            MeanFCH4P = mean(MeanP),
+            MedFCH4P = median(MeanP),
+            sdFCH4P = sd(MeanP),
+            nSD = sdFCH4P/sdFCH4,
+            Bias = mean(MeanP - MeanO),
+            Class = NA) %>% 
+  ungroup() %>% 
+  mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
+
+# by-ID, grouped by Class 
+msc_class <- ungroup(rf.pred.all) %>% 
+  group_by(ID, Month) %>%
+  summarize(MeanO = mean(FCH4, na.rm=TRUE),
+            MeanP = mean(FCH4P, na.rm=TRUE),
+            MedO = median(FCH4, na.rm=TRUE),
+            MedP = median(FCH4P, na.rm=TRUE),
+            Class = Class[1]) %>%  
+  ungroup() %>% 
+  group_by(Class) %>% 
+  summarize(Name = "msc class",
+            Samples = n(),
+            R2 = cor(MeanP, MeanO)^2,
+            NSE = 1 - sum((MeanO - MeanP)^2) / sum((MeanO - mean(MeanO))^2),
+            MAE = sum(abs(MeanO - MeanP))/n(),
+            nMAE = MAE/sd(MeanO),
+            MeanFCH4 = mean(MeanO),
+            MedFCH4 = median(MeanO),
+            sdFCH4 = sd(MeanO),
+            MeanFCH4P = mean(MeanP),
+            MedFCH4P = median(MeanP),
+            sdFCH4P = sd(MeanP),
+            nSD = sdFCH4P/sdFCH4,
+            Bias = mean(MeanP - MeanO)) %>% 
+  ungroup() %>% 
+  mutate(cBias = abs(Bias)/sum(abs(Bias))*100) 
+
+# by-ID, grouped by Climate 
+msc_climate <- ungroup(rf.pred.all) %>% 
+  # filter(!ID == "USOWC") %>% 
+  group_by(ID, Month) %>%
+  summarize(MeanO = mean(FCH4, na.rm=TRUE),
+            MeanP = mean(FCH4P, na.rm=TRUE),
+            MedO = median(FCH4, na.rm=TRUE),
+            MedP = median(FCH4P, na.rm=TRUE),
+            Climate = Climate[1], 
+            Class = NA) %>%  
+  ungroup() %>% 
+  group_by(Climate) %>% 
+  summarize(Name = "msc climate",
+            Samples = n(),
+            R2 = cor(MeanP, MeanO)^2,
+            NSE = 1 - sum((MeanO - MeanP)^2) / sum((MeanO - mean(MeanO))^2),
+            MAE = sum(abs(MeanO - MeanP))/n(),
+            nMAE = MAE/sd(MeanO),
+            MeanFCH4 = mean(MeanO),
+            MedFCH4 = median(MeanO),
+            sdFCH4 = sd(MeanO),
+            MeanFCH4P = mean(MeanP),
+            MedFCH4P = median(MeanP),
+            sdFCH4P = sd(MeanP),
+            nSD = sdFCH4P/sdFCH4,
+            Bias = mean(MeanP - MeanO),
+            Class = NA) %>% 
+  ungroup() %>% 
+  mutate(cBias = abs(Bias)/sum(abs(Bias))*100) 
+
+# metrics (by-site for component)
+msc_id <- ungroup(rf.pred.all) %>% 
+  group_by(ID, Month) %>%
+  summarize(MeanO = mean(FCH4, na.rm=TRUE),
+            MeanP = mean(FCH4P, na.rm=TRUE),
+            MedO = median(FCH4, na.rm=TRUE),
+            MedP = median(FCH4P, na.rm=TRUE),
+            Climate = Climate[1], 
+            Class = Class[1]) %>%  
+  ungroup() %>% 
+  group_by(ID) %>% 
+  summarize(Name = "msc ID",
+            Samples = n(),
+            R2 = cor(MeanP, MeanO)^2,
+            NSE = 1 - sum((MeanO - MeanP)^2) / sum((MeanO - mean(MeanO))^2),
+            MAE = sum(abs(MeanO - MeanP))/n(),
+            nMAE = MAE/sd(MeanO),
+            MeanFCH4 = mean(MeanO),
+            MedFCH4 = median(MeanO),
+            sdFCH4 = sd(MeanO),
+            MeanFCH4P = mean(MeanP),
+            MedFCH4P = median(MeanP),
+            sdFCH4P = sd(MeanP),
+            nSD = sdFCH4P/sdFCH4,
+            Bias = mean(MeanP - MeanO),
+            Class = Class[1]) %>% 
+  ungroup() %>% 
+  mutate(cBias = abs(Bias)/sum(abs(Bias))*100) 
+
+# join msc
+msc_data <- bind_rows(msc, msc_class, msc_climate, msc_id)
+write.csv(msc_data, paste(loc, "predictions/cv/msc.csv", sep = ""),
+          row.names = F)
+
+# plot histogram of msc performance: R2
+msc_data %>% 
+  filter(Name == "msc ID",
+         NSE > 0) %>% 
+  dplyr::select(ID, Class, R2, NSE, MAE, nMAE, Bias, cBias) %>% 
+  gather(key = "Metric", value = "Score", 3:8) %>% 
+  filter(Metric %in% c("R2", "NSE")) %>% 
+  ggplot(aes(Score, fill = Class)) +
+  geom_histogram(bins = 15) +
+  facet_wrap(~Metric, ncol = 1) +
+  scale_fill_manual(values = rep(class_col_vector,8)) +
+  my_theme
+ggsave(paste(loc, "predictions/cv/msc_histogram_r2.png", sep = ""),
+       width = 13, height = 24, units = c("cm"), dpi = 300)
+
+
+# plot histogram of msc performance: BIAS
+msc_data %>% 
+  filter(Name == "msc ID") %>% 
+  dplyr::select(ID, Class, R2, NSE, MAE, nMAE, Bias, cBias) %>% 
+  gather(key = "Metric", value = "Score", 3:8) %>% 
+  filter(Metric %in% c("Bias", "cBias")) %>% 
+  ggplot(aes(Score, fill = Class)) +
+  geom_histogram() +
+  facet_wrap(~Metric, scales = 'free', ncol = 1) +
+  scale_fill_manual(values = rep(class_col_vector,8)) +
+  my_theme
+ggsave(paste(loc, "predictions/cv/msc_histogram_bias.png", sep = ""),
+       width = 13, height = 24, units = c("cm"), dpi = 300)
+
+# plot histogram of msc performance: MAE
+msc_data %>% 
+  filter(Name == "msc ID") %>% 
+  dplyr::select(ID, Class,R2, NSE, MAE, nMAE, Bias, cBias) %>% 
+  gather(key = "Metric", value = "Score", 3:8) %>% 
+  filter(Metric %in% c("MAE", "nMAE")) %>% 
+  ggplot(aes(Score, fill = Class)) +
+  geom_histogram() +
+  facet_wrap(~Metric, scales = 'free', ncol = 1) +
+  scale_fill_manual(values = rep(class_col_vector,8)) +
+  my_theme
+ggsave(paste(loc, "predictions/cv/msc_histogram_mae.png", sep = ""),
+       width = 13, height = 24, units = c("cm"), dpi = 300)
+
+# global msc comparison
+ungroup(rf.pred.all) %>% 
+  group_by(ID) %>%
+  mutate(annual_meanO = mean(FCH4, na.rm=TRUE),
+         annual_meanP = mean(FCH4P, na.rm=TRUE)) %>% 
+  group_by(ID, Month) %>% 
+  summarize(annual_meanO = annual_meanO[1],
+            annual_meanP = annual_meanP[1],
+            mscO = abs(mean(FCH4, na.rm=TRUE)-annual_meanO),
+            mscP = abs(mean(FCH4P, na.rm=TRUE)-annual_meanP),
+            IGBP = IGBP[1],
+            Climate = Climate[1],
+            Class = Class[1],
+            Months = n()) %>% 
+  ungroup() %>% 
+  ggplot(aes(mscO, mscP, col = Class)) +
+  # scale_x_log10(limits = c(3,600)) +
+  # scale_y_log10(limits = c(3,600)) +
+  geom_point(size = 3, alpha = 0.6) +
+  geom_abline(slope = 1, intercept = 0, colour = 'grey') +
+  scale_color_manual(values = class_col_vector) +
+  my_theme +
+  labs(x= expression('Obs. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'), y = expression('Pred. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'))
+ggsave(paste(loc, "predictions/cv/msc_pvo.png", sep = ""),
+       width = 20, height = 10, units = c("cm"), dpi = 300)
+
+# MSC plots Climate
+ungroup(rf.pred.all) %>% 
+  group_by(ID) %>%
+  mutate(annual_meanO = mean(FCH4, na.rm=TRUE),
+         annual_meanP = mean(FCH4P, na.rm=TRUE)) %>% 
+  group_by(ID, Month) %>% 
+  summarize(annual_meanO = annual_meanO[1],
+            annual_meanP = annual_meanP[1],
+            mscO = abs(mean(FCH4, na.rm=TRUE)-annual_meanO),
+            mscP = abs(mean(FCH4P, na.rm=TRUE)-annual_meanP),
+            IGBP = IGBP[1],
+            Climate = Climate[1],
+            Class = Class[1],
+            Months = n()) %>% 
+  ungroup() %>% 
+  ggplot(aes(mscO, mscP, col = Class)) +
+  geom_abline(slope = 1, intercept = 0, colour = 'black') +
+  geom_point(size = 2) +
+  facet_wrap(~Climate, ncol = 2, scales = 'free') +
+  scale_color_manual(values = class_col_vector) +
+  my_theme +
+  labs(x= expression("Observed "*CH[4]*' MSC (nmol m'^{-2}*' s'^{-1}*')'), y = expression("Predicted "*CH[4]*' MSC (nmol m'^{-2}*' s'^{-1}*')')) 
+ggsave(paste(loc, "predictions/cv/msc_pvo_climate.png", sep = ""),
+       width = 24, height = 20, units = c("cm"), dpi = 300)
+
+
+## FINAL FIGURE 
+# MSC plots ID
+climate_names <- c(`1` = "Tundra", `2` = "Boreal", `3` = "Temperate", `4` = "Tropical")
+
+ungroup(rf.pred.all) %>% 
+  group_by(ID) %>%
+  mutate(annual_meanO = mean(FCH4, na.rm=TRUE),
+         annual_meanP = mean(FCH4P, na.rm=TRUE)) %>% 
+  group_by(ID, Month) %>% 
+  summarize(annual_meanO = annual_meanO[1],
+            annual_meanP = annual_meanP[1],
+            mscO = abs(mean(FCH4, na.rm=TRUE)-annual_meanO),
+            mscP = abs(mean(FCH4P, na.rm=TRUE)-annual_meanP),
+            IGBP = IGBP[1],
+            Climate = Climate[1],
+            Months = n()) %>% 
+  ungroup() %>% 
+  ggplot(aes(mscO, mscP, col = ID)) +
+  geom_abline(slope = 1, intercept = 0, colour = 'black') +
+  geom_point(size = 2) +
+  geom_smooth(method = 'lm', se = FALSE) +
+  facet_wrap(~Climate, ncol = 2, scales = 'free', labeller = labeller(Climate = climate_names)) +
+  # scale_y_continuous(limits = c(1,200)) +
+  # scale_x_continuous(limits = c(1,200)) +
+  scale_color_manual(values = rep(col_vector_values,2)) +
+  theme(legend.position = "right",
+        legend.direction = 'vertical') +
+  my_theme +
+  labs(x= expression("Observed "*CH[4]*' MSC (nmol m'^{-2}*' s'^{-1}*')'), y = expression("Predicted "*CH[4]*' MSC (nmol m'^{-2}*' s'^{-1}*')')) 
+ggsave(paste(loc, "predictions/cv/msc_pvo_id.png", sep = ""),
+       width = 20, height = 26, units = c("cm"), dpi = 300)
+
+# timeseries
+ungroup(rf.pred.all) %>% 
+  group_by(ID) %>%
+  mutate(annual_meanO = mean(FCH4, na.rm=TRUE),
+         annual_meanP = mean(FCH4P, na.rm=TRUE)) %>% 
+  group_by(ID, Month) %>% 
+  summarize(annual_meanO = annual_meanO[1],
+            annual_meanP = annual_meanP[1],
+            mscO = mean(FCH4, na.rm=TRUE)-annual_meanO,
+            mscP = mean(FCH4P, na.rm=TRUE)-annual_meanP,
+            IGBP = IGBP[1],
+            Months = n()) %>% 
+  ggplot(aes(Month, mscO)) +
+  geom_point(size = 3) +
+  geom_point(aes(Month, mscP), col = 'orange', size = 3) +
+  facet_wrap(~ID,scales = 'free',ncol=8) +
+  # scale_y_log10(limits = c(0.01,1000), breaks = c(0.001,0.1,10,1000), labels = c(0.001,0.1,10,1000)) +
+  scale_x_continuous(breaks = c(1:12), limits = c(1,12), labels = c("J","F","M","A","M","J","J","A","S","O","N","D")) +
+  my_theme +
+  labs(x= "Month", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) 
+ggsave(paste(loc, "predictions/cv/msc_timeseries.png", sep = ""),
+       width = 45, height = 25, units = c("cm"), dpi = 300)
+
+## FINAL FIGURE
+# timeseries
+ungroup(rf.pred.all) %>% 
+  filter(ID %in% c("SEDeg", "DEHte","BWNxr", "FRLGt", "USORv", "NZKop")) %>% 
+  group_by(ID) %>%
+  mutate(annual_meanO = mean(FCH4, na.rm=TRUE),
+         annual_meanP = mean(FCH4P, na.rm=TRUE)) %>% 
+  group_by(ID, Month) %>% 
+  summarize(annual_meanO = annual_meanO[1],
+            annual_meanP = annual_meanP[1],
+            mscO = mean(FCH4, na.rm=TRUE)-annual_meanO,
+            mscP = mean(FCH4P, na.rm=TRUE)-annual_meanP,
+            IGBP = IGBP[1],
+            Climate = Climate[1],
+            Months = n()) %>% 
+  ggplot(aes(Month, mscO)) +
+  geom_point(size = 2) +
+  geom_point(aes(Month, mscP), col = 'orange', size = 2) +
+  facet_wrap(~ID, scales = 'free', ncol=3, labeller = labeller(Climate = climate_names)) +
+  # scale_y_log10(limits = c(0.01,1000), breaks = c(0.001,0.1,10,1000), labels = c(0.001,0.1,10,1000)) +
+  scale_x_continuous(breaks = c(1:12), limits = c(1,12), labels = c("J","F","M","A","M","J","J","A","S","O","N","D")) +
+  my_theme +
+  labs(x= "Month", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) 
+ggsave(paste(loc, "predictions/cv/msc_highlowights.png", sep = ""),
+       width = 24, height = 14, units = c("cm"), dpi = 300)
+
+
+```
+
+##### Anomalies (i.e., excursions from mean seasonal cycle)
+
+```{r}
+# first create mean seasonal cycle dataframe
+pred.msc <- ungroup(rf.pred.all) %>% 
+  group_by(ID, Month) %>% 
+  summarize(mscO = mean(FCH4, na.rm=TRUE),
+            mscP = mean(FCH4P, na.rm=TRUE),
+            Years = n()) 
+
+# then left join back onto full dataframe
+rf.pred.msc <- rf.pred.all %>% left_join(pred.msc, by = c("ID","Month")) 
+
+# global monthly anomaly summary
+anomaly <- ungroup(rf.pred.msc) %>% 
+  group_by(ID, Year, Month) %>%
+  summarize(mscO = mscO[1],
+            Years = Years[1],
+            FCH4 = mean(FCH4),
+            FCH4P = mean(FCH4P)) %>% 
+  mutate(anomalyO = FCH4 - mscO,
+         anomalyP = FCH4P - mscO) %>% 
+  ungroup() %>% 
+  summarize(Name = "anomaly",
+            Samples = n(),
+            R2 = cor(anomalyP, anomalyO)^2,
+            NSE = 1 - sum((anomalyO - anomalyP)^2) / sum((anomalyO - mean(anomalyO))^2),
+            MAE = sum(abs(anomalyO - anomalyP))/n(),
+            nMAE = MAE/sd(anomalyO),
+            MeanFCH4 = mean(anomalyO),
+            MedFCH4 = median(anomalyO),
+            sdFCH4 = sd(anomalyO),
+            MeanFCH4P = mean(anomalyP),
+            MedFCH4P = median(anomalyP),
+            sdFCH4P = sd(anomalyP),
+            nSD = sdFCH4P/sdFCH4,
+            Bias = mean(anomalyP - anomalyO)) %>% 
+  ungroup() %>% 
+  mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
+
+# by-ID, grouped by CLASS 
+anomaly_class <- ungroup(rf.pred.msc) %>% 
+  group_by(ID, Year, Month) %>%
+  summarize(mscO = mscO[1],
+            Years = Years[1],
+            FCH4 = mean(FCH4),
+            FCH4P = mean(FCH4P),
+            Class = Class[1]) %>% 
+  mutate(anomalyO = FCH4 - mscO,
+         anomalyP = FCH4P - mscO) %>% 
+  ungroup() %>% 
+  group_by(Class) %>% 
+  summarize(Name = "Class",
+            Samples = n(),
+            R2 = cor(anomalyP, anomalyO)^2,
+            NSE = 1 - sum((anomalyO - anomalyP)^2) / sum((anomalyO - mean(anomalyO))^2),
+            MAE = sum(abs(anomalyO - anomalyP))/n(),
+            nMAE = MAE/sd(anomalyO),
+            MeanFCH4 = mean(anomalyO),
+            MedFCH4 = median(anomalyO),
+            sdFCH4 = sd(anomalyO),
+            MeanFCH4P = mean(anomalyP),
+            MedFCH4P = median(anomalyP),
+            sdFCH4P = sd(anomalyP),
+            nSD = sdFCH4P/sdFCH4,
+            Bias = mean(anomalyP - anomalyO)) %>% 
+  ungroup() %>% 
+  mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
+
+# by-ID, grouped by Climate 
+anomaly_climate <- ungroup(rf.pred.msc) %>% 
+  group_by(ID, Year, Month) %>%
+  summarize(mscO = mscO[1],
+            Years = Years[1],
+            FCH4 = mean(FCH4),
+            FCH4P = mean(FCH4P),
+            Climate = Climate[1]) %>% 
+  mutate(anomalyO = FCH4 - mscO,
+         anomalyP = FCH4P - mscO) %>% 
+  ungroup() %>% 
+  group_by(Climate) %>% 
+  summarize(Name = "Climate",
+            Samples = n(),
+            R2 = cor(anomalyP, anomalyO)^2,
+            NSE = 1 - sum((anomalyO - anomalyP)^2) / sum((anomalyO - mean(anomalyO))^2),
+            MAE = sum(abs(anomalyO - anomalyP))/n(),
+            nMAE = MAE/sd(anomalyO),
+            MeanFCH4 = mean(anomalyO),
+            MedFCH4 = median(anomalyO),
+            sdFCH4 = sd(anomalyO),
+            MeanFCH4P = mean(anomalyP),
+            MedFCH4P = median(anomalyP),
+            sdFCH4P = sd(anomalyP),
+            nSD = sdFCH4P/sdFCH4,
+            Bias = mean(anomalyP - anomalyO)) %>% 
+  ungroup() %>% 
+  mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
+
+# now group by ID
+anomaly_id <- ungroup(rf.pred.msc) %>% 
+  group_by(ID, Year, Month) %>%
+  summarize(mscO = mscO[1],
+            Years = Years[1],
+            FCH4 = mean(FCH4),
+            FCH4P = mean(FCH4P),
+            Climate = Climate[1]) %>% 
+  mutate(anomalyO = FCH4 - mscO,
+         anomalyP = FCH4P - mscO) %>% 
+  ungroup() %>% 
+  group_by(ID) %>% 
+  summarize(Name = "ID",
+            Samples = n(),
+            R2 = cor(anomalyP, anomalyO)^2,
+            NSE = 1 - sum((anomalyO - anomalyP)^2) / sum((anomalyO - mean(anomalyO))^2),
+            MAE = sum(abs(anomalyO - anomalyP))/n(),
+            nMAE = MAE/sd(anomalyO),
+            MeanFCH4 = mean(anomalyO),
+            MedFCH4 = median(anomalyO),
+            sdFCH4 = sd(anomalyO),
+            MeanFCH4P = mean(anomalyP),
+            MedFCH4P = median(anomalyP),
+            sdFCH4P = sd(anomalyP),
+            nSD = sdFCH4P/sdFCH4,
+            Bias = mean(anomalyP - anomalyO)) %>% 
+  ungroup() %>% 
+  mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
+
+# join anomalies
+anomaly_data <- bind_rows(anomaly, anomaly_class, anomaly_climate, anomaly_id)
+write.csv(anomaly_data, paste(loc, "predictions/cv/anomaly.csv", sep=""),
+          row.names=FALSE)
+
+# global anomalies 
+rf.pred.msc %>% 
+  group_by(ID, Year, Month) %>% 
+  summarize(mscO = mscO[1],
+            mscP = mscP[1],
+            Years = Years[1],
+            FCH4 = FCH4[1],
+            FCH4P = FCH4P[1],
+            Class = Class[1],
+            Climate = Climate[1]) %>% 
+  mutate(anomalyO = abs(FCH4 - mscO),
+         anomalyP = abs(FCH4P - mscP)) %>%  
+  ungroup() %>% 
+  ggplot(aes(anomalyO, anomalyP, col = Class)) +
+  # scale_x_log10(limits = c(0.01,1000)) +
+  # scale_y_log10(limits = c(0.01,1000)) +
+  geom_point(size = 2, alpha = 0.5) +
+  geom_abline(slope = 1, intercept = 0, colour = 'grey') +
+  scale_color_manual(values = class_col_vector) +
+  # facet_wrap(~Climate, scales = 'free', ncol = 1) +
+  my_theme +
+  labs(x= expression('Obs. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'), y = expression('Pred. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'))
+ggsave(paste(loc, "predictions/cv/anomalies_pvo.png", sep = ""),
+       width = 20, height = 10, units = c("cm"), dpi = 300)
+
+# now calculate monthly anomalies  
+rf.pred.msc %>% 
+  group_by(ID, Year, Month) %>% 
+  summarize(mscO = mscO[1],
+            mscP = mscP[1],
+            Years = Years[1],
+            FCH4 = FCH4[1],
+            FCH4P = FCH4P[1],
+            Class = Class[1],
+            Climate = Climate[1]) %>% 
+  mutate(anomalyO = abs(FCH4 - mscO),
+         anomalyP = abs(FCH4P - mscP)) %>%  
+  ungroup() %>% 
+  ggplot(aes(anomalyO, anomalyP, col = Class)) +
+  # scale_x_log10(limits = c(0.01,1000)) +
+  # scale_y_log10(limits = c(0.01,1000)) +
+  geom_point(size = 2, alpha = 0.5) +
+  geom_abline(slope = 1, intercept = 0, colour = 'grey') +
+  scale_color_manual(values = class_col_vector) +
+  facet_wrap(~Climate, scales = 'free', ncol = 1) +
+  my_theme +
+  labs(x= expression('Obs. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'), y = expression('Pred. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'))
+ggsave(paste(loc, "predictions/cv/anomalies_pvo_climate.png", sep = ""),
+       width = 13, height = 36, units = c("cm"), dpi = 300)
+
+# timeseries
+rf.pred.msc %>% 
+  group_by(ID, Year, Month) %>% 
+  summarize(mscO = mscO[1],
+            mscP = mscP[1],
+            Years = Years[1],
+            FCH4 = FCH4[1],
+            FCH4P = FCH4P[1],
+            Class = Class[1],
+            Climate = Climate[1]) %>% 
+  mutate(anomalyO = abs(FCH4 - mscO),
+         anomalyP = abs(FCH4P - mscP)) %>%  
+  ungroup() %>% 
+  ggplot(aes(Month, anomalyO)) +
+    geom_point(col = 'black', size = 3) +
+    geom_point(aes(Month, anomalyP), col = 'orange', size = 3, alpha = 0.5) +
+    facet_wrap(~ID, scales = 'free', ncol = 8) +
+    # scale_y_log10(limits = c(0.01,1000), breaks = c(0.001,0.1,10,1000), labels = c(0.001,0.1,10,1000)) +
+    scale_x_continuous(breaks = c(1:12), limits = c(1,12), labels = c("J","F","M","A","M","J","J","A","S","O","N","D")) +
+    my_theme +
+    labs(x= "Month", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) 
+ggsave(paste(loc, "predictions/cv/anomalies_timeseries.png", sep = ""),
+       width = 45, height = 25, units = c("cm"), dpi = 300)
+
+```
