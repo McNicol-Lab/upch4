@@ -97,7 +97,6 @@ loc <- "/Volumes/Samsung_T5/Stanford/upch4_local/"
   8. Variable Importances
       + Variable Importance Rankings
       + Variable Responses
-      + Partial Dependency Plots
       + ShapR
   9. Upscaled Model with Monte Carlo (MC)
       + Forcing Data
@@ -4475,3 +4474,6 @@ ggsave(paste(loc, "varimp/var_response_all.png", sep = ""),
        width = 25, height = 22, units = c("cm"), dpi = 300)
 ```
 
+
+##### ShapR
+#### 9. Upscaled Model with Monte Carlo (MC)
