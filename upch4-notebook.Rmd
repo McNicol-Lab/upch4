@@ -4446,3 +4446,32 @@ variable.importance %>%
 ggsave(paste(loc, "varimp/pred_rank.png", sep = ""),
        width = 18, height = 13, units = c("cm"), dpi = 300)
 ```
+
+##### Variable Responses
+
+```{r}
+# read rf model
+rf_model <- readRDS(paste(loc, "ensembles/cv/best6.rds", sep = ""))
+
+# get feature names
+variable.importance <- varImp(rf_model[[1]], scale = TRUE)
+feat <- rownames(variable.importance$importance) %>% rev()
+
+# Read in full csv
+train <- read.csv(paste(loc, "predictions/cv/best6_pred.csv", sep = "")) # local path
+
+# look at all relationships
+train %>% 
+  # filter(!ID == "USOWC") %>% 
+  dplyr::select(FCH4P = FCH4P, FCH4, feat) %>% 
+  gather(key = "Predictor", value = "Value", 3:8) %>% 
+  ggplot(aes(Value, FCH4)) + 
+  geom_point(alpha = 0.05, size = 1) +
+  geom_point(aes(Value, FCH4P), alpha = 0.05, size = 1, color = "orange") +
+  facet_wrap(~Predictor, scales = 'free') +
+  ylab(label =  expression("FCH4 (nmol m"^{-2}*" s"^{-1}*")")) +
+  my_theme
+ggsave(paste(loc, "varimp/var_response_all.png", sep = ""),
+       width = 25, height = 22, units = c("cm"), dpi = 300)
+```
+
