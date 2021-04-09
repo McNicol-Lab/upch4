@@ -3242,7 +3242,7 @@ ggsave(paste(loc, "ffs/stepwise/MAE_evolve.png", sep = ""),
 
 ```
 
-#### 7. Cross Validation
+#### 7. Cross Validation (Train, Predict)
 
 ##### Read in training data
 
@@ -3410,6 +3410,7 @@ ggsave(paste(loc, "predictions/cv/best6_pvo.png", sep = ""),
        width = 15, height = 8, units = c("cm"), dpi = 300)
 ```
 
+#### 7. (cont.) Cross Validation (Evaluate)
 ##### Read csv
 
 ```{r}
@@ -3503,6 +3504,7 @@ global <- ungroup(rf.pred.all) %>%
             cBias = abs(Bias)/sum(abs(Bias))*100) 
 
 global_ID <- ungroup(rf.pred.all) %>% 
+    # filter(!ID == "USOWC") %>%
   group_by(ID) %>% 
   summarize(samples = n(),
             R2 = cor(FCH4P, FCH4)^2,
@@ -3520,6 +3522,7 @@ global_ID <- ungroup(rf.pred.all) %>%
             cBias = abs(Bias)/sum(abs(Bias))*100) 
 
 global_ID_monthly <- ungroup(rf.pred.all) %>% 
+      # filter(!ID == "USOWC") %>%
   group_by(ID, Month) %>% 
   summarize(samples = n(),
             R2 = cor(FCH4P, FCH4)^2,
@@ -3541,9 +3544,9 @@ global <- bind_rows(global, global_ID, global_ID_monthly)
 write.csv(global, paste(loc, "predictions/cv/global.csv", sep = ""),
           row.names = F)
 
-# global without USOWC
-global_wo_usowc <- ungroup(rf.pred.all) %>% 
-  # filter(!ID == "USOWC") %>%
+
+global <- ungroup(rf.pred.all) %>% 
+  filter(!ID == "USOWC") %>%
   summarize(samples = n(),
             R2 = cor(FCH4P, FCH4)^2,
             NSE = 1 - sum((FCH4 - FCH4P)^2) / sum((FCH4 - mean(FCH4))^2),
@@ -3559,10 +3562,48 @@ global_wo_usowc <- ungroup(rf.pred.all) %>%
             Bias = mean(FCH4P - FCH4),
             cBias = abs(Bias)/sum(abs(Bias))*100) 
 
-write.csv(global_wo_usowc,
+global_ID <- ungroup(rf.pred.all) %>% 
+    filter(!ID == "USOWC") %>%
+  group_by(ID) %>% 
+  summarize(samples = n(),
+            R2 = cor(FCH4P, FCH4)^2,
+            NSE = 1 - sum((FCH4 - FCH4P)^2) / sum((FCH4 - mean(FCH4))^2),
+            MAE = sum(abs(FCH4 - FCH4P))/n(),
+            nMAE = MAE/sd(FCH4),
+            MeanO = mean(FCH4),
+            MedO = median(FCH4),
+            sdO = sd(FCH4),
+            MeanP = mean(FCH4P),
+            MedP = median(FCH4P),
+            sdP = sd(FCH4P),
+            nSD = sdP/sdO,
+            Bias = mean(FCH4P - FCH4),
+            cBias = abs(Bias)/sum(abs(Bias))*100) 
+
+global_ID_monthly <- ungroup(rf.pred.all) %>% 
+      filter(!ID == "USOWC") %>%
+  group_by(ID, Month) %>% 
+  summarize(samples = n(),
+            R2 = cor(FCH4P, FCH4)^2,
+            NSE = 1 - sum((FCH4 - FCH4P)^2) / sum((FCH4 - mean(FCH4))^2),
+            MAE = sum(abs(FCH4 - FCH4P))/n(),
+            nMAE = MAE/sd(FCH4),
+            MeanO = mean(FCH4),
+            MedO = median(FCH4),
+            sdO = sd(FCH4),
+            MeanP = mean(FCH4P),
+            MedP = median(FCH4P),
+            sdP = sd(FCH4P),
+            nSD = sdP/sdO,
+            Bias = mean(FCH4P - FCH4),
+            cBias = abs(Bias)/sum(abs(Bias))*100) 
+
+global <- bind_rows(global, global_ID, global_ID_monthly)
+
+
+write.csv(global,
           paste(loc, "predictions/cv/global_wo_usowc.csv", sep = ""), 
           row.names = F)
-
 ```
 
 ###### Site-mean metrics
@@ -3570,7 +3611,6 @@ write.csv(global_wo_usowc,
 ```{r}
 ## performance metrics broken down by site-means, seasonal cycle and weekly/daily anomalies
 # site-means
-# by-ID
 sitemean <- ungroup(rf.pred.all) %>% 
   group_by(ID) %>%
   # filter(!ID == "USOWC") %>%
@@ -3601,6 +3641,7 @@ sitemean <- ungroup(rf.pred.all) %>%
 
 # by-ID, grouped by Class 
 sitemean_class <- ungroup(rf.pred.all) %>% 
+    # filter(!ID == "USOWC") %>%
   group_by(ID) %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
             MeanP = mean(FCH4P, na.rm=TRUE),
@@ -3628,6 +3669,7 @@ sitemean_class <- ungroup(rf.pred.all) %>%
 
 # by-ID, grouped by Climate 
 sitemean_climate <- ungroup(rf.pred.all) %>% 
+    # filter(!ID == "USOWC") %>%
   group_by(ID) %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
             MeanP = mean(FCH4P, na.rm=TRUE),
@@ -3657,6 +3699,7 @@ sitemean_climate <- ungroup(rf.pred.all) %>%
 
 # metrics (by-site for component)
 sitemean_id <- ungroup(rf.pred.all) %>% 
+    # filter(!ID == "USOWC") %>%
   group_by(ID) %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
             MeanP = mean(FCH4P, na.rm=TRUE),
@@ -3688,9 +3731,9 @@ sitemean_data <- bind_rows(sitemean, sitemean_class, sitemean_climate, sitemean_
 write.csv(sitemean_data, paste(loc, "predictions/cv/sitemean.csv", sep = ""),
           row.names = F)
 
-
 ## METRICS WITHOUT USOWC
-sitemean_wo_usowc <- ungroup(rf.pred.all) %>% 
+# site-means
+sitemean <- ungroup(rf.pred.all) %>% 
   group_by(ID) %>%
   filter(!ID == "USOWC") %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
@@ -3718,8 +3761,96 @@ sitemean_wo_usowc <- ungroup(rf.pred.all) %>%
   ungroup() %>% 
   mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
 
-write.csv(sitemean_wo_usowc,
-          paste(loc, "predictions/cv/sitemean_wo_usowc.csv", sep = ""), 
+# by-ID, grouped by Class 
+sitemean_class <- ungroup(rf.pred.all) %>% 
+    filter(!ID == "USOWC") %>%
+  group_by(ID) %>%
+  summarize(MeanO = mean(FCH4, na.rm=TRUE),
+            MeanP = mean(FCH4P, na.rm=TRUE),
+            MedO = median(FCH4, na.rm=TRUE),
+            MedP = median(FCH4P, na.rm=TRUE),
+            Class = Class[1]) %>%  
+  ungroup() %>% 
+  group_by(Class) %>% 
+  summarize(Name = "Site means Class",
+            Samples = n(),
+            R2 = cor(MeanP, MeanO)^2,
+            NSE = 1 - sum((MeanO - MeanP)^2) / sum((MeanO - mean(MeanO))^2),
+            MAE = sum(abs(MeanO - MeanP))/n(),
+            nMAE = MAE/sd(MeanO),
+            MeanFCH4 = mean(MeanO),
+            MedFCH4 = median(MeanO),
+            sdFCH4 = sd(MeanO),
+            MeanFCH4P = mean(MeanP),
+            MedFCH4P = median(MeanP),
+            sdFCH4P = sd(MeanP),
+            nSD = sdFCH4P/sdFCH4,
+            Bias = mean(MeanP - MeanO)) %>% 
+  ungroup() %>% 
+  mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
+
+# by-ID, grouped by Climate 
+sitemean_climate <- ungroup(rf.pred.all) %>% 
+    filter(!ID == "USOWC") %>%
+  group_by(ID) %>%
+  summarize(MeanO = mean(FCH4, na.rm=TRUE),
+            MeanP = mean(FCH4P, na.rm=TRUE),
+            MedO = median(FCH4, na.rm=TRUE),
+            MedP = median(FCH4P, na.rm=TRUE),
+            Climate = Climate[1],
+            Class = NA) %>%  
+  ungroup() %>% 
+  group_by(Climate) %>% 
+  summarize(Name = "Site means Climate",
+            Samples = n(),
+            R2 = cor(MeanP, MeanO)^2,
+            NSE = 1 - sum((MeanO - MeanP)^2) / sum((MeanO - mean(MeanO))^2),
+            MAE = sum(abs(MeanO - MeanP))/n(),
+            nMAE = MAE/sd(MeanO),
+            MeanFCH4 = mean(MeanO),
+            MedFCH4 = median(MeanO),
+            sdFCH4 = sd(MeanO),
+            MeanFCH4P = mean(MeanP),
+            MedFCH4P = median(MeanP),
+            sdFCH4P = sd(MeanP),
+            nSD = sdFCH4P/sdFCH4,
+            Bias = mean(MeanP - MeanO), 
+            Class = NA) %>% 
+  ungroup() %>% 
+  mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
+
+# metrics (by-site for component)
+sitemean_id <- ungroup(rf.pred.all) %>% 
+    filter(!ID == "USOWC") %>%
+  group_by(ID) %>%
+  summarize(MeanO = mean(FCH4, na.rm=TRUE),
+            MeanP = mean(FCH4P, na.rm=TRUE),
+            MedO = median(FCH4, na.rm=TRUE),
+            MedP = median(FCH4P, na.rm=TRUE),
+            Class = Class[1]) %>%  
+  ungroup() %>% 
+  group_by(ID) %>% 
+  summarize(Name = "Site means ID",
+            Samples = n(),
+            R2 = cor(MeanP, MeanO)^2,
+            NSE = 1 - sum((MeanO - MeanP)^2) / sum((MeanO - mean(MeanO))^2),
+            MAE = sum(abs(MeanO - MeanP))/n(),
+            nMAE = MAE/sd(MeanO),
+            MeanFCH4 = mean(MeanO),
+            MedFCH4 = median(MeanO),
+            sdFCH4 = sd(MeanO),
+            MeanFCH4P = mean(MeanP),
+            MedFCH4P = median(MeanP),
+            sdFCH4P = sd(MeanP),
+            nSD = sdFCH4P/sdFCH4,
+            Bias = mean(MeanP - MeanO),
+            Class = Class[1]) %>% 
+  ungroup() %>% 
+  mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
+
+# join sitemean
+sitemean_data <- bind_rows(sitemean, sitemean_class, sitemean_climate, sitemean_id)
+write.csv(sitemean_data, paste(loc, "predictions/cv/sitemean_wo_usowc.csv", sep = ""),
           row.names = F)
 
 ```
@@ -3819,11 +3950,12 @@ ggsave(paste(loc, "predictions/cv/sitemean_pvo_climate.png", sep = ""),
        width = 13, height = 36, units = c("cm"), dpi = 300)
 ```
 
-##### Mean seasonal cycle
+##### Mean Seasonal Cycles
 
 ```{r}
 # by-ID
 msc <- ungroup(rf.pred.all) %>% 
+    # filter(!ID == "USOWC") %>% 
   group_by(ID, Month) %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
             MeanP = mean(FCH4P, na.rm=TRUE),
@@ -3852,6 +3984,7 @@ msc <- ungroup(rf.pred.all) %>%
 
 # by-ID, grouped by Class 
 msc_class <- ungroup(rf.pred.all) %>% 
+    # filter(!ID == "USOWC") %>% 
   group_by(ID, Month) %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
             MeanP = mean(FCH4P, na.rm=TRUE),
@@ -3909,6 +4042,7 @@ msc_climate <- ungroup(rf.pred.all) %>%
 
 # metrics (by-site for component)
 msc_id <- ungroup(rf.pred.all) %>% 
+    # filter(!ID == "USOWC") %>% 
   group_by(ID, Month) %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
             MeanP = mean(FCH4P, na.rm=TRUE),
@@ -3943,8 +4077,8 @@ write.csv(msc_data, paste(loc, "predictions/cv/msc.csv", sep = ""),
 
 ### WITHOUT US-OWC
 # by-ID
-msc_wo_usowc <- ungroup(rf.pred.all) %>% 
-  filter(!ID == "USOWC") %>% 
+msc <- ungroup(rf.pred.all) %>% 
+    filter(!ID == "USOWC") %>%
   group_by(ID, Month) %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
             MeanP = mean(FCH4P, na.rm=TRUE),
@@ -3971,9 +4105,104 @@ msc_wo_usowc <- ungroup(rf.pred.all) %>%
   ungroup() %>% 
   mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
 
-write.csv(msc_wo_usowc,
-          paste(loc, "predictions/cv/msc_wo_usowc.csv", sep = ""), 
+# by-ID, grouped by Class 
+msc_class <- ungroup(rf.pred.all) %>% 
+      filter(!ID == "USOWC") %>%
+  group_by(ID, Month) %>%
+  summarize(MeanO = mean(FCH4, na.rm=TRUE),
+            MeanP = mean(FCH4P, na.rm=TRUE),
+            MedO = median(FCH4, na.rm=TRUE),
+            MedP = median(FCH4P, na.rm=TRUE),
+            Class = Class[1]) %>%  
+  ungroup() %>% 
+  group_by(Class) %>% 
+  summarize(Name = "msc class",
+            Samples = n(),
+            R2 = cor(MeanP, MeanO)^2,
+            NSE = 1 - sum((MeanO - MeanP)^2) / sum((MeanO - mean(MeanO))^2),
+            MAE = sum(abs(MeanO - MeanP))/n(),
+            nMAE = MAE/sd(MeanO),
+            MeanFCH4 = mean(MeanO),
+            MedFCH4 = median(MeanO),
+            sdFCH4 = sd(MeanO),
+            MeanFCH4P = mean(MeanP),
+            MedFCH4P = median(MeanP),
+            sdFCH4P = sd(MeanP),
+            nSD = sdFCH4P/sdFCH4,
+            Bias = mean(MeanP - MeanO)) %>% 
+  ungroup() %>% 
+  mutate(cBias = abs(Bias)/sum(abs(Bias))*100) 
+
+# by-ID, grouped by Climate 
+msc_climate <- ungroup(rf.pred.all) %>% 
+    filter(!ID == "USOWC") %>%
+  group_by(ID, Month) %>%
+  summarize(MeanO = mean(FCH4, na.rm=TRUE),
+            MeanP = mean(FCH4P, na.rm=TRUE),
+            MedO = median(FCH4, na.rm=TRUE),
+            MedP = median(FCH4P, na.rm=TRUE),
+            Climate = Climate[1], 
+            Class = NA) %>%  
+  ungroup() %>% 
+  group_by(Climate) %>% 
+  summarize(Name = "msc climate",
+            Samples = n(),
+            R2 = cor(MeanP, MeanO)^2,
+            NSE = 1 - sum((MeanO - MeanP)^2) / sum((MeanO - mean(MeanO))^2),
+            MAE = sum(abs(MeanO - MeanP))/n(),
+            nMAE = MAE/sd(MeanO),
+            MeanFCH4 = mean(MeanO),
+            MedFCH4 = median(MeanO),
+            sdFCH4 = sd(MeanO),
+            MeanFCH4P = mean(MeanP),
+            MedFCH4P = median(MeanP),
+            sdFCH4P = sd(MeanP),
+            nSD = sdFCH4P/sdFCH4,
+            Bias = mean(MeanP - MeanO),
+            Class = NA) %>% 
+  ungroup() %>% 
+  mutate(cBias = abs(Bias)/sum(abs(Bias))*100) 
+
+# metrics (by-site for component)
+msc_id <- ungroup(rf.pred.all) %>% 
+      filter(!ID == "USOWC") %>%
+  group_by(ID, Month) %>%
+  summarize(MeanO = mean(FCH4, na.rm=TRUE),
+            MeanP = mean(FCH4P, na.rm=TRUE),
+            MedO = median(FCH4, na.rm=TRUE),
+            MedP = median(FCH4P, na.rm=TRUE),
+            Climate = Climate[1], 
+            Class = Class[1]) %>%  
+  ungroup() %>% 
+  group_by(ID) %>% 
+  summarize(Name = "msc ID",
+            Samples = n(),
+            R2 = cor(MeanP, MeanO)^2,
+            NSE = 1 - sum((MeanO - MeanP)^2) / sum((MeanO - mean(MeanO))^2),
+            MAE = sum(abs(MeanO - MeanP))/n(),
+            nMAE = MAE/sd(MeanO),
+            MeanFCH4 = mean(MeanO),
+            MedFCH4 = median(MeanO),
+            sdFCH4 = sd(MeanO),
+            MeanFCH4P = mean(MeanP),
+            MedFCH4P = median(MeanP),
+            sdFCH4P = sd(MeanP),
+            nSD = sdFCH4P/sdFCH4,
+            Bias = mean(MeanP - MeanO),
+            Class = Class[1]) %>% 
+  ungroup() %>% 
+  mutate(cBias = abs(Bias)/sum(abs(Bias))*100) 
+
+# join msc
+msc_data <- bind_rows(msc, msc_class, msc_climate, msc_id)
+write.csv(msc_data, paste(loc, "predictions/cv/msc_wo_usowc.csv", sep = ""),
           row.names = F)
+
+```
+
+##### Other MSC plots
+
+```{r}
 
 # plot histogram of msc performance: R2
 msc_data %>% 
