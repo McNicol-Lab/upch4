@@ -4710,16 +4710,19 @@ ggsave(paste(loc, "varimp/var_response_all.png", sep = ""),
 
 Six final predictors:
 
-    + canopyht (extract with buffer for MC)
-    + wc_pwtm (extract with buffer for MC)
-    + wc_mtwq (extract with buffer for MC)
+    + canopyht (dispersion = sd of 25 km buffer for MC)
+    + wc_pwtm (dispersion = sd of 25 km buffer for MC)
+    + wc_mtwq (dispersion = sd of 25 km buffer for MC)
 
     + TA (Tower measured, then mapped to MERRA2 2001-2018, extract with buffer)
     + TA_LAG2 (Tower measured, then MERRA2 2001-2018, imposed lag, extract with buffer)
-    + EVI_LAG3 (MODIS, imposed lag, fixed uncertainty)
+    + EVI_LAG3 (MODIS, imposed lag, fixed uncertainty = 0.015)
     
 
+
 Details on Final MC [Here](https://docs.google.com/spreadsheets/d/10-veJchCsyrG2azK3UkuAGGwju4vjgIqcxeps1m9EDU/edit#gid=1658702303)
+
+##### 1) Define the uncertainty around static grid data by extracting with buffer
 
 ##### Get site metadata (coordinates)
 
@@ -4832,8 +4835,8 @@ worldclim <- worldclim %>%
 ###### Create new name vector to match 2 products
 
 ```{r}
-newnames <- c("wc_mtdq", 
-       "wc_pwtm")
+newnames <- c("wc_mtdq_sd", 
+       "wc_pwtm_sd")
 
 oldnames <- names(worldclim)[15:16]
 worldclim <- worldclim %>% 
@@ -4846,7 +4849,50 @@ worldclim <- worldclim %>%
 write.csv(worldclim, paste(loc, "mc/extracted/worldclim_sd.csv", sep = ""), row.names = F)
 ```
 
+##### 2) Perform MC Simulations
 
+##### Read in loocv training data
+
+```{r}
+data <- read.csv(paste(loc, "training-data/final.csv", sep = "")) %>% 
+  dplyr::select(1:17, FCH4, FCH4_F_UNC, TA, TA_LAG2, canopyht, wc_mtdq,  wc_pwtm, EVI_LAG3, -Upscaling)
+head(data)
+```
+##### Read in standard deviations (static uncertainties)
+
+```{r}
+canopyht <- read.csv(paste(loc, "mc/extracted/canopyht_sd.csv", sep = ""))
+worldclim <- read.csv(paste(loc, "mc/extracted/worldclim_sd.csv", sep = ""))
+static <- left_join(canopyht, worldclim) %>% 
+  filter(Upscaling == 1) %>% 
+  dplyr::select(-Upland.Class, -Upscaling)
+names(static)
+names(data)
+```
+
+##### Merge with training data
+
+```{r}
+data <- data %>% 
+  left_join(static, by = c("ID", "Site.Name", "Data.Policy", "Country", "Latitude", "Longitude", "IGBP",
+                           "Site.Classification", "DOI", "DOI.Reference", "Site.Personnel", "Base.File.Host"))
+```
+
+##### Generate 1000 simulated observations (of the weekly data set)
+
+```{r warning = F, echo = F, message = F}
+data1 <- data %>% 
+  rowwise() %>% 
+  mutate(FCH4_mc = list(rnorm(10, mean = FCH4, sd = FCH4_F_UNC)),
+         TA_mc = list(rnorm(10, mean = TA, sd = 1)),
+         TA_LAG2_mc = list(rnorm(10, mean = TA_LAG2, sd = 1)),
+         EVI_LAG3_mc = list(rnorm(10, mean = EVI_LAG3, sd = 0.015)),
+         wc_mtdq_mc = list(rnorm(10, mean = wc_mtdq, sd = wc_mtdq_sd)),
+         wc_pwtm_mc = list(rnorm(10, mean = wc_pwtm, sd = wc_pwtm_sd)),
+         canopyht_mc = list(rnorm(10, mean = canopyht, sd = canopyht_sd))) %>% 
+  unnest(cols = c(FCH4_mc, TA_mc, TA_LAG2_mc, EVI_LAG3_mc, wc_mtdq_mc, wc_pwtm_mc, 
+                  canopyht_mc))
+```
 
 
 
