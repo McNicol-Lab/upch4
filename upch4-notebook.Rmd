@@ -4922,6 +4922,9 @@ for(i in 1:500){
 
 # bind rows
 data5 <- data4 %>% bind_rows()
+
+saveRDS(data5, 
+        paste(loc, "mc/data/1000mc_500bs.rds", sep = ""))
 ```
 
 ##### Identify which site was left out then subset those data  (forgot to set seed above)
@@ -4955,18 +4958,22 @@ ID.drop <- bind_rows(ID.drop) %>%
 ```
 
 
+##### Finally, subset the single held-out site from each mc_i
 
-# now subset the single site from each mc_i
-data8 <- list()
+```{r}
+data6 <- list()
 for(i in 1:500){
-  data8[[i]] <- data5 %>% 
+  data6[[i]] <- data3 %>% 
     filter(mc_i == i & ID == ID.drop[i])
   
 }
 
-data8 <- bind_rows(data8)
+data6 <- bind_rows(data6)
 
-saveRDS(data8, "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Model Datasets/mc/201006_all_ppro_1000mc_500bs_heldout.rds")
+saveRDS(data6, 
+        paste(loc, "mc/data/1000mc_500bs_heldout.rds", sep = ""))
+```
+
 
 
 
