@@ -108,20 +108,19 @@ loc <- "/Volumes/Samsung_T5/Stanford/upch4_local/"
       + MC Simulations
       + MC ML Model Training
       + MC ML Model Validation
-  10. Upscaling
-      + Prepare Member Forcing Data
+  10. Data Representativeness
+      + Prepare Gridded Data
+      + Global Dissimilarity
+      + Tower Constituency
+      + Extrapolation Errors
+          - MC ML Model Training - Dissimilarity Only
+    11. Upscaling
       + Run on Computing Cluster
           - Output Grids and Sums
       + Product Evaluation
           - Unweighted Wetland Fluxes (nmol)
           - Weighted Sums and Uncertainties (Tg)
           - Independent Validation
-  11. Data Representativeness
-      + Prepare Gridded Data
-      + Global Dissimilarity
-      + Tower Constituency
-      + Extrapolation Errors
-          - MC ML Model Training - Dissimilarity Only
           
 [**Link to Workflow Figure**](https://drive.google.com/drive/folders/1jiFyqzoxxMpdtRLCwxCtzKpfILRNIW5K)
           
