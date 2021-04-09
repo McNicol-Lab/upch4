@@ -4883,17 +4883,90 @@ data <- data %>%
 ```{r warning = F, echo = F, message = F}
 data1 <- data %>% 
   rowwise() %>% 
-  mutate(FCH4_mc = list(rnorm(10, mean = FCH4, sd = FCH4_F_UNC)),
-         TA_mc = list(rnorm(10, mean = TA, sd = 1)),
-         TA_LAG2_mc = list(rnorm(10, mean = TA_LAG2, sd = 1)),
-         EVI_LAG3_mc = list(rnorm(10, mean = EVI_LAG3, sd = 0.015)),
-         wc_mtdq_mc = list(rnorm(10, mean = wc_mtdq, sd = wc_mtdq_sd)),
-         wc_pwtm_mc = list(rnorm(10, mean = wc_pwtm, sd = wc_pwtm_sd)),
-         canopyht_mc = list(rnorm(10, mean = canopyht, sd = canopyht_sd))) %>% 
+  mutate(FCH4_mc = list(rnorm(1000, mean = FCH4, sd = FCH4_F_UNC)),
+         TA_mc = list(rnorm(1000, mean = TA, sd = 1)),
+         TA_LAG2_mc = list(rnorm(1000, mean = TA_LAG2, sd = 1)),
+         EVI_LAG3_mc = list(rnorm(1000, mean = EVI_LAG3, sd = 0.015)),
+         wc_mtdq_mc = list(rnorm(1000, mean = wc_mtdq, sd = wc_mtdq_sd)),
+         wc_pwtm_mc = list(rnorm(1000, mean = wc_pwtm, sd = wc_pwtm_sd)),
+         canopyht_mc = list(rnorm(1000, mean = canopyht, sd = canopyht_sd))) %>% 
   unnest(cols = c(FCH4_mc, TA_mc, TA_LAG2_mc, EVI_LAG3_mc, wc_mtdq_mc, wc_pwtm_mc, 
                   canopyht_mc))
 ```
 
+###### For each observation (week/row) sample 500/1000, with replacement, and split into 500 training datasets
+
+```{r}
+data2 <- data1 %>% 
+  group_by(ID, Year, Month, Week) %>% 
+  sample_n(500, replace = T) %>% 
+  mutate(mc_i = 1:n()) %>% 
+  group_by(mc_i) %>% 
+  group_split() 
+
+data3 <- data2 %>% bind_rows() %>% dplyr::select(mc_i, everything()) 
+```
+
+##### Now drop IDs at random from each of the 500 datasets
+
+```{r}
+site.names <- data3 %>% dplyr::select(ID) %>% filter(ID != "USOWC") %>% mutate(ID = factor(ID)) %>% pull() %>% levels()
+site.drop <- sample(site.names, 500, replace = T)
+
+data4 <- list()
+for(i in 1:500){
+  data4[[i]] <- data3 %>% 
+    filter(mc_i == i) %>% 
+    filter(ID != site.drop[i] & ID != "USOWC")
+}
+
+# bind rows
+data5 <- data4 %>% bind_rows()
+```
+
+##### Identify which site was left out then subset those data  (forgot to set seed above)
+
+```{r warning = F, message = F, echo = F}
+# convert ID vector to column
+ID.names <- site.names %>% 
+  as_tibble() %>% 
+  rename("ID" = "value")
+
+# get IDs for each mc_i
+IDs <- list()
+for(i in 1:500){
+  IDs[[i]] <- data5 %>% 
+    filter(mc_i == i) %>% 
+    dplyr::select(ID) %>% 
+    distinct()
+}
+
+# get the held-out site for each mc_i
+ID.drop <- list()
+for(i in 1:500){
+  ID.drop[[i]] <- ID.names %>% 
+    anti_join(IDs[[i]])
+}
+
+# compile
+ID.drop <- bind_rows(ID.drop) %>% 
+  dplyr::select(ID) %>% 
+  pull()
+```
+
+
+
+# now subset the single site from each mc_i
+data8 <- list()
+for(i in 1:500){
+  data8[[i]] <- data5 %>% 
+    filter(mc_i == i & ID == ID.drop[i])
+  
+}
+
+data8 <- bind_rows(data8)
+
+saveRDS(data8, "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Model Datasets/mc/201006_all_ppro_1000mc_500bs_heldout.rds")
 
 
 
