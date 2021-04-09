@@ -102,7 +102,6 @@ loc <- "/Volumes/Samsung_T5/Stanford/upch4_local/"
       + Forcing Data
           - Mapping
           - Member Product Choices
-          - Evaluate Product Divergence
       + Data Preparation
           - Extract Gridded Data for MC
           - Pre-Process FLUXNET-CH4 for MC
@@ -4706,3 +4705,151 @@ ggsave(paste(loc, "varimp/var_response_all.png", sep = ""),
 
 ##### ShapR
 #### 9. Upscaled Model with Monte Carlo (MC)
+
+##### Forcing Data
+
+Six final predictors:
+
+    + canopyht (extract with buffer for MC)
+    + wc_pwtm (extract with buffer for MC)
+    + wc_mtwq (extract with buffer for MC)
+
+    + TA (Tower measured, then mapped to MERRA2 2001-2018, extract with buffer)
+    + TA_LAG2 (Tower measured, then MERRA2 2001-2018, imposed lag, extract with buffer)
+    + EVI_LAG3 (MODIS, imposed lag, fixed uncertainty)
+    
+
+Details on Final MC [Here](https://docs.google.com/spreadsheets/d/10-veJchCsyrG2azK3UkuAGGwju4vjgIqcxeps1m9EDU/edit#gid=1658702303)
+
+##### Get site metadata (coordinates)
+
+```{r}
+sites <- read.csv(paste(loc, "fluxnet-ch4-data/metadata/fluxnet-ch4-site-metadata.csv", sep = "")) %>% 
+  mutate(ID = paste(substr(ID, 1, 2), substr(ID, 4, 6), sep = ""))
+site.coords <- cbind(sites$Longitude, sites$Latitude) # (x, y)
+site.num <- length(site.coords[,1])
+```
+
+##### Global Canopy Height
+
+```{r}
+raster.names <- list.files(paste(loc, "grids/global-canopy-height/", sep = ""), pattern = "tif$", full.names = FALSE)
+stack <- stack(paste(loc, "grids/global-canopy-height/", raster.names, sep = ""))
+canopyht <- as_tibble(raster::extract(stack, site.coords, buffer = 25000, fun = sd, na.rm = T)) 
+canopyht <- cbind(sites, canopyht) %>% 
+  rename(canopyht_sd = value)
+head(canopyht)
+```
+
+###### Check for missing data
+
+```{r}
+canopyht %>% 
+  mutate(missing = is.na(canopyht_sd)) %>% 
+  group_by(ID) %>% 
+  summarize(total = n(),
+            missing = sum(missing)) %>% 
+  arrange(desc(missing))
+```
+
+No missing data
+
+###### Write data
+
+```{r}
+write.csv(canopyht, paste(loc, "mc/extracted/", "canopyht_sd.csv", sep = ""), row.names =  F)
+```
+
+##### WorldClim 2.0
+
+```{r warning = F}
+setwd(loc)
+raster.names <- list.files(paste(loc, "grids/worldclim/", sep = ""), pattern = "tif$", full.names = FALSE)
+stack <- stack(paste(loc, "grids/worldclim/", sep = "", raster.names[c(9,13)]))
+plot(stack[[1]])
+points(site.coords)
+```
+
+###### Extract worldclim data
+
+```{r}
+worldclim <- as_tibble(raster::extract(stack, site.coords, buffer = 25000, fun = sd, na.rm = T)) 
+worldclim <- cbind(sites, worldclim) 
+head(worldclim)
+```
+
+###### Check for missing data
+
+```{r}
+worldclim %>% 
+  filter(is.na(wc2.0_bio_30s_09))
+
+worldclim %>% 
+  filter(is.na(wc2.0_bio_30s_13))
+```
+HKMPM data are missing. 
+
+###### Look at HKMPM location:
+
+```{r}
+coords_subset <- site.coords[sites$ID %in% c("HKMPM"),] 
+coords_subset_names <- sites$ID[sites$Latitude %in% coords_subset]
+
+bounding_boxes <- bounding_box(coords_subset)
+
+bounding_boxes_maps <- crop(stack[[1]], bounding_boxes)
+
+plot(bounding_boxes_maps)
+points(114.02924,  22.49817)
+```
+Can move onto nearby coastline by shifting west
+
+###### Shift HKMPM west:
+
+```{r}
+site.coords.temp <- sites %>% 
+  filter(ID %in% c("HKMPM")) %>% 
+  mutate(Longitude = Longitude + 0.05) %>% 
+  dplyr::select(Longitude, Latitude) %>% 
+  as.matrix() %>% unname()
+
+sites.temp <- sites %>% 
+  filter(ID %in% c("HKMPM")) 
+         
+worldclim.temp <- as_tibble(raster::extract(stack, site.coords.temp, buffer = 25000, fun = sd, na.rm = T))
+worldclim.temp <- cbind(sites.temp, worldclim.temp)
+head(worldclim.temp)
+```
+###### Rejoin
+
+```{r}
+worldclim <- worldclim %>% 
+  filter(!ID == "HKMPM") %>% 
+  bind_rows(worldclim.temp) %>% 
+  arrange(ID)
+```
+
+###### Create new name vector to match 2 products
+
+```{r}
+newnames <- c("wc_mtdq", 
+       "wc_pwtm")
+
+oldnames <- names(worldclim)[15:16]
+worldclim <- worldclim %>% 
+ rename_at(vars(oldnames), ~ newnames)
+```
+
+###### Write worlclim data
+
+```{r}
+write.csv(worldclim, paste(loc, "mc/extracted/worldclim_sd.csv", sep = ""), row.names = F)
+```
+
+
+
+
+
+
+  
+
