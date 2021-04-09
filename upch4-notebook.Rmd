@@ -4975,7 +4975,145 @@ saveRDS(data6,
 ```
 
 
+#### 10. Data Representativeness
 
+##### Prepare Grids
 
+##### Read in generic (for resampling)
+
+```{r}
+rpot <- stack(paste(loc, "grids/computed/Rpot.nc", sep = ""))
+```
+
+##### Prepare worldclim
+
+```{r}
+wc_mtdq <- raster(paste(loc, "grids/worldclim/wc2.0_bio_30s_09.tif", sep = ""))
+wc_pwtm <- raster(paste(loc, "grids/worldclim/wc2.0_bio_30s_13.tif", sep = ""))
+
+wc_mtdq <- resample(wc_mtdq, rpot)
+wc_pwtm <- resample(wc_pwtm, rpot)
+
+writeRaster(wc_mtdq, paste(loc, "grids/ffs/wc_mtdq.tif", sep = ""), overwrite=TRUE)
+writeRaster(wc_pwtm, paste(loc, "grids/ffs/wc_pwtm.tif", sep = ""), overwrite=TRUE)
+```
+
+##### Prepare canopy height
+
+```{r}
+canopyht <- raster(paste(loc, "grids/global-canopy-height/Simard_Pinto_3DGlobalVeg_JGR.tif", sep = ""))
+canopyht_res <- resample(canopyht, rpot)
+writeRaster(canopyht_res, paste(loc, "grids/ffs/canopyht.tif", sep = ""), overwrite=TRUE)
+```
+
+##### Air Temperature (MERRA2)
+
+```{r}
+raster.names <-list.files(paste(loc, "grids/merra2/", sep = ""), pattern = "nc4$", full.names = F)
+nc_data <- lapply(paste(loc, "grids/merrra2/", raster.names, sep = ""), nc_open)
+```
+
+##### Save the print(nc) dump to a text file
+
+```{r}
+{
+  sink('merra2_2001-2015_metadata.txt')
+  print(nc_data)
+  sink()
+}
+```
+
+##### Look at metadatafile to see which variable to use
+
+```{r}
+lon <- ncvar_get(nc_data[[1]], "lon")
+lat <- ncvar_get(nc_data[[1]], "lat")
+fillvalue <- ncatt_get(nc_data[[1]], "T2M", "_FillValue")
+```
+
+##### Get just temperature and close nc files
+
+```{r}
+TA <- list()
+for(i in 1:length(nc_data)){
+  TA[[i]] <- ncvar_get(nc_data[[i]], "T2M")
+}
+```
+
+##### replace fill values with NA
+
+```{r}
+TA_r <- list()
+
+for(i in 1:length(nc_data)) {
   
+  TA[[i]][TA[[i]] == fillvalue$value] <- NA
+  
+  TA_r[[i]] <- raster(t(TA[[i]]), xmn=min(lon), xmx=max(lon), ymn=min(lat), ymx=max(lat), crs=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs+ towgs84=0,0,0")) 
+  TA_r[[i]] <- flip(TA_r[[i]], direction = 'y')
+
+}
+```
+
+
+```{r}
+TA_stack <- stack(TA_r)
+TA_stack <- resample(TA_stack, rpot) # resample to 0.25degree
+TA_stack <- TA_stack-273.15 # convert to celcius
+writeRaster(TA_stack, paste(loc, "grids/ffs/TA.nc", sep = ""), format = "CDF", overwrite = T)
+```
+
+
+
+# read MODIS
+# EVI
+loc <- "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Grids/MODIS/EVI/"
+setwd(loc)
+raster.names <-list.files(loc, pattern = "tif$", full.names = FALSE)
+evi <- stack(raster.names)
+evi_names <- paste(substr(names(evi),2,5),0,substr(names(evi),6,6),sep="")
+for(i in 1:nlayers(evi)){
+  writeRaster(evi[[i]],  paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Grids/MODIS/EVI/long names/",evi_names[i],".tif",sep=""), overwrite = TRUE)
+}
+
+loc <- "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Grids/MODIS/EVI/"
+setwd(loc)
+raster.names <-list.files(loc, pattern = "tif$", full.names = FALSE)
+evi <- stack(raster.names)
+
+# years
+years <- list()
+for(i in seq(1,205,12)){
+  years[[i]] <- c(i:(i+11))
+}
+years <- compact(years)
+
+# resample
+start_time <- Sys.time()
+beginCluster()
+evi_res <- list()
+for(i in 1:length(years)){
+  evi_res[[i]] <- resample(evi[[ years[[i]] ]], cos.yr)
+}
+endCluster()
+end_time <- Sys.time()
+end_time - start_time
+
+evi_res <- stack(evi_res)
+
+# get annual min for all 18 years
+evi_min <- list()
+for(i in 1:18){
+  evi_min[[i]] <- min(evi_res[[ years[[i]] ]], na.rm=TRUE)
+}
+
+evi_min <- stack(evi_min)
+
+writeRaster(evi_min, "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Grids/final_ffs/EVI_min.nc", format="CDF", overwrite=TRUE)
+
+## load stack
+evi_min <- stack("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Grids/final_ffs/EVI_min.nc")
+EVI_overall_min <- mean(evi_min, na.rm=TRUE)
+writeRaster(EVI_overall_min, "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Grids/final_ffs/dissimilarity_only/EVI_overall_min.tif", overwrite=TRUE)
+
 
