@@ -5231,7 +5231,7 @@ scaled_data <- lapply(all_stack, rescale01)
 
 ```{r}
 rescale02 <- function(x) {
-  (x - min(x)) / (max(x) - min(x)) }
+  (x - min(x, na.rm = T)) / (max(x, na.rm = T) - min(x, na.rm = T)) }
 ```
 
 ##### Rescale temporal grids
@@ -5240,7 +5240,18 @@ rescale02 <- function(x) {
 scaled_data_2 <- rescale02(TA)
 scaled_data_3 <- rescale02(TA_LAG2)
 scaled_data_4 <- rescale02(EVI_LAG3)
+
 ```
+##### Issue with the recaled EVI
+
+Try replacing all NAs with zeros
+
+```{r}
+plot(scaled_data_4[[7]])
+scaled_data_4[is.na(scaled_data_4)] <- 0
+plot(scaled_data_4[[7]])
+```
+
 
 ###### Recombine and rename
 
@@ -5347,7 +5358,7 @@ for(i in 1:12){
 }
 
 all_stack_masked_full <- stack(all_stack_masked)
-
+plot(all_stack[[6]])
 writeRaster(all_stack_masked_full, paste0(loc, "dissimilarity/output/stacks/all_weighted_masked.nc"), format='CDF', overwrite = TRUE)
 ```
 
