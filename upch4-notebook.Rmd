@@ -5242,16 +5242,6 @@ scaled_data_3 <- rescale02(TA_LAG2)
 scaled_data_4 <- rescale02(EVI_LAG3)
 
 ```
-##### Issue with the recaled EVI
-
-Try replacing all NAs with zeros
-
-```{r}
-plot(scaled_data_4[[7]])
-scaled_data_4[is.na(scaled_data_4)] <- 0
-plot(scaled_data_4[[7]])
-```
-
 
 ###### Recombine and rename
 
@@ -5409,7 +5399,7 @@ for (i in 1:12){
 }
 
 # check points line up
-plot(all_stack[[1]]$canopyht)
+plot(all_stack[[7]]$EVI_LAG3)
 points(coords[,4:5])
 ```
 
@@ -5570,6 +5560,261 @@ for (i in 1:12){ # months
          width = 188, height = 100, dpi = 600, units = "mm")
 }
 ```
+
+##### Output the monthly distance and other metrics
+
+
+```{r}
+for(i in 1:12){
+  monthly_global_DI[[i]] <- monthly_global_DI[[i]] %>% 
+    as_tibble() %>% 
+    dplyr::select(1:15,min_dist,closest_tower,closest_Cluster,DI) %>% 
+    mutate(Month = i)
+}
+
+for(i in 1:12){
+write.csv(monthly_global_DI[[i]], paste0(loc, "dissimilarity/output/stats/all_monthly_global_DI",i,".csv"), row.names = F)
+}
+```
+
+##### Remove large stack
+
+```{r}
+rm("all_stack")
+```
+
+##### Create Global DI dataframe
+
+```{r}
+monthly_global_DI <- bind_rows(monthly_global_DI)
+
+monthly_global_DI_subset <- list()
+for(i in 1:12){
+  monthly_global_DI_subset[[i]] <- monthly_global_DI %>% 
+    filter(Month == i) %>% 
+    dplyr::select(closest_fold = closest_Cluster, closest_tower, min_dist, DI, x, y) %>% 
+    mutate(Month = i)
+}
+monthly_global_DI_subset <- bind_rows(monthly_global_DI_subset)
+write.csv(monthly_global_DI_subset, paste0(loc, "dissimilarity/output/stats/all_monthly_global_DI_subset.csv"), row.names = F)
+```
+
+##### Look at the distribution of distances 
+
+```{r}
+monthly_global_DI %>% 
+  dplyr::select(closest_tower, min_dist) %>% 
+  mutate(closest_tower = as.factor(closest_tower)) %>% 
+  ggplot(aes(min_dist)) +
+  geom_histogram() +
+  geom_vline(xintercept = median(monthly_global_DI$min_dist)) +
+  my_theme
+ggsave(paste0(loc, "dissimilarity/figures/all_min_dist_distribution.png"),
+       width = 10, height = 8, units = c("cm"), dpi = 300)
+```
+
+##### Look at the distribution of dissimilarities 
+
+```{r}
+monthly_global_DI %>% 
+  dplyr::select(closest_tower, DI) %>% 
+  mutate(closest_tower = as.factor(closest_tower)) %>% 
+  ggplot(aes(DI)) +
+  geom_histogram() +
+  geom_vline(xintercept = median(monthly_global_DI$DI)) +
+  my_theme
+ggsave(paste0(loc, "dissimilarity/figures/all_DI_distribution.png"),
+       width = 10, height = 8, units = c("cm"), dpi = 300)
+```
+
+##### What is the summed annual dissimilarity and distance?
+
+```{r}
+monthly_global_DI %>% 
+  dplyr::select(DI, min_dist) %>% 
+  summarize(global_DI_sum = sum(DI),
+            global_min_dist_sum = sum(min_dist),
+            global_DI_mean = mean(DI),
+            global_min_dist_mean = mean(min_dist)) %>% 
+  write.csv(paste0(loc, "dissimilarity/output/stats/annual_DI_mindist.csv"), row.names = F)
+```
+
+##### What is the monthly dissimilairty and distance?
+
+```{r}
+monthly_global_DI %>% 
+  dplyr::select(Month, DI, min_dist) %>% 
+  group_by(Month) %>% 
+  summarize(global_DI_sum = sum(DI),
+            global_min_dist_sum = sum(min_dist),
+            global_DI_mean = mean(DI),
+            global_min_dist_mean = mean(min_dist)) %>% 
+  write.csv(paste0(loc, "dissimilarity/output/stats/monthly_DI_mindist.csv"), row.names = F)
+```
+
+##### what is the summed AOA (annual)
+
+```{r}
+monthly_global_DI %>% 
+  dplyr::select(DI) %>% 
+  summarize(global_sum_AOA = sum(DI < all_sites_DI_AOA),
+            global_sum_AOE = sum(DI > all_sites_DI_AOA),
+            total_area = sum(global_sum_AOA,global_sum_AOE)) %>% 
+  mutate(fractionAOA = global_sum_AOA / total_area) %>% 
+  write.csv(paste0(loc, "dissimilarity/output/stats/annual_AOA_AOE.csv"), row.names = F)
+```
+
+##### what is the summed AOA (monthly)
+
+```{r}
+monthly_global_DI %>% 
+  dplyr::select(Month, DI) %>% 
+  group_by(Month) %>% 
+  summarize(global_sum_AOA = sum(DI < all_sites_DI_AOA),
+            global_sum_AOE = sum(DI > all_sites_DI_AOA),
+            total_area = sum(global_sum_AOA,global_sum_AOE)) %>% 
+  mutate(fractionAOA = global_sum_AOA / total_area) %>% 
+  write.csv(paste0(loc, "dissimilarity/output/stats/monthly_AOA_AOE.csv"), row.names = F)
+```
+
+##### look at constituency size, and the relationship with mean dissimilarity from the tower 
+
+```{r}
+monthly_global_DI %>% 
+  dplyr::select(closest_tower, DI) %>% 
+  mutate(closest_tower = substr(closest_tower,1,5)) %>% 
+  mutate(closest_tower = as.factor(closest_tower),
+         count = 1)  %>% 
+  group_by(closest_tower) %>% 
+  summarize(pixels = sum(count),
+            DI = mean(DI)) %>% 
+  ungroup() %>% 
+  mutate(cover = pixels/sum(pixels)*100) %>% 
+  arrange(desc(cover)) %>% 
+  ggplot(aes(cover, DI)) + 
+  geom_point() +
+  labs(x = "Global Cover (%)", y = "Dissimilarity Index") +
+  my_theme
+ggsave(paste0(loc, "dissimilarity/figures/all_constituency_size_DI.png"),
+       width = 10, height = 8, units = c("cm"), dpi = 300)
+```
+
+##### Figure of the rank of DI coverages (annual by ID)
+
+```{r}
+monthly_global_DI %>% 
+  dplyr::select(closest_tower, DI) %>% 
+  mutate(closest_tower = substr(closest_tower,1,5)) %>% 
+  mutate(closest_tower = as.factor(closest_tower),
+         count = 1) %>% 
+  group_by(closest_tower) %>% 
+  summarize(pixels = sum(count),
+            DI = mean(DI)) %>% 
+  ungroup() %>% 
+  mutate(cover = pixels/sum(pixels)*100) %>% 
+  arrange(desc(cover)) %>% 
+  mutate(closest_tower = fct_reorder(closest_tower, cover)) %>% 
+  ggplot(aes(x = closest_tower, y = cover)) +
+  geom_segment(aes(x = closest_tower, xend = closest_tower, y = 0, yend = cover), color = 'grey', stat = "identity") +
+  geom_point(size = 4) +
+  coord_flip() +
+  xlab("ID") + ylab("Global Annual Pixel Cover (%)") +
+  my_theme
+ggsave(paste0(loc, "dissimilarity/figures/all_constituency_size_rank.png"),
+       width = 10, height = 20, units = c("cm"), dpi = 300)
+```
+
+##### Figure of the rank of coverages (monthly by cluster)
+
+```{r}
+monthly_global_DI_cover <- monthly_global_DI %>% 
+  dplyr::select(Month, closest_Cluster, DI) %>% 
+  mutate(closest_Cluster = as.factor(closest_Cluster),
+         count = 1) %>% 
+  group_by(Month, closest_Cluster) %>% 
+  summarize(pixels = sum(count),
+            DI = mean(DI)) %>% 
+  group_by(Month) %>% 
+  mutate(cover = pixels/sum(pixels)*100) 
+
+ 
+for (i in 1:12){
+  monthly_global_DI_cover %>% 
+    filter(Month == i) %>% 
+    mutate(closest_Cluster = fct_reorder(closest_Cluster, cover)) %>% 
+    ggplot(aes(x = closest_Cluster, y = cover)) +
+    geom_segment(aes(x = closest_Cluster, xend = closest_Cluster, y = 0, yend = cover), color = 'grey', stat = "identity") +
+    geom_point(size = 4) +
+    coord_flip() +
+    facet_wrap(~Month) +
+    labs(c = "ID", y = "Global Annual Pixel Cover (%)") +
+    my_theme
+ggsave(paste0(loc, "dissimilarity/figures/all_constituency_size_rank",i,".png"),
+         width = 10, height = 20, units = c("cm"), dpi = 300)
+}
+
+```
+
+##### figure of the rank of dissimilarities
+
+```{r}
+for (i in 1:12){
+  monthly_global_DI_cover %>% 
+    filter(Month == i) %>% 
+    mutate(closest_Cluster = fct_reorder(closest_Cluster, DI)) %>% 
+    ggplot(aes(x = closest_Cluster, y = DI)) +
+    geom_segment(aes(x = closest_Cluster, xend = closest_Cluster, y = 0, yend = DI), color = 'grey', stat = "identity") +
+    geom_point(size = 4) +
+    coord_flip() +
+    facet_wrap(~Month) +
+    scale_y_continuous(limits = c(0,0.2)) +
+    xlab("Closest Cluster") +
+    my_theme
+  ggsave(paste0(loc, "dissimilarity/figures/all_constituency_DI_rank",i,".png"),
+         width = 10, height = 20, units = c("cm"), dpi = 300)
+}
+```
+
+##### Output the monthly mean DI for each site (from all sites not in the same fold)
+
+```{r}
+write.csv(all_sites_DI, paste0(loc,"dissimilarity/output/stats/all_sites_DI.csv"), row.names = F) 
+```
+
+##### Mean network dissimilarity
+
+```{r}
+all_sites_DI <- read.csv(paste0(loc, "dissimilarity/output/stats/all_sites_DI.csv"))
+
+all_sites_DI_plot <- all_sites_DI %>% 
+  mutate(ID = as.factor(ID)) %>% 
+  group_by(ID) %>% 
+  summarize(DI = mean(DI)) %>% 
+  arrange(DI) %>% 
+  mutate(order = row_number())
+
+xlabels <- c(as.character(all_sites_DI_plot$ID))
+
+all_sites_DI_plot %>% 
+  ggplot(aes(x = order, y =  DI)) +
+  geom_segment(aes(x = order, xend = order, y = 0, yend = DI), color = 'grey', stat = "identity") +
+  geom_point(size = 4) + 
+  geom_label(aes(x=order, y=0.015, label = xlabels), hjust=1, label.size = 0) +
+  # scale_x_discrete(breaks = all_sites_mean_DI_all_plot$order, labels = xlabels) +
+  coord_flip() +
+  ylab("Overall Mean Network Dissimilarity") +
+  my_theme +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.line.y = element_blank())
+ggsave(paste0(loc, "dissimilarity/figures/all_site_mean_DI.png"),
+       width = 20, height = 25, units = c("cm"), dpi = 300)
+
+
+all_sites_DI %>% 
+  group_by(Month) %>% 
+  summarize(AOA_95 = quantile(DI, 0.95)) %>% 
+  write.csv(paste0(loc, "dissimilarity/output/stats/monthly_DI_95.csv"), row.names = F)
+```
+
 
 
 
