@@ -5162,7 +5162,7 @@ writeRaster(EVI_LAG3, paste(loc, "grids/ffs/EVI_LAG3.nc", sep = ""), format="CDF
 #   rename(color_id = V1) %>%
 # write.csv(paste(loc, "dissimilarity/figures/color_ramp_constituency.csv", sep = ""), row.names = F)
 
-col_vector_values <- read.csv(paste(loc, "dissimilarity/figures/color_ramp_constituency.csv", sep = "")) %>% 
+col_vector_values <- read.csv(paste(loc, "dissimilarity/figures/200827_color_ramp_constituency.csv", sep = "")) %>% 
   dplyr::select(color_id) %>% 
   pull()
 ```
@@ -5171,7 +5171,6 @@ col_vector_values <- read.csv(paste(loc, "dissimilarity/figures/color_ramp_const
 ##### Import additional libraries
 
 ```{r}
-source(paste(loc, "dissimilarity/rplots/tower_color_ls.r", sep=  ""))
 source(paste(loc, "dissimilarity/rplots/tower_color_ls.r", sep=  ""))
 source(paste(loc, "dissimilarity/rplots/themes/line_plot_theme.r", sep=  ""))
 source(paste(loc, "dissimilarity/rplots/themes/map_theme.r", sep=  ""))
@@ -5542,20 +5541,40 @@ for (i in 1:12){ # months
   map_outline_df <- fortify(coastsCoarse)
   sPDF <- getMap()[getMap()$ADMIN!='Antarctica',]
 
+  # # dissimilarity plots
+  # ggplot() +
+  #   geom_polygon(data=sPDF, aes(long, lat, group=group), fill="grey90") +
+  #   geom_tile(data = all_stack_masked_df_wdist, aes(x = x, y = y, fill = DI)) +
+  #   geom_point(data = coords[,4:5],
+  #              aes(x = Longitude, y = Latitude), size = 1.5, color = "blue") +
+  #   geom_path(data = map_outline_df, aes(long, lat, group = group), color = 'grey20', size = 0.3) +
+  #   coord_equal() +
+  #   scale_fill_gradient2(low = muted("blue"), mid = 'white', high = "red", midpoint = all_sites_DI_AOA) +
+  #   scale_y_continuous(limits=c(-60, 85)) +
+  #   labs(title = "Global Dissimilarity Index from 43 FLUXNET-CH4 Wetlands") +
+  #   theme_map(8) +
+  #   theme(legend.position = 'right')
+  # 
+  # ggsave(file = paste("all_DI_aoa",i,".png", sep=""),
+  #        path = paste0(loc, "dissimilarity/figures/"),
+  #        width = 188, height = 100, dpi = 600, units = "mm")
+  
+  # constituency plots
   ggplot() +
     geom_polygon(data=sPDF, aes(long, lat, group=group), fill="grey90") +
-    geom_tile(data = all_stack_masked_df_wdist, aes(x = x, y = y, fill = DI)) +
+    geom_tile(data = all_stack_masked_df_wdist, aes(x = x, y = y, fill = closest_Cluster)) +
     geom_point(data = coords[,4:5],
                aes(x = Longitude, y = Latitude), size = 1.5, color = "blue") +
     geom_path(data = map_outline_df, aes(long, lat, group = group), color = 'grey20', size = 0.3) +
     coord_equal() +
-    scale_fill_gradient2(low = muted("blue"), mid = 'white', high = "red", midpoint = all_sites_DI_AOA) +
+    scale_fill_manual(values = col_vector_values) +
     scale_y_continuous(limits=c(-60, 85)) +
-    labs(title = "Global Dissimilarity Index from 43 FLUXNET-CH4 Wetlands") +
+    labs(title = "Tower Constituency") +
     theme_map(8) +
     theme(legend.position = 'right')
+    
 
-  ggsave(file = paste("all_DI_aoa",i,".png", sep=""),
+  ggsave(file = paste("all_tower_constituency",i,".png", sep=""),
          path = paste0(loc, "dissimilarity/figures/"),
          width = 188, height = 100, dpi = 600, units = "mm")
 }
@@ -5815,6 +5834,46 @@ all_sites_DI %>%
   write.csv(paste0(loc, "dissimilarity/output/stats/monthly_DI_95.csv"), row.names = F)
 ```
 
+#### (cont.) 10. Dissimilarity - Error Relationships
+
+##### Get perfrmance and DI info
+
+```{r}
+
+site_month_metrics <- read.csv(paste0(loc, "predictions/cv/global.csv"))
+site_month_DI <- read.csv(paste0(loc, "dissimilarity/output/stats/all_sites_DI.csv"))
+data <- read.csv(paste0(loc, "training-data/final.csv")) # local path
+fold_names <- data %>% group_by(Cluster) %>% summarize(Name = ID[1]) 
+
+```
+
+##### Plot histogram of site-month DIs
+
+```{r}
+site_month_DI %>% 
+  left_join(fold_names) %>% 
+  ggplot(aes(DI, fill = factor(Name))) +
+  geom_histogram() +
+  scale_fill_manual(values = col_vector_values) +
+  facet_wrap(~Month) +
+  my_theme
+ggsave(paste0(loc, "dissimilarity/figures/all_sites_DI_monthly_histogram.png"),
+       width = 20, height = 20, units = c("cm"), dpi = 300)
+```
+
+##### Look at relationship (MAE vs. DI)
+
+```{r}
+site_month_DI %>% 
+  filter(ID != "USOWC") %>% 
+  dplyr::select(ID, Month, min_dist, mean_cvCluster_dist, DI) %>% 
+  right_join(site_month_metrics, by = c("ID", "Month")) %>% 
+  ggplot(aes(DI, MAE)) +
+  geom_point() +
+  my_theme
+ggsave(paste0(loc, "dissimilarity/figures/error_vs_DI.png"),
+       width = 20, height = 20, units = c("cm"), dpi = 300)
+```
 
 
 
