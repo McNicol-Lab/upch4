@@ -13,6 +13,7 @@ Load packages and ggplot theme:
 
 ```{r message = F}
 rm(list=ls())
+library(scales)
 library(rlist)
 library(tidyverse) 
 library(lubridate)
@@ -24,6 +25,13 @@ library(caret)
 library(parallel)
 library(RColorBrewer)
 library(ncdf4)
+library(ggrepel)
+library(here)
+library(proxy)
+library(vegan)
+library(rworldmap)
+library(rgdal)
+# source(paste(loc, "dissimilarity/rplots/import_libraries.r", sep=  "")) update this with all libraries
 source("code/ggplot_theme.R")
 source("code/fit_all_pairs.R")
 source("code/fit_stepwise.R")
@@ -5098,7 +5106,7 @@ writeRaster(TA_LAG2, paste(loc, "grids/ffs/TA_LAG2.nc", sep = ""), format="CDF",
 
 ##### Create MODIS EVI_LAG3
 
-# EVI
+##### EVI
 
 ```{r}
 raster.names <-list.files( paste(loc, "modis/grids/evi/", sep = ""), pattern = "tif$", full.names = FALSE)
@@ -5137,3 +5145,430 @@ EVI_LAG3 <- stack(evi_msc$Dec, evi[[1:215]])
 writeRaster(EVI_LAG3, paste(loc, "grids/ffs/EVI_LAG3.nc", sep = ""), format="CDF", overwrite = T)
 
 ```
+
+#### 10. (cont.) Global Dissimilarity
+
+##### Get colors
+
+```{r}
+# create color palette
+# qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+# col_vector = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+# col_vector_values = sample(col_vector, 28, replace=F)
+# 
+# col_vector_values %>%
+#   array(dim=c(28,1)) %>%
+#   as_tibble() %>%
+#   rename(color_id = V1) %>%
+# write.csv(paste(loc, "dissimilarity/figures/color_ramp_constituency.csv", sep = ""), row.names = F)
+
+col_vector_values <- read.csv(paste(loc, "dissimilarity/figures/color_ramp_constituency.csv", sep = "")) %>% 
+  dplyr::select(color_id) %>% 
+  pull()
+```
+
+
+##### Import additional libraries
+
+```{r}
+source(paste(loc, "dissimilarity/rplots/tower_color_ls.r", sep=  ""))
+source(paste(loc, "dissimilarity/rplots/tower_color_ls.r", sep=  ""))
+source(paste(loc, "dissimilarity/rplots/themes/line_plot_theme.r", sep=  ""))
+source(paste(loc, "dissimilarity/rplots/themes/map_theme.r", sep=  ""))
+source(paste(loc, "dissimilarity/rplots/plots/custom_theme.R", sep=  ""))
+options(stringsAsFactors = F)
+```
+
+##### Setup
+
+```{r}
+# define common extent
+com_ext <- extent(-180, 180,  -56, 85)
+
+# Number of predictors being used for analysis
+num_pred = 6
+```
+
+##### Read static grids
+
+```{r}
+canopyht <- raster(paste0(loc, 'grids/ffs/canopyht.tif')) %>% crop(com_ext)
+wc_mtdq <- raster(paste0(loc, 'grids/ffs/wc_mtdq.tif')) %>% crop(com_ext)
+wc_pwtm <- raster(paste0(loc, 'grids/ffs/wc_pwtm.tif')) %>% crop(com_ext)
+```
+
+##### Read temporal msc (limit dissim. analysis to msc)
+
+```{r}
+TA <- stack(paste0(loc, 'grids/ffs/TA_msc.nc')) %>% crop(com_ext)
+TA_LAG2 <- stack(paste0(loc, 'grids/ffs/TA_msc_LAG2.nc')) %>% crop(com_ext)
+EVI_LAG3 <- stack(paste0(loc, 'grids/ffs/EVI_msc_LAG3.nc')) %>% crop(com_ext)
+```
+
+##### Create a stack (without temporal predictors for now)
+
+```{r}
+all_stack <- list()
+for (i in 1:12){
+  all_stack[[i]]<- stack(canopyht, wc_mtdq, wc_pwtm) 
+}
+```
+
+##### Define function to rescale static grids
+
+```{r}
+rescale01 <- function(x) {
+  (x - cellStats(x, stat = 'min')) / (cellStats(x, stat = 'max') - cellStats(x, stat = 'min')) }
+```
+
+##### Rescale static grids
+
+```{r}
+scaled_data <- lapply(all_stack, rescale01)
+```
+
+##### Define function to rescale temporal grids
+
+```{r}
+rescale02 <- function(x) {
+  (x - min(x)) / (max(x) - min(x)) }
+```
+
+##### Rescale temporal grids
+
+```{r}
+scaled_data_2 <- rescale02(TA)
+scaled_data_3 <- rescale02(TA_LAG2)
+scaled_data_4 <- rescale02(EVI_LAG3)
+```
+
+###### Recombine and rename
+
+```{r}
+for (i in 1:12){
+  all_stack[[i]] <- stack(scaled_data[[i]], 
+                              scaled_data_2[[i]], 
+                              scaled_data_3[[i]], 
+                              scaled_data_4[[i]]) 
+  names(all_stack[[i]]) <- c("canopyht", "wc_mtdq", "wc_pwtm",
+                             "TA", "TA_LAG2", "EVI_LAG3")
+}
+
+all_stack_full <- stack(all_stack)
+writeRaster(all_stack_full, paste0(loc, "dissimilarity/output/stacks/all.nc"), format='CDF', overwrite = T)
+```
+
+##### Read in all stack (for subsequent attempts)
+
+```{r}
+all_stack_full <- stack(paste0(loc, "dissimilarity/output/stacks/all.nc"))
+                        
+# recreate all_stack list
+month_vector_st <- c(seq(1,72,6))
+month_vector_end <- month_vector_st+5
+
+all_stack <- list()
+for (i in 1:12){
+  all_stack[[i]] <- all_stack_full[[c(month_vector_st[i]:(month_vector_end[i]))]]
+  names(all_stack[[i]]) <- c("canopyht", "wc_mtdq", "wc_pwtm",
+                             "TA", "TA_LAG2", "EVI_LAG3")
+}
+```
+
+###### set up weights
+
+Weights come from scaled varimp output
+
+```{r}
+rescaling_weights <- c(100, # TA
+                       68,  # wc_pwtm
+                       67,  # wc_mtdq
+                       50,  # TA_LAG2
+                       27,  # canopyht
+                       11   # EVI_LAG3
+                       ) /100 
+
+rescaling_weights <- c("TA" = rescaling_weights[1], 
+                       "wc_pwtm" = rescaling_weights[2], 
+                       "wc_mtdq" = rescaling_weights[3],
+                       "TA_LAG2" = rescaling_weights[4], 
+                       "canopyht" = rescaling_weights[5], 
+                       "EVI_LAG3" = rescaling_weights[6])
+
+for (i in 1:12){
+  all_stack[[i]]$TA <- all_stack[[i]]$TA*rescaling_weights["TA"]
+  all_stack[[i]]$wc_pwtm <- all_stack[[i]]$wc_pwtm*rescaling_weights["wc_pwtm"]
+  all_stack[[i]]$wc_mtdq <- all_stack[[i]]$wc_mtdq*rescaling_weights["wc_mtdq"]
+  all_stack[[i]]$TA_LAG2 <- all_stack[[i]]$TA_LAG2*rescaling_weights["TA_LAG2"]
+  all_stack[[i]]$canopyht <- all_stack[[i]]$canopyht*rescaling_weights["canopyht"]
+  all_stack[[i]]$EVI_LAG3 <- all_stack[[i]]$EVI_LAG3*rescaling_weights["EVI_LAG3"]
+}
+
+all_stack_weighted_full <- stack(all_stack)
+writeRaster(all_stack_weighted_full, paste0(loc, "dissimilarity/output/stacks/all_weighted.nc"), format='CDF', overwrite = T)
+```
+
+##### Read in all stack weighted (for subsequent attempts)
+
+```{r}
+all_stack_weighted_full <- stack(paste0(loc, "dissimilarity/output/stacks/all_stack_weighted_full.nc"))
+month_vector_st <- c(seq(1,72,6))
+month_vector_end <- month_vector_st+5
+
+all_stack <- list()
+for (i in 1:12){
+  all_stack[[i]] <- all_stack_weighted_full[[c(month_vector_st[i]:(month_vector_end[i]))]]
+  names(all_stack[[i]]) <- c("canopyht", "wc_mtdq", "wc_pwtm",
+                             "TA", "TA_LAG2", "EVI_LAG3")
+}
+```
+
+##### Read wetland map ( Fw = fraction wetland )
+
+Only use the first year of data (2000)
+
+```{r}
+Fw <- stack(paste0(loc, "grids/WAD2M/gcp-ch4_wetlands_2000-2018_025deg.nc"))
+Fw <- Fw[[1:12]]
+```
+
+##### Crop out Antartica
+
+```{r}
+Fw <- crop(Fw, com_ext)
+```
+
+##### Mask out zero wetland areas
+
+```{r}
+all_stack_masked <- list()
+for(i in 1:12){
+  all_stack_masked[[i]] <- mask(all_stack[[i]], Fw[[i]])
+}
+
+all_stack_masked_full <- stack(all_stack_masked)
+
+writeRaster(all_stack_masked_full, paste0(loc, "dissimilarity/output/stacks/all_weighted_masked.nc"), format='CDF', overwrite = TRUE)
+```
+
+##### Read in all stack masked and weighted (for subsequent attempts)
+
+```{r}
+all_stack_masked_full <- stack(paste0(loc, "dissimilarity/output/stacks/all_weighted_masked.nc"))
+month_vector_st <- c(seq(1,72,6))
+month_vector_end <- month_vector_st+5
+
+all_stack_masked <- list()
+for (i in 1:12){
+  all_stack_masked[[i]] <- all_stack_masked_full[[c(month_vector_st[i]:(month_vector_end[i]))]]
+  names(all_stack_masked[[i]]) <- c("canopyht", "wc_mtdq", "wc_pwtm",
+                             "TA", "TA_LAG2", "EVI_LAG3")
+}
+
+```
+
+##### Convert monthly (as list) stack to dataframes
+
+```{r}
+all_stack_masked_df <- list()
+for (i in 1:12){
+  all_stack_masked_df[[i]] <- as.data.frame(as(all_stack_masked[[i]], "SpatialPixelsDataFrame")) %>% filter_all(all_vars(!is.na(.)))
+}
+Fw_df <- as.data.frame(as(Fw, "SpatialPixelsDataFrame")) %>% filter_all(all_vars(!is.na(.)))
+```
+
+
+##### Read tower data
+
+```{r}
+tower_data <- read.csv("/Volumes/Samsung_T5/Stanford/upch4_local/training-data/final.csv")
+head(tower_data)
+
+# Get coordinates from the tower data
+coords <- tower_data %>% 
+  dplyr::select(Month, Cluster, ID, Longitude, Latitude) %>% 
+  group_by(Month, Cluster, ID) %>% unique() %>% 
+  arrange(Month) 
+
+# get it for each month
+coords_month <- list()
+for (i in 1:12){
+  coords_month[[i]] <- coords %>% 
+    filter(Month == i)
+}
+
+# check points line up
+plot(all_stack[[1]]$canopyht)
+points(coords[,4:5])
+```
+
+```{r}
+# Extract at points
+all_sites <- list()
+for (i in 1:12){
+  all_sites[[i]] <- raster::extract(all_stack[[i]], coords_month[[i]][,4:5]) %>% 
+    as_tibble() %>% 
+    bind_cols(coords_month[[i]]) %>% 
+    dplyr::select(Month, Cluster, ID, Latitude, Longitude, everything())
+}
+all_sites <- bind_rows(all_sites)
+```
+
+##### Run dissimilarity analysis
+
+```{r}
+# set up lists and outputs
+monthly_global_DI <- list()
+all_sites_mean_DI <- list()
+
+month_seq <- all_sites$Month # 26 clusters * 12 months
+length(month_seq)
+
+for (i in 1:12){ # months
+  
+  # Calculate eucledian distance between each tower (28) and each pixel (> 100000 pixels)
+  distance <- proxy::dist(y = all_sites[c(6:length(all_sites))], 
+                          x = all_stack_masked_df[[i]][1:(length(all_stack_masked_df[[i]])-2)], 
+                          method = "Euclidean",
+                          diag = FALSE, 
+                          upper = FALSE)
+  
+  # Reformat to be usable for analysis
+  distance <- as.data.frame(as.matrix.data.frame(distance))
+  str(distance)
+  
+  names(distance) <- all_sites %>% dplyr::select(ID) %>% pull() %>% paste("_",month_seq,sep="")
+  Clusters <- all_sites %>%  dplyr::select(Cluster) %>% pull()
+  Cluster_names <- all_sites %>% group_by(Cluster) %>% summarize(ID = ID[1]) %>% pull()
+  all_stack_masked_df_wdist <- cbind(all_stack_masked_df[[i]], distance)
+  
+  # Find the minimum distance in terms of the predictor variables at each pixel on Earth from the network of towers
+  num_col = ncol(all_stack_masked_df_wdist)
+  
+  # get minimum distance, and the name of the closest tower
+  all_stack_masked_df_wdist <- all_stack_masked_df_wdist %>% 
+    mutate(min_dist = apply(all_stack_masked_df_wdist[, (num_pred + 3):num_col], MARGIN = 1, FUN = min, na.rm = TRUE),
+           closest = c(apply(all_stack_masked_df_wdist[, (num_pred + 3):num_col], MARGIN = 1, FUN = which.min)),
+           closest_tower = names(distance)[closest],
+           closest_Cluster = Clusters[closest],
+           closest_Cluster = Cluster_names[closest_Cluster])
+  
+  
+  # Calculate eucledian distance between towers
+  distance_network <- proxy::dist(y = all_sites[c(6:length(all_sites))], 
+                                  x = all_sites[c(6:length(all_sites))], 
+                                  method = "Euclidean",
+                                  diag = FALSE, 
+                                  upper = FALSE)
+  
+  # Reformat to be usable for analysis
+  distance_network <- as.data.frame(as.matrix.data.frame(distance_network))
+  str(distance_network)
+  names(distance_network) <- all_sites %>% dplyr::select(ID) %>% pull() %>% paste("_",month_seq,sep="")
+  all_sites_wdist <- cbind(all_sites, distance_network)
+  
+  num_col = ncol(all_sites_wdist)
+  
+  # get overall mean tower-tower distance
+  all_sites_mean_distance <- all_sites_wdist %>% 
+    na_if(0) %>% 
+    mutate(mean_dist = apply(all_sites_wdist[, (num_pred + 6):num_col], MARGIN = 1, FUN = mean, na.rm = TRUE)) %>% 
+    pull(mean_dist) %>% mean()
+  
+  # pixel DI =  min distance / mean distance
+  all_stack_masked_df_wdist <- all_stack_masked_df_wdist %>% 
+    mutate(DI = min_dist / all_sites_mean_distance)
+  
+  str(all_sites_wdist)
+  
+  # AOA (area of applicability) calculation
+  # Step 0: Gather data
+  all_sites_wdist <- all_sites_wdist %>% 
+    dplyr::select(Month, Cluster, ID,c((num_pred + 6):num_col)) %>% 
+    gather(key = "ID_2", value = "distance", 4:449) %>% 
+    mutate(ID_2 = substr(ID_2,1,5)) %>% 
+    unique()
+
+  # Step 1: Get the minimum distance between each tower and the network (excluding other towers in the same Cluster)
+  id_names <- all_sites_wdist %>% dplyr::select(ID) %>% pull() %>% factor() %>%  levels()
+  Clusters <- all_sites_wdist %>% group_by(ID) %>% summarize(Clusters = Cluster[1]) %>% dplyr::select(Clusters) %>% pull()
+  Clusters_vector <- c(rep(Clusters,each = 12)) %>% as_tibble() %>% rename(Cluster = value)
+
+  all_sites_min_dist <- list()
+  for (j in 1:43) {
+    all_sites_min_dist[[j]] <- all_sites_wdist %>% 
+      filter(!Cluster == Clusters[j]) %>% 
+      filter(ID != ID_2) %>% 
+      filter(ID_2 == id_names[j]) %>% 
+      group_by(Month, ID_2) %>% 
+      summarize(min_dist = min(distance))
+  }
+  
+  all_sites_min_dist <- bind_rows(all_sites_min_dist) %>% 
+    bind_cols(Clusters_vector) %>% 
+    as_tibble() %>% arrange(Month, ID_2) %>% 
+    dplyr::select(Month, Cluster, ID = ID_2, min_dist)
+  
+  
+  # Step 2: Get the average distance between all tower training points (excluding towers in the same Cluster)
+  all_sites_cvCluster_dist <- list()
+  for (j in 1:43) {
+    all_sites_cvCluster_dist[[j]] <- all_sites_wdist %>% 
+      filter(!Cluster == Clusters[j]) %>% 
+      filter(ID != ID_2) %>% 
+      filter(!ID_2 == id_names[j]) %>% 
+      summarize(ID = id_names[j],
+                mean_cvCluster_dist = mean(distance))
+  }
+  
+  all_sites_cvCluster_dist <- bind_rows(all_sites_cvCluster_dist) 
+  
+  
+  # Step 3: Create a cvCluster tibble and calculate the DI for each site
+  all_sites_DI <- all_sites_min_dist %>% left_join(all_sites_cvCluster_dist, by = c("ID")) %>% 
+    mutate(DI = min_dist/mean_cvCluster_dist)
+  
+  all_sites_DI_AOA <- quantile(all_sites_DI$DI, 0.95) 
+  # all_sites_DI_sd <- sd(all_sites_DI$DI) 
+  # all_sites_AOA <- all_sites_DI_mean+all_sites_DI_sd # use this as AOA threshold
+  
+  # get output
+  monthly_global_DI[[i]] <- all_stack_masked_df_wdist
+  #
+  
+  ## Make an outline of the countries for the plot
+  data(coastsCoarse)
+  map_outline_df <- fortify(coastsCoarse)
+  sPDF <- getMap()[getMap()$ADMIN!='Antarctica',]
+
+  ggplot() +
+    geom_polygon(data=sPDF, aes(long, lat, group=group), fill="grey90") +
+    geom_tile(data = all_stack_masked_df_wdist, aes(x = x, y = y, fill = DI)) +
+    geom_point(data = coords[,4:5],
+               aes(x = Longitude, y = Latitude), size = 1.5, color = "blue") +
+    geom_path(data = map_outline_df, aes(long, lat, group = group), color = 'grey20', size = 0.3) +
+    coord_equal() +
+    scale_fill_gradient2(low = muted("blue"), mid = 'white', high = "red", midpoint = all_sites_DI_AOA) +
+    scale_y_continuous(limits=c(-60, 85)) +
+    labs(title = "Global Dissimilarity Index from 43 FLUXNET-CH4 Wetlands") +
+    theme_map(8) +
+    theme(legend.position = 'right')
+
+  ggsave(file = paste("all_DI_aoa",i,".png", sep=""),
+         path = paste0(loc, "dissimilarity/figures/"),
+         width = 188, height = 100, dpi = 600, units = "mm")
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
