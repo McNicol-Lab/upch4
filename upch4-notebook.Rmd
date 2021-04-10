@@ -35,6 +35,8 @@ library(rgdal)
 source("code/ggplot_theme.R")
 source("code/fit_all_pairs.R")
 source("code/fit_stepwise.R")
+source() #placeholder for rescaling grid function (static)
+source() #placeholder for rescaling grid function (temporal)
 ```
 
 **NOTE: This work flow uses many large files so most data is stored locally and requires hard filepaths**
@@ -5100,7 +5102,8 @@ writeRaster(TA_msc_LAG2, paste(loc, "grids/ffs/TA_msc_LAG2.nc", sep = ""), forma
 Fill end of stack with Dec from msc
 
 ```{r}
-TA_LAG2 <- stack(TA_stack[[2:204]], TA_msc[[12]])
+TA_LAG4 <- stack(TA_msc[[12]], TA_stack[[1:215]])
+TA_LAG2 <- TA_stack + (TA_LAG4 - TA_stack)*0.5
 writeRaster(TA_LAG2, paste(loc, "grids/ffs/TA_LAG2.nc", sep = ""), format="CDF", overwrite = T)
 ```
 
@@ -5909,62 +5912,61 @@ wc_pwtm <- raster(paste0(loc, 'grids/ffs/wc_pwtm.tif')) %>% crop(com_ext)
 
 ##### Read temporal grids
 
-```{r}
+```{r echo = F, message = F, warning = F}
 TA <- stack(paste0(loc, 'grids/ffs/TA.nc')) %>% crop(com_ext)
 TA_LAG2 <- stack(paste0(loc, 'grids/ffs/TA_LAG2.nc')) %>% crop(com_ext)
 EVI_LAG3 <- stack(paste0(loc, 'grids/ffs/EVI_LAG3.nc')) %>% crop(com_ext)
 ```
 
+##### Look at grids QC
+
+```{r}
+plot(EVI_LAG3[[7]])
+```
+
+
+##### Check if can fill gaps in `EVI_LAG3` with `EVI_msc_LAG3`
+
+```{r}
+EVI_msc_LAG3 <- stack(paste0(loc, "grids/ffs/EVI_msc_LAG3.nc")) %>% crop(com_ext)
+plot(EVI_msc_LAG3[[7]])
+```
+
+##### Fill gaps with `EVI_msc_LAG3`
+
+```{r}
+month_index <- c(rep(1:12, 18))
+
+for(i in 1:216){
+  na_mask_temp <- is.na(EVI_LAG3[[i]])
+  msc_temp <- crop(EVI_msc_LAG3[[month_index[i]]], na_mask_temp)
+  EVI_LAG3[[i]] <- cover(EVI_LAG3[[i]], msc_temp)
+}
+```
+
 ##### Create a stack (without temporal predictors for now)
 
 ```{r}
-all_stack <- list()
+upscaling_stack <- list()
 for (i in 1:216){
-  all_stack[[i]]<- stack(canopyht, wc_mtdq, wc_pwtm) 
+  upscaling_stack[[i]]<- stack(canopyht, wc_mtdq, wc_pwtm, TA[[i]], TA_LAG2[[i]], EVI_LAG3[[i]]) 
+  names(upscaling_stack[[i]]) <- c("canopyht", "wc_mtdq", "wc_pwtm", "TA", "TA_LAG2", "EVI_LAG3")
+}
+
+plot(upscaling_stack[[7]])
+```
+
+##### Write out upscaling forcing
+
+```{r}
+digit1 <- c(rep(0,99), rep(1,100), rep(2,17))
+digit2 <- c(rep(0,9), rep(1:9, each = 10), rep(0:9, each = 10), rep(0, 10), rep(1, 7))
+digit3 <- c(1:9, rep(0:9, 20), 0:6)
+
+month_index <- bind_cols(digit1 = digit1, digit2 = digit2, digit3 = digit3) %>% unite(index, c(digit1, digit2, digit3), sep = "")
+
+for(i in 1:216){
+  writeRaster(upscaling_stack[[i]], paste0(loc, "grids/ffs/forcing/forcing_", month_index$index[i], ".nc"),format = "CDF", overwrite = T)
 }
 ```
 
-##### Define function to rescale static grids
-
-```{r}
-rescale01 <- function(x) {
-  (x - cellStats(x, stat = 'min')) / (cellStats(x, stat = 'max') - cellStats(x, stat = 'min')) }
-```
-
-##### Rescale static grids
-
-```{r}
-scaled_data <- lapply(all_stack, rescale01)
-```
-
-##### Define function to rescale temporal grids
-
-```{r}
-rescale02 <- function(x) {
-  (x - min(x, na.rm = T)) / (max(x, na.rm = T) - min(x, na.rm = T)) }
-```
-
-##### Rescale temporal grids
-
-```{r}
-scaled_data_2 <- rescale02(TA)
-scaled_data_3 <- rescale02(TA_LAG2)
-scaled_data_4 <- rescale02(EVI_LAG3)
-
-```
-
-###### Recombine and rename
-
-```{r}
-for (i in 1:12){
-  all_stack[[i]] <- stack(scaled_data[[i]], 
-                              scaled_data_2[[i]], 
-                              scaled_data_3[[i]], 
-                              scaled_data_4[[i]]) 
-  names(all_stack[[i]]) <- c("canopyht", "wc_mtdq", "wc_pwtm",
-                             "TA", "TA_LAG2", "EVI_LAG3")
-}
-
-all_stack_full <- stack(all_stack)
-writeRaster(all_stack_full, paste0(loc, "dissimilarity/output/stacks/all.nc"), format='CDF', overwrite = T)
-```
