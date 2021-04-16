@@ -4865,7 +4865,7 @@ write.csv(worldclim, paste(loc, "mc/extracted/worldclim_sd.csv", sep = ""), row.
 
 ```{r}
 data <- read.csv(paste(loc, "training-data/final.csv", sep = "")) %>% 
-  dplyr::select(1:17, FCH4, FCH4_F_UNC, TA, TA_LAG2, canopyht, wc_mtdq,  wc_pwtm, EVI_LAG3, -Upscaling)
+  dplyr::select(Cluster, ID, Year, Month, Week, FCH4, FCH4_F_UNC, TA, TA_LAG2, canopyht, wc_mtdq,  wc_pwtm, EVI_LAG3)
 head(data)
 ```
 ##### Read in standard deviations (static uncertainties)
@@ -4875,7 +4875,7 @@ canopyht <- read.csv(paste(loc, "mc/extracted/canopyht_sd.csv", sep = ""))
 worldclim <- read.csv(paste(loc, "mc/extracted/worldclim_sd.csv", sep = ""))
 static <- left_join(canopyht, worldclim) %>% 
   filter(Upscaling == 1) %>% 
-  dplyr::select(-Upland.Class, -Upscaling)
+  dplyr::select(ID, canopyht_sd, wc_mtdq_sd, wc_pwtm_sd)
 names(static)
 names(data)
 ```
@@ -4884,8 +4884,7 @@ names(data)
 
 ```{r}
 data <- data %>% 
-  left_join(static, by = c("ID", "Site.Name", "Data.Policy", "Country", "Latitude", "Longitude", "IGBP",
-                           "Site.Classification", "DOI", "DOI.Reference", "Site.Personnel", "Base.File.Host"))
+  left_join(static, by = c("ID"))
 ```
 
 ##### Generate 1000 simulated observations (of the weekly data set)
@@ -4921,14 +4920,13 @@ data3 <- data2 %>% bind_rows() %>% dplyr::select(mc_i, everything())
 ##### Now drop IDs at random from each of the 500 datasets (and always drop USOWC)
 
 ```{r}
-site.names <- data3 %>% dplyr::select(ID) %>% filter(ID != "USOWC") %>% mutate(ID = factor(ID)) %>% pull() %>% levels()
-site.drop <- sample(site.names, 500, replace = T)
+cluster.drop <- sample(1:26, 500, replace = T)
 
 data4 <- list()
 for(i in 1:500){
   data4[[i]] <- data3 %>% 
     filter(mc_i == i) %>% 
-    filter(ID != site.drop[i] & ID != "USOWC")
+    filter(Cluster != cluster.drop[i] & ID != "USOWC")
 }
 
 # bind rows
@@ -4941,10 +4939,7 @@ saveRDS(data5,
 ##### Identify which site was left out then subset those data
 
 ```{r warning = F, message = F, echo = F}
-# convert ID vector to column
-ID.names <- site.names %>% 
-  as_tibble() %>% 
-  rename("ID" = "value")
+ID.names <- data3 %>% dplyr::select(ID) %>% mutate(ID = factor(ID)) %>% distinct()
 
 # get IDs for each mc_i
 IDs <- list()
@@ -4956,29 +4951,30 @@ for(i in 1:500){
 }
 
 # get the held-out site for each mc_i
-ID.drop <- list()
+ID.drop.list <- list()
 for(i in 1:500){
-  ID.drop[[i]] <- ID.names %>% 
-    anti_join(IDs[[i]])
+  ID.drop.list[[i]] <- ID.names %>% 
+    anti_join(IDs[[i]]) %>% 
+    mutate(Cluster = cluster.drop[i],
+           mc_i = i) %>% 
+    dplyr::select(mc_i, Cluster, ID)
 }
 
 # compile
-ID.drop <- bind_rows(ID.drop) %>% 
-  dplyr::select(ID) %>% 
-  pull()
+ID.drop <-  bind_rows(ID.drop.list) 
 
 write.csv(ID.drop, 
           paste0(loc, "/mc/bootstrap-site-dropped.csv"),
           row.names = F)
 ```
 
-##### Finally, subset the single held-out site from each mc_i
+##### Finally, subset the held-out site data from each mc_i
 
 ```{r}
 data6 <- list()
 for(i in 1:500){
   data6[[i]] <- data3 %>% 
-    filter(mc_i == i & ID == ID.drop[i])
+    filter(mc_i == i & ID %in% ID.drop.list[[i]]$ID )
   
 }
 
@@ -4989,6 +4985,225 @@ saveRDS(data6,
 ```
 
 #### 9. (cont.) MC Model Training
+
+##### Read in training data
+
+```{r}
+data <- readRDS(paste0(loc, "/mc/data/1000mc_500bs.rds")) # local path
+```
+
+##### Get features
+
+```{r}
+names(data)
+mc.feat <- data %>% 
+  dplyr::select(19:24) %>% 
+  names()
+```
+
+##### Set up for model training
+
+```{r}
+feat <- mc.feat
+feat_l <- length(feat)
+data_l <- length(data$mc_i)
+
+# data folds 
+mc_iterations <- data %>% dplyr::select(mc_i) %>% max()
+folds <- data %>% dplyr::select(Cluster) %>% max()
+fold_names <- data %>% group_by(Cluster) %>% summarize(Name = ID[1])
+iteration_l <- length(data$mc_i)/mc_iterations
+```
+
+##### Setup folds
+
+```{r}
+# set up mc iterations
+train_feat <- list()
+train_label <- list()
+
+for (i in 1:500) {
+  train_label[[i]] <- data %>% filter(mc_i == i) %>% dplyr::select(FCH4_mc) %>% pull()
+  train_feat[[i]] <- data %>% filter(mc_i == i) %>% dplyr::select(feat)
+}
+
+# for inner-cv for hyperparam, nested within mc iterations
+folds_index <- list() 
+for(i in 1:500){
+  x <- list()
+  folds_index[[i]] <- x
+}
+
+for (i in 1:500) {
+  for (j in 1:folds){
+    folds_index[[i]][[j]] <- data %>% 
+      filter(mc_i == i) %>% 
+      mutate(index = 1:n()) %>% 
+      filter(!Cluster == j) %>% 
+      dplyr::select(index) %>% 
+      pull()
+  }
+}
+
+saveRDS(folds_index, paste0(loc, 'mc/data/folds_index.rds'))
+```
+
+##### Train RF
+
+```{r echo = F, warning = F}
+set.seed(23)
+
+## set up lists 
+tgrid <- list()
+myControl <- list()
+
+## Create tune-grid
+tgrid <- expand.grid(
+  .mtry = c(2,4,6),
+  .splitrule = "variance", 
+  .min.node.size = c(iteration_l*0.001,iteration_l*0.01)
+)
+
+rf_model <- list()
+for (i in 1:500) {
+    
+    ## Create trainControl object
+    myControl <- trainControl(
+      method = "cv",
+      allowParallel = TRUE,
+      verboseIter = TRUE, 
+      returnData = FALSE,
+      index = folds_index[[i]]
+    )
+
+    ## train rf on folds
+    rf_model[[i]] <- train(
+      x = train_feat[[i]], 
+      y = train_label[[i]],
+      method = 'ranger',
+      trControl = myControl,
+      tuneGrid = tgrid,
+      num.trees = 60,
+      metric = 'MAE'
+    )
+    print(i)
+
+}
+  
+saveRDS(rf_model, 
+        paste0(loc, "ensembles/mc/rf.rds"),
+        )# local dir.
+
+```
+
+
+# look at r2 and MAE for all models 
+mean_MAE <- c()
+mean_r2 <- c()
+tune_r2 <- list()
+tune_MAE <- list()
+tune_r2se <- list()
+tune_MAEse <- list()
+for (i in 1:length(rf_model)){
+  mean_MAE[i] <- rf_model[[i]]$results$MAE[which(rf_model[[i]]$results$MAE == min(rf_model[[i]]$results$MAE))] 
+  mean_r2[i] <- rf_model[[i]]$finalModel$r.squared
+  tune_r2[[i]] <- rf_model[[i]]$results[,c(5)]
+  tune_MAE[[i]] <- rf_model[[i]]$results[,c(4)]
+  tune_r2se[[i]] <- rf_model[[i]]$results[,c(6)]
+  tune_MAEse[[i]] <- rf_model[[i]]$results[,c(4)]
+
+}
+summary(mean_r2) # oob R2
+
+tune_r2s <- cbind(rf_model[[1]]$results[,c(1,3)],bind_cols(tune_r2)) %>% 
+  gather(key = "fold", value = "R2", 3:502)
+tune_MAEs <- cbind(rf_model[[1]]$results[,c(1,3)],bind_cols(tune_MAE)) %>% 
+  gather(key = "fold", value = "MAE", 3:502)
+mean(tune_MAEs$MAE); mean(tune_r2s$R2) # inner MAE and R2
+
+
+
+# get all hold out predictions
+rf.pred <- list()
+for (i in 1:length(rf_model)) {
+  rf.pred[[i]] <- data %>% 
+    filter(mc_i == i) %>%   
+    mutate(FCH4P = predict(rf_model[[i]], .),
+           index = 1:n())
+}
+rf.pred.all <- bind_rows(rf.pred)
+str(rf.pred.all)
+head(rf.pred.all)
+
+class_col_vector <- rep(c("#E78AC3","#F1E2CC","#33A02C","#377EB8","#E41A1C","#999999"),10)
+
+# look at pred vs obs
+rf.pred.all %>% 
+  filter(mc_i %in% c(1:12)) %>%
+  ggplot(aes(FCH4, FCH4P)) +
+  # stat_binhex(aes(fill=log(..count..))) +
+  geom_point() +
+  geom_abline(slope = 1, color = 'white') +
+  facet_wrap(~mc_i) +
+  # scale_x_continuous(limits = c(0,1000)) +
+  # scale_y_continuous(limits = c(0,1000)) +
+  xlab(label = expression("FCH4 (nmol m"^{-2}*" s"^{-1}*")")) +
+  ylab(label = expression("FCH4P (nmol m"^{-2}*" s"^{-1}*")")) +
+  mytheme
+ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Monte Carlo/predictions/201009_rf_mc_12b_nocanopyht.png", sep = ""),
+       width = 24, height = 24, units = c("cm"), dpi = 300)
+
+# Drop bias correction because seems to have very minor effect and not easy to grid
+# try bias correction
+splinemod <- smooth.spline(y=rf.pred.all$FCH4, x=rf.pred.all$FCH4P, spar = 2)
+# plot(rf.pred.all$FCH4P[1:10000],rf.pred.all$FCH4[1:10000], xlim = c(0,500), ylim = c(0,500))
+# abline(0,1,col = 'blue')
+# lines(splinemod, col="red", lwd=3)
+
+saveRDS(splinemod, "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Monte Carlo/predictions/201009_rf_mc_spline_nocanopyht.rds")
+
+# get bias corrected predictions
+FCH4P_cor <- predict(splinemod, rf.pred.all$FCH4P)
+FCH4P_cor <- FCH4P_cor$y
+rf.pred.all <- cbind(rf.pred.all, FCH4P_cor)
+
+# look at pred vs obs
+rf.pred.all %>% 
+  filter(mc_i %in% c(1:12)) %>%
+  ggplot(aes(FCH4, FCH4P_cor)) +
+  # stat_binhex(aes(fill=log(..count..))) +
+  geom_point() +
+  geom_abline(slope = 1, color = 'white') +
+  facet_wrap(~mc_i) +
+  # scale_x_continuous(limits = c(0,1000)) +
+  # scale_y_continuous(limits = c(0,1000)) +
+  xlab(label = expression("FCH4 (nmol m"^{-2}*" s"^{-1}*")")) +
+  ylab(label = expression("FCH4P Bias Cor. (nmol m"^{-2}*" s"^{-1}*")")) +
+  mytheme
+ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Monte Carlo/predictions/201009_rf_mc_12b_bias_cor_nocanopyht.png", sep = ""),
+       width = 24, height = 24, units = c("cm"), dpi = 300)
+
+write.csv(rf.pred.all, "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Monte Carlo/predictions/201009_rf_mc_pred_nocanopyht.csv",
+          row.names = FALSE)
+
+# experiment and date
+tune_r2s %>% 
+  ggplot(aes(min.node.size, R2, col = factor(mtry))) +
+  geom_line() +
+  scale_x_log10() +
+  facet_wrap(~fold) +
+  mytheme
+ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Monte Carlo/predictions/tune_r2.pdf",
+       width = 20, height = 20, units = c("cm"), dpi = 300)
+
+tune_MAEs %>% 
+  ggplot(aes(min.node.size, MAE, col = factor(mtry))) +
+  geom_line() +
+  scale_x_log10() +
+  facet_wrap(~fold) +
+  mytheme
+ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Monte Carlo/predictions/tune_mae.pdf",
+       width = 20, height = 20, units = c("cm"), dpi = 300)
 
 
 
