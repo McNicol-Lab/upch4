@@ -5153,7 +5153,7 @@ as_tibble(cbind(metrics, values)) %>%
             row.names = F)
 ```
 
-# get all hold out predictions
+##### Get all hold out predictions
 
 ```{r}
 # read in held out data
@@ -5191,6 +5191,127 @@ rf.pred.all %>%
   my_theme
 ggsave(paste0(loc, "mc/predictions/rf_mc_heldout.png", sep = ""),
        width = 24, height = 24, units = c("cm"), dpi = 300)
+```
+
+#### 9. (cont.) MC Validation and Error Scaling
+
+##### Read in MC data
+
+```{r}
+data <- read.csv(paste0(loc, "mc/predictions/rf_mc.csv"))
+```
+
+##### Summarize fluxes 
+
+```{r}
+# get the mean and variance for each week
+summary <- data %>% 
+  group_by(ID, Year, Month, Week) %>% 
+  summarize(meanFCH4 = mean(FCH4, na.rm = TRUE),
+            meanFCH4_mc = mean(FCH4_mc, na.rm = TRUE),
+            meanFCH4P = mean(FCH4P, na.rm = TRUE),
+            sdFCH4P = sd(FCH4P, na.rm = TRUE))
+
+summary %>% 
+  # filter(ID == "CASCB") %>% 
+  mutate(week_dec = Week/52,
+         year_dec = Year+week_dec) %>% 
+  ggplot(aes(year_dec, meanFCH4P)) + 
+  geom_errorbar(aes(year_dec, ymin = meanFCH4P - 2*sdFCH4P, ymax = meanFCH4P + 2*sdFCH4P), alpha = 0.9, color = 'grey') +
+  geom_point(color = "blue", alpha = 0.7) + 
+  geom_point(aes(year_dec, meanFCH4), size = 0.5) +
+  facet_wrap(~ID, scales = 'free') + 
+  labs(x = "Decimal Year", y = expression("FCH4 Predicted (nmol m"^{-2}*" s"^{-1}*")")) +
+  my_theme
+ggsave(paste0(loc, "mc/predictions/timeseries.png", sep = ""),
+       width = 50, height = 35, units = c("cm"), dpi = 300)
+
+```
+
+##### MC Prediction Variance vs. Dissimilarity
+
+Output held-out data summary
+
+```{r}
+hold_out <- readRDS(paste0(loc, "mc/data/1000mc_500bs_heldout.rds"))
+
+hold_out %>% 
+  group_by(mc_i) %>% 
+  summarize(n()) %>% 
+  write.csv(paste0(loc, "mc/data/heldout_sample_size.csv"),
+            row.names = F)
+
+```
+
+##### Subset prediction data
+
+```{r}
+pred <- data %>% dplyr::select(mc_i, Cluster, ID, Year, Month, Week, FCH4Pe = FCH4P)
+```
+
+##### Calculate the monthly mean and variance of each prediction across mc iterations
+
+```{r}
+pred_full <- pred %>% 
+  group_by(Cluster, ID, Year, Month) %>% 
+  summarize(mean = mean(FCH4Pe, na.rm = TRUE),
+            var = var(FCH4Pe, na.rm = TRUE)) 
+```
+
+#### Read in DI
+
+```{r}
+di <- read.csv(paste0(loc, "dissimilarity/output/stats/all_sites_DI.csv"))
+```
+
+##### Output DI summary
+
+```{r}
+di %>%
+  group_by(Cluster) %>%
+  summarize(DI_cluster_mean = mean(DI)) %>%
+  arrange(desc(DI_cluster_mean)) %>%
+  write.csv(paste0(loc, "dissimilarity/output/stats/mean_cluster_DI.csv"), 
+            row.names = F)
+```
+
+##### Set up model and create label function
+
+```{r}
+di_curve <- di %>% 
+  left_join(pred_full, by = c("Cluster", "ID", "Month")) %>% 
+  filter(!is.na(mean))
+
+lm_eqn <- function(df){
+  m <- lm(y ~ x, df);
+  eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2, 
+                   list(a = format(unname(coef(m)[1]), digits = 2),
+                        b = format(unname(coef(m)[2]), digits = 2),
+                        r2 = format(summary(m)$r.squared, digits = 3)))
+  as.character(as.expression(eq));
+}
+
+```
+
+##### Convert to simple data frame
+
+No interesting result.
+
+```{r}
+df <- di_curve %>% dplyr::select(y = var, x = DI)
+
+di_curve %>%
+  filter(!ID == "USOWC") %>%
+  ggplot(aes(DI, var)) +
+  geom_point() +
+  geom_smooth(method = 'lm', se = FALSE) +
+  # geom_text(x = 0.2, y = 6000, label = lm_eqn(df), parse = TRUE, size = 5) +
+  labs(y = expression(atop("Extraplation Variance", "(nmol m"^{-2}*" s"^{-1}*")"))) +
+  my_theme
+ggsave(paste0(loc, "dissimilarity/di_vs_variance.png", sep = ""),
+       width = 14, height = 12, units = c("cm"), dpi = 300)
+
+summary(lm(y ~ x, data = df))
 ```
 
 
