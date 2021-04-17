@@ -31,6 +31,7 @@ library(proxy)
 library(vegan)
 library(rworldmap)
 library(rgdal)
+library(VGAM)
 # source(paste(loc, "dissimilarity/rplots/import_libraries.r", sep=  "")) update this with all libraries
 source("code/ggplot_theme.R")
 source("code/fit_all_pairs.R")
@@ -4877,7 +4878,7 @@ write.csv(worldclim, paste(loc, "mc/extracted/worldclim_sd.csv", sep = ""), row.
 
 ```{r}
 data <- read.csv(paste(loc, "training-data/final.csv", sep = "")) %>% 
-  dplyr::select(Cluster, ID, Year, Month, Week, FCH4, FCH4_F_UNC, TA, TA_LAG2, canopyht, wc_mtdq,  wc_pwtm, EVI_LAG3)
+  dplyr::select(Cluster, ID, Year, Month, Week, FCH4, FCH4_UNC, TA, TA_LAG2, canopyht, wc_mtdq,  wc_pwtm, EVI_LAG3)
 head(data)
 ```
 ##### Read in standard deviations (static uncertainties)
@@ -4905,7 +4906,7 @@ data <- data %>%
 set.seed(23)
 data1 <- data %>% 
   rowwise() %>% 
-  mutate(FCH4_mc = list(rnorm(1000, mean = FCH4, sd = FCH4_F_UNC)),
+  mutate(FCH4_mc = list(rlaplace(1000, location = FCH4, scale = FCH4_UNC/2)),
          TA_mc = list(rnorm(1000, mean = TA, sd = 0.5)),
          TA_LAG2_mc = list(rnorm(1000, mean = TA_LAG2, sd = 0.5)),
          EVI_LAG3_mc = list(rnorm(1000, mean = EVI_LAG3, sd = 0.015)),
@@ -5051,13 +5052,12 @@ for(i in 1:500){
   folds_index[[i]] <- x
 }
 
-head(data_old)
 for (i in 1:500) {
-  for (j in 1:length(folds_retained)){
+  for (j in 1:25){
     folds_index[[i]][[j]] <- data %>% 
       filter(mc_i == i) %>% 
       mutate(index = 1:n()) %>% 
-      filter(!Cluster == folds_retained[[i]][j]) %>% 
+      filter(!Cluster == folds_retained[[i]]$value[j]) %>% 
       dplyr::select(index) %>% 
       pull()
   }
@@ -5085,7 +5085,7 @@ tgrid <- expand.grid(
 )
 
 rf_model <- list()
-for (i in 85:500) {
+for (i in 1:500) {
     
     ## Create trainControl object
     myControl <- trainControl(
@@ -5162,91 +5162,38 @@ data_test <- readRDS(paste0(loc, "mc/data/1000mc_500bs_heldout.rds"))
 rf.pred <- list()
 for (i in 1:length(rf_model)) {
   rf.pred[[i]] <- data_test %>% 
-    filter(mc_i == i) %>%   
+    filter(!ID == "USOWC",
+           mc_i == i) %>%   
     mutate(FCH4P = predict(rf_model[[i]], .),
-           index = 1:n())
+           index = 1:n(),
+           cluster_drop = cluster.drop[i])
 }
 rf.pred.all <- bind_rows(rf.pred)
-str(rf.pred.all)
-head(rf.pred.all)
 
-cluster.drop[1:32]
+write.csv(rf.pred.all, paste0(loc, "mc/predictions/rf_mc.csv"))
 ```
 
-# look at pred vs obs
+##### Look at pred vs obs
 
 ```{r}
-class_col_vector <- rep(c("#E78AC3","#F1E2CC","#33A02C","#377EB8","#E41A1C","#999999"),10)
-
 rf.pred.all %>% 
-  filter(mc_i %in% c(1:32)) %>%
+  arrange(cluster_drop) %>% 
+  filter(mc_i %in% c(1:26)) %>%
   ggplot(aes(FCH4, FCH4P)) +
   # stat_binhex(aes(fill=log(..count..))) +
   geom_point() +
-  geom_abline(slope = 1, color = 'white') +
-  facet_wrap(~mc_i) +
+  geom_abline(slope = 1, color = 'dark red') +
+  facet_wrap(~mc_i, scales = 'free') +
   # scale_x_continuous(limits = c(0,1000)) +
   # scale_y_continuous(limits = c(0,1000)) +
   xlab(label = expression("FCH4 (nmol m"^{-2}*" s"^{-1}*")")) +
   ylab(label = expression("FCH4P (nmol m"^{-2}*" s"^{-1}*")")) +
   my_theme
-ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Monte Carlo/predictions/201009_rf_mc_12b_nocanopyht.png", sep = ""),
+ggsave(paste0(loc, "mc/predictions/rf_mc_heldout.png", sep = ""),
        width = 24, height = 24, units = c("cm"), dpi = 300)
 ```
 
 
-
-# Drop bias correction because seems to have very minor effect and not easy to grid
-# try bias correction
-splinemod <- smooth.spline(y=rf.pred.all$FCH4, x=rf.pred.all$FCH4P, spar = 2)
-# plot(rf.pred.all$FCH4P[1:10000],rf.pred.all$FCH4[1:10000], xlim = c(0,500), ylim = c(0,500))
-# abline(0,1,col = 'blue')
-# lines(splinemod, col="red", lwd=3)
-
-saveRDS(splinemod, "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Monte Carlo/predictions/201009_rf_mc_spline_nocanopyht.rds")
-
-# get bias corrected predictions
-FCH4P_cor <- predict(splinemod, rf.pred.all$FCH4P)
-FCH4P_cor <- FCH4P_cor$y
-rf.pred.all <- cbind(rf.pred.all, FCH4P_cor)
-
-# look at pred vs obs
-rf.pred.all %>% 
-  filter(mc_i %in% c(1:12)) %>%
-  ggplot(aes(FCH4, FCH4P_cor)) +
-  # stat_binhex(aes(fill=log(..count..))) +
-  geom_point() +
-  geom_abline(slope = 1, color = 'white') +
-  facet_wrap(~mc_i) +
-  # scale_x_continuous(limits = c(0,1000)) +
-  # scale_y_continuous(limits = c(0,1000)) +
-  xlab(label = expression("FCH4 (nmol m"^{-2}*" s"^{-1}*")")) +
-  ylab(label = expression("FCH4P Bias Cor. (nmol m"^{-2}*" s"^{-1}*")")) +
-  mytheme
-ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Monte Carlo/predictions/201009_rf_mc_12b_bias_cor_nocanopyht.png", sep = ""),
-       width = 24, height = 24, units = c("cm"), dpi = 300)
-
-write.csv(rf.pred.all, "/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Monte Carlo/predictions/201009_rf_mc_pred_nocanopyht.csv",
-          row.names = FALSE)
-
-# experiment and date
-tune_r2s %>% 
-  ggplot(aes(min.node.size, R2, col = factor(mtry))) +
-  geom_line() +
-  scale_x_log10() +
-  facet_wrap(~fold) +
-  mytheme
-ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Monte Carlo/predictions/tune_r2.pdf",
-       width = 20, height = 20, units = c("cm"), dpi = 300)
-
-tune_MAEs %>% 
-  ggplot(aes(min.node.size, MAE, col = factor(mtry))) +
-  geom_line() +
-  scale_x_log10() +
-  facet_wrap(~fold) +
-  mytheme
-ggsave("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Monte Carlo/predictions/tune_mae.pdf",
-       width = 20, height = 20, units = c("cm"), dpi = 300)
 
 
 
