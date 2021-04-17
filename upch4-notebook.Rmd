@@ -212,6 +212,7 @@ head(one_site)
 ##### Get FLUXNET-CH4 site names:
 
 ```{r}
+files <- list.files(paste0(loc, "fluxnet-ch4-data/hh/"))
 site.names <- paste( substr(files, 5, 6), substr(files, 8, 10), sep = "")
 ```
 
@@ -339,6 +340,17 @@ hh <- lapply(hh, compute_uv)
 
 head(hh[[1]]) # check it worked
 ```
+##### Merge Random and Gap-filling uncertainty columns before taking mean 
+
+```{r}
+for (i in 1:length(hh)){
+    hh[[i]] <- hh[[i]] %>% 
+      mutate(FCH4_UNC = ifelse(is.na(FCH4_F_RANDUNC), FCH4_F_ANNOPTLM_UNC, FCH4_F_RANDUNC)) %>% 
+      dplyr::select(-FCH4_F_RANDUNC, -FCH4_F_ANNOPTLM_UNC)
+}
+head(hh[[1]])
+```
+
 
 ##### Compute weekly means of everything, including vector average WD and speed, excluding precip. (sums)
 
@@ -419,7 +431,7 @@ head(weekly_flat)
 
 Notes on variable selection:
 
-  + Total FCH4 uncertainty `FCH4_F_UNC` is random `FCH4_F_RANDUNC` and gap-filling `FCH4_F_ANNOPTLM_UNC` uncertainty summed in quadrature. I also drop the `FCH4_F_ANNOPTLM_QC` Quality control flag because I implement a stricter filtering criteria later of at least one observed flux per day.
+  + Total FCH4 uncertainty `FCH4_F_UNC` is the average of the weekly random `FCH4_F_RANDUNC` and gap-filling `FCH4_F_ANNOPTLM_UNC` uncertainty. I also drop the `FCH4_F_ANNOPTLM_QC` Quality control flag because I implement a stricter filtering criteria later of at least one observed flux per day.
   + The output of the daytime method `_DT` is used for gross primary production (GPP) and ecosystem respiration (RECO). Although both methods are subject to bias due to light-inhibition of leaf respiration, [Keenan et al. 2019](https://doi.org/10.1038/s41559-019-0809-2) show that the biases for the DT method only impact night-time respiration, but did not impact apparent photosynthesis or daytime respiration.
   + LE and NEE were gap-filled according to [Knox et al. 2019](10.1175/BAMS-D-18-0268.1) - same overall method to FCH4.
   + Other micro-meteorology (e.g., PPFD_IN) was gap-filled using ERA interim data (see [Delwiche et al.](10.5194/essd-2020-307)).
@@ -428,9 +440,9 @@ Notes on variable selection:
 
 ```{r}
 weekly_subset <- weekly_flat %>% 
-  mutate(FCH4_F_UNC = sqrt(FCH4_F_ANNOPTLM_UNC^2 + FCH4_F_RANDUNC^2)) %>% 
+  mutate(FCH4_UNC = FCH4_UNC) %>% 
   dplyr::select(ID, Year, Month, Week,    # descriptive data
-         FCH4 = FCH4_F_ANNOPTLM, FCH4_F_UNC, imputed,   # methane fluxes
+         FCH4 = FCH4_F_ANNOPTLM, FCH4_UNC, imputed,   # methane fluxes
          NEE = NEE_F_ANNOPTLM,  GPP = GPP_DT, RECO = RECO_DT,  # ecosystem C fluxes
          PPFD_IN = PPFD_IN_F, SW_IN = SW_IN_F, LW_IN = LW_IN_F, NETRAD = NETRAD_F,   # radiation
          LE = LE_F_ANNOPTLM, H = H_F,  # ecosystem energy fluxes
@@ -2372,7 +2384,7 @@ str(all_data)
 ```{r}
 all_data %>% 
    dplyr::select(-`Site.Name`, -`Data.Policy`, -Country, -IGBP, -`Site.Classification`, -DOI,  -`DOI.Reference`, -`Site.Personnel`, 
-                -`Upland.Class`, -`Base.File.Host`, -Upscaling, -FCH4, -FCH4_F_UNC, -imputed) %>% 
+                -`Upland.Class`, -`Base.File.Host`, -Upscaling, -FCH4, -FCH4_UNC, -imputed) %>% 
   group_by(ID) %>% 
   summarize_all(list(~sum(is.na(.)) / n() )) %>% 
   write.csv(paste(loc, "training-data/missingness/predictor_missingness_weekly.csv", sep = ""), row.names = F)
@@ -2391,7 +2403,7 @@ all_data <- all_data %>%
 
 all_data_impute <- all_data %>% 
   dplyr::select(-ID, -`Site.Name`, -`Data.Policy`, -Country, -IGBP, -`Site.Classification`, -DOI,  -`DOI.Reference`, -`Site.Personnel`, 
-                -`Upland.Class`, -`Base.File.Host`, -Upscaling, -FCH4, -FCH4_F_UNC, -imputed) 
+                -`Upland.Class`, -`Base.File.Host`, -Upscaling, -FCH4, -FCH4_UNC, -imputed) 
 
 impute_names <- all_data_impute %>% names()
 
@@ -2407,7 +2419,7 @@ all_data[impute_names] <- all_data_impute_pp
 ```{r}
 all_data %>% 
    dplyr::select(-`Site.Name`, -`Data.Policy`, -Country, -IGBP, -`Site.Classification`, -DOI,  -`DOI.Reference`, -`Site.Personnel`,
-                -`Upland.Class`, -`Base.File.Host`, -Upscaling, -FCH4, -FCH4_F_UNC, -imputed) %>%
+                -`Upland.Class`, -`Base.File.Host`, -Upscaling, -FCH4, -FCH4_UNC, -imputed) %>%
   group_by(ID) %>%
   summarize_all(list(~sum(is.na(.)) / n() )) %>% 
   write.csv(paste(loc, "training-data/missingness/predictor_missingness_after_impute_weekly.csv", sep = ""), row.names = F)
