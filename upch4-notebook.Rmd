@@ -32,6 +32,8 @@ library(vegan)
 library(rworldmap)
 library(rgdal)
 library(VGAM)
+library(rnaturalearth)
+library(rnaturalearthdata)
 # source(paste(loc, "dissimilarity/rplots/import_libraries.r", sep=  "")) update this with all libraries
 source("code/ggplot_theme.R")
 source("code/fit_all_pairs.R")
@@ -2770,7 +2772,7 @@ write.csv(all_data, paste(loc, "/training-data/all_data.csv", sep = ""), row.nam
 names(all_data)[21:ncol(all_data)] %>% write.csv(paste(loc, "/training-data/list_of_predictors.csv", sep = ""))
 ```
 
-#### 6. Forward Feature Selection
+#### 6. Forward Feature Selection (+clustering)
 
 ##### Read in data and remove upland class
 
@@ -2866,6 +2868,72 @@ write.csv(cluster_bycluster, paste(loc, "/training-data/clusters/cluster_byclust
 ```
 
 ##### Output training data (with clusters)
+
+
+##### Visualize clusters on global map
+
+```{r}
+# ggplot theme
+theme_map <- theme_bw() +
+  theme(panel.border = element_blank(),
+        axis.title=element_text(size=14), axis.text=element_text(size=14),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_blank(),
+        legend.position = "none",
+        strip.text = element_text(face="bold", size=10),
+        strip.background = element_rect(fill='white', colour='white',size=1))
+
+# get cluster stats
+cluster_count <- read.csv(paste0(loc, "training-data/clusters/cluster_bycluster.csv")) %>% 
+  st_as_sf(coords = c("Longitude", "Latitude"))
+
+# get WAD2M
+raster.names <- list.files(paste0(loc, "grids/WAD2M/"), pattern = "nc$", full.names = F)
+stack <- stack(paste0(loc, "grids/WAD2M/", raster.names[1]))
+
+# get maximum wetland extent (August)
+max <- stack[[8]]
+
+# convert to spatial dataframe
+max_spdf <- as(max, "SpatialPixelsDataFrame")
+max_df <- as.data.frame(max_spdf)
+colnames(max_df) <- c("value", "x", "y")
+
+st_crs(cluster_count) <- 4236
+
+# get colors
+col_vector <-  c("#E78AC3","#F1E2CC","#33A02C","#377EB8","#E41A1C","#999999")
+
+# load worldmap
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+world <- map_data("world")
+
+ggplot() +
+  geom_polygon(data = world, aes(x = long, y = lat, group = group), fill = 'light grey') +
+  geom_raster(data=max_df, aes(x=x, y=y, fill = log10(value)), alpha=1) +
+  geom_sf(data = cluster_count, aes(color = factor(Class), size = percent), alpha = 0.9) + 
+  xlab(NULL) + ylab(NULL) +
+  scale_color_manual(values = col_vector) +
+  # scale_shape_manual(values = c(15,16,21,22,25)) +
+  scale_fill_gradient2(name = "WAD2M Wetlands (%)",
+                       limits = c(-3,2),
+                       labels = c(0.001,0.01,0.1,1,10,100),
+                       low = "light grey",
+                       mid = "light grey",
+                      midpoint = log10(0.001),
+                      high = "black",
+                      space = "Lab",
+                      na.value = "light grey",
+                      guide = "colourbar") +
+  ggtitle("LOOCV Clusters", subtitle = paste0("(43 sites in ", length(unique(cluster_count$Cluster))," clusters)")) + 
+  theme_map +
+  theme(legend.position = 'right',
+        legend.direction = 'vertical')
+ggsave(paste0(loc, "training-data/clusters/clusters_map.png"),
+       width = 24, height = 20, units = c("cm"), dpi = 900)
+```
 
 ```{r}
 write.csv(all_data, paste(loc, "training-data/final.csv", sep  = ""), row.names = F)
