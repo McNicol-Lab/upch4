@@ -3569,8 +3569,8 @@ ungroup(rf.pred.all) %>%
         axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
   ylab(label = expression("Error (nmol m"^{-2}*" s"^{-1}*")")) +
   scale_fill_manual(values = class_col_vector) 
-ggsave(paste(loc, "predictions/cv/residuals_error.pdf", sep = ""),
-       width = 13, height = 9, units = c("cm"), dpi = 300)
+ggsave(paste(loc, "predictions/cv/residuals_error.png", sep = ""),
+       width = 13, height = 15, units = c("cm"), dpi = 300)
 ```
 
 ###### Global Metrics
