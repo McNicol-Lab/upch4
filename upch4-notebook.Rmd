@@ -6369,7 +6369,6 @@ ggsave(paste0(loc, "dissimilarity/figures/error_vs_DI.png"),
 
 
 #### 11. Upscaling
-
 ##### Create Forcing Data
 
 ```{r}
@@ -6446,5 +6445,62 @@ month_index <- bind_cols(digit1 = digit1, digit2 = digit2, digit3 = digit3) %>% 
 for(i in 1:216){
   writeRaster(upscaling_stack[[i]], paste0(loc, "grids/ffs/forcing/forcing_", month_index$index[i], ".nc"),format = "CDF", overwrite = T)
 }
+```
+
+
+#### 11. (cont.) Upscaling Evaluation 
+
+##### Visualize Bootstrap Timeseries
+
+```{r}
+data <- read.csv(paste0(loc, "upscaling-output-raw/sums/boot_sum_TgCH4month_m1.csv")) %>% dplyr::select(2:5)
+
+head(data)
+
+data %>% 
+  group_by(t) %>% 
+  summarize(boot_mean = mean(sum_TgCH4month)) %>% head(30)
+
+
+nmol <- stack(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_nmolm2sec.nc"))
+plot(nmol[[1:12]])
+
+gc <- stack(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_gCm2day.nc"))
+plot(gc[[1:12]])
+
+mgch4 <- stack(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_mgCH4m2day_Aw.nc"))
+plot(mgch4[[1:12]])
+
+tgch4 <- nc_open(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_TgCH4month_Aw.nc"))
+tgch4_sd <- ncvar_get(tgch4, "sd_ch4")
+
+lon <- ncvar_get(tgch4, "longitude")
+lat <- ncvar_get(tgch4, "latitude", verbose = F)
+t <- ncvar_get(tgch4, "Time")
+
+fillvalue <- ncatt_get(tgch4, "sd_ch4", "_FillValue")
+
+nc_close(tgch4) 
+
+tgch4_sd[tgch4_sd == fillvalue$value] <- NA
+
+tgch4_sd.slice <- tgch4_sd[, , 1] 
+
+r <- list()
+for(i in 1:216) {
+  r[[i]] <- raster(t(tgch4_sd[, , i]), xmn=min(lon), xmx=max(lon), ymn=min(lat), ymx=max(lat), crs=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs+ towgs84=0,0,0"))
+}
+
+r_stack <- stack(r)
+
+plot(r_stack[[1:12]])
+
+plot(tgch4_sd[[1:12]])
+
+
+sd_sums <- cellStats(r_stack[[1:12]], sum)
+
+plot(sums)
+
 ```
 
