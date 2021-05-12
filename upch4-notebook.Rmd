@@ -6489,6 +6489,98 @@ data %>%
   summarize(boot_mean = mean(sum_TgCH4month)) %>% head(30) 
 ```
 
+
+##### Get the upscaling grid predictions at each site
+
+```{r}
+# read in site locations
+sites <- read.csv(paste0(loc, "fluxnet-ch4-data/metadata/fluxnet-ch4-site-metadata.csv"))
+site.coords <- cbind(sites$Longitude,sites$Latitude)
+
+amflux.sites <- read.csv(paste0(loc, "fluxnet-ch4-data/metadata/ameriflux-validation-metadata.csv"))
+val.coords <- cbind(amflux.sites$Longitude,amflux.sites$Latitude)
+
+## read in etienne's nmol ensemble output
+nmol <- nc_open(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_nmolm2sec.nc"))
+  
+  attributes(nmol)
+
+  mean <- ncvar_get(nmol, "mean_ch4")
+  sd <- ncvar_get(nmol, "sd_ch4")
+  var <- ncvar_get(nmol, "var_ch4")
+  lon <- ncvar_get(nmol, "longitude")
+  lat <- ncvar_get(nmol, "latitude", verbose = F)
+  t <- ncvar_get(nmol, "Time")
+  nc_close(nmol)
+  
+  mean.yr <- list()
+  sd.yr <- list()
+  var.yr <- list()
+  for (j in 1:216) {
+    mean.yr[[j]] <- raster(t(mean[,,j]), xmn=min(lon), xmx=max(lon), ymn=min(lat), ymx=max(lat), crs=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs+ towgs84=0,0,0"))
+    sd.yr[[j]] <- raster(t(sd[,,j]), xmn=min(lon), xmx=max(lon), ymn=min(lat), ymx=max(lat), crs=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs+ towgs84=0,0,0"))
+    var.yr[[j]] <- raster(t(var[,,j]), xmn=min(lon), xmx=max(lon), ymn=min(lat), ymx=max(lat), crs=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs+ towgs84=0,0,0"))
+  }
+  mean.all <- stack(mean.yr)
+  sd.all <- stack(sd.yr)
+  var.all <- stack(var.yr)
+  
+  # extract data at sites
+  mean_nmol.site <- as_tibble(raster::extract(mean.all, site.coords))
+  mean_nmol.val <- as_tibble(raster::extract(mean.all, val.coords))
+  sd_nmol.site <- as_tibble(raster::extract(sd.all, site.coords))
+  sd_nmol.val <- as_tibble(raster::extract(sd.all, val.coords))
+
+  # join to site tables
+  mean_nmol.site <- cbind(sites, mean_nmol.site)
+  mean_nmol.val <- cbind(amflux.sites, mean_nmol.val)
+  sd_nmol.site <- cbind(sites, sd_nmol.site)
+  sd_nmol.val <- cbind(amflux.sites, sd_nmol.val)
+  
+  # gather into long files
+  months <- rep(c(rep(1:12, each = 81)), 18) # 18 years x 12 months x 81 sites
+  years <- c(rep(2001:2018, each = 12*81)) # 
+  length(months) == length(years)
+
+  mean_nmol.site <- mean_nmol.site %>% 
+    gather(key = "layer", value = "mean_FCH4P_grid_nmol", 15:230) %>% 
+    mutate(Year = years,
+           Month = months) %>% 
+    dplyr::select(1:14, Year, Month, mean_FCH4P_grid_nmol)
+  
+  sd_nmol.site <- sd_nmol.site %>% 
+    gather(key = "layer", value = "sd_FCH4P_grid_nmol", 15:230) %>% 
+    mutate(Year = years,
+           Month = months) %>% 
+    dplyr::select(ID, Year, Month, sd_FCH4P_grid_nmol)
+  
+  nmol.site <- mean_nmol.site %>% left_join(sd_nmol.site)
+  
+  # gather into long files
+  months <- rep(c(rep(1:12, each = 7)), 18) # 18 years x 12 months x 7 sites
+  years <- c(rep(2001:2018, each = 12*7)) # 
+  length(months) == length(years)
+  
+   mean_nmol.val <- mean_nmol.val %>% 
+    gather(key = "layer", value = "FCH4P_grid_nmol", 5:220) %>% 
+    mutate(Year = years,
+           Month = months) %>% 
+    dplyr::select(1:4, Year, Month, FCH4P_grid_nmol)
+   
+   sd_nmol.val <- sd_nmol.val %>% 
+     gather(key = "layer", value = "sd_FCH4P_grid_nmol", 5:220) %>% 
+     mutate(Year = years,
+            Month = months) %>% 
+     dplyr::select(ID = Site.Id, Year, Month, sd_FCH4P_grid_nmol)
+   
+   nmol.val <- mean_nmol.val %>% left_join(sd_nmol.val)
+   
+write.csv(nmol.site, paste0(loc, "predictions/gridded/nmol/training-site-pred.csv"), row.names = F)
+write.csv(nmol.val, paste0(loc, "predictions/gridded/nmol/val-site-pred.csv"), row.names = F)
+
+```
+
+
 ##### 
 ```
 nmol <- stack(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_nmolm2sec.nc"))
