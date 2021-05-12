@@ -128,9 +128,11 @@ loc <- "/Volumes/Samsung_T5/Stanford/upch4_local/"
       + Tower Constituency
       + Extrapolation Errors
           - MC ML Model Training - Dissimilarity Only
-    11. Upscaling
+  11. Upscaling
+      + Prepare Grid Forcing Data
       + Run on Computing Cluster
           - Output Grids and Sums
+      + 
       + Product Evaluation
           - Unweighted Wetland Fluxes (nmol)
           - Weighted Sums and Uncertainties (Tg)
@@ -5404,7 +5406,7 @@ di_curve %>%
   # geom_text(x = 0.2, y = 6000, label = lm_eqn(df), parse = TRUE, size = 5) +
   labs(y = expression(atop("Extraplation Variance", "(nmol m"^{-2}*" s"^{-1}*")"))) +
   my_theme
-ggsave(paste0(loc, "dissimilarity/di_vs_variance.png", sep = ""),
+ggsave(paste0(loc, "dissimilarity/figures/di_vs_variance.png", sep = ""),
        width = 14, height = 12, units = c("cm"), dpi = 300)
 
 summary(lm(y ~ x, data = df))
@@ -6084,6 +6086,11 @@ rm("all_stack")
 ##### Create Global DI dataframe
 
 ```{r}
+monthly_global_DI <- list()
+for(i in 1:12){
+monthly_global_DI[[i]] <- read.csv(paste0(loc, "dissimilarity/output/stats/all_monthly_global_DI",i,".csv"))
+}
+
 monthly_global_DI <- bind_rows(monthly_global_DI)
 
 monthly_global_DI_subset <- list()
@@ -6194,7 +6201,7 @@ monthly_global_DI %>%
   labs(x = "Global Cover (%)", y = "Dissimilarity Index") +
   my_theme
 ggsave(paste0(loc, "dissimilarity/figures/all_constituency_size_DI.png"),
-       width = 10, height = 8, units = c("cm"), dpi = 300)
+       width = 15, height = 12, units = c("cm"), dpi = 300)
 ```
 
 ##### Figure of the rank of DI coverages (annual by ID)
@@ -6293,6 +6300,7 @@ all_sites_DI_plot <- all_sites_DI %>%
 
 xlabels <- c(as.character(all_sites_DI_plot$ID))
 
+# note that DI in this plot includes year-round conditions (including winter in Arctic when wetlands frozen)
 all_sites_DI_plot %>% 
   ggplot(aes(x = order, y =  DI)) +
   geom_segment(aes(x = order, xend = order, y = 0, yend = DI), color = 'grey', stat = "identity") +
@@ -6304,6 +6312,30 @@ all_sites_DI_plot %>%
   my_theme +
   theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.line.y = element_blank())
 ggsave(paste0(loc, "dissimilarity/figures/all_site_mean_DI.png"),
+       width = 20, height = 25, units = c("cm"), dpi = 300)
+
+all_sites_DI_plot <- all_sites_DI %>% 
+  filter(Month %in% c(6,7,8)) %>% 
+  mutate(ID = as.factor(ID)) %>% 
+  group_by(ID) %>% 
+  summarize(DI = mean(DI)) %>% 
+  arrange(DI) %>% 
+  mutate(order = row_number())
+
+xlabels <- c(as.character(all_sites_DI_plot$ID))
+
+# this plot includes only growing season conditions (June-August)
+all_sites_DI_plot %>% 
+  ggplot(aes(x = order, y =  DI)) +
+  geom_segment(aes(x = order, xend = order, y = 0, yend = DI), color = 'grey', stat = "identity") +
+  geom_point(size = 4) + 
+  geom_label(aes(x=order, y=0.015, label = xlabels), hjust=1.3, label.size = 0) +
+  # scale_x_discrete(breaks = all_sites_mean_DI_all_plot$order, labels = xlabels) +
+  coord_flip() +
+  ylab("Overall Mean Network Dissimilarity") +
+  my_theme +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.line.y = element_blank())
+ggsave(paste0(loc, "dissimilarity/figures/all_site_mean_DI_growing_season.png"),
        width = 20, height = 25, units = c("cm"), dpi = 300)
 
 
@@ -6349,23 +6381,12 @@ site_month_DI %>%
   right_join(site_month_metrics, by = c("ID", "Month")) %>% 
   ggplot(aes(DI, MAE)) +
   geom_point() +
+  geom_smooth(method = 'lm', se = FALSE) +
+  scale_y_continuous(limits = c(0,300)) +
   my_theme
 ggsave(paste0(loc, "dissimilarity/figures/error_vs_DI.png"),
-       width = 20, height = 20, units = c("cm"), dpi = 300)
+       width = 15, height = 12, units = c("cm"), dpi = 300)
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 #### 11. Upscaling
@@ -6448,20 +6469,27 @@ for(i in 1:216){
 ```
 
 
+
+#### 11. (cont.) Upscaling: INSERT CLUSTER COMPUTING CODE (Etienne) 
+
+
 #### 11. (cont.) Upscaling Evaluation 
 
-##### Visualize Bootstrap Timeseries
+##### Individual Bootstrap Sums 
 
 ```{r}
 data <- read.csv(paste0(loc, "upscaling-output-raw/sums/boot_sum_TgCH4month_m1.csv")) %>% dplyr::select(2:5)
 
 head(data)
 
+# check that bootstrap mean equals Tg grids
 data %>% 
   group_by(t) %>% 
-  summarize(boot_mean = mean(sum_TgCH4month)) %>% head(30)
+  summarize(boot_mean = mean(sum_TgCH4month)) %>% head(30) 
+```
 
-
+##### 
+```
 nmol <- stack(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_nmolm2sec.nc"))
 plot(nmol[[1:12]])
 
@@ -6472,33 +6500,33 @@ mgch4 <- stack(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_mgCH4m2day_A
 plot(mgch4[[1:12]])
 
 tgch4 <- nc_open(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_TgCH4month_Aw.nc"))
-tgch4_sd <- ncvar_get(tgch4, "sd_ch4")
+tgch4_mean <- ncvar_get(tgch4, "mean_ch4")
 
 lon <- ncvar_get(tgch4, "longitude")
 lat <- ncvar_get(tgch4, "latitude", verbose = F)
 t <- ncvar_get(tgch4, "Time")
 
-fillvalue <- ncatt_get(tgch4, "sd_ch4", "_FillValue")
+fillvalue <- ncatt_get(tgch4, "mean_ch4", "_FillValue")
 
 nc_close(tgch4) 
 
-tgch4_sd[tgch4_sd == fillvalue$value] <- NA
+tgch4_sd[tgch4_mean == fillvalue$value] <- NA
 
 tgch4_sd.slice <- tgch4_sd[, , 1] 
 
 r <- list()
-for(i in 1:216) {
-  r[[i]] <- raster(t(tgch4_sd[, , i]), xmn=min(lon), xmx=max(lon), ymn=min(lat), ymx=max(lat), crs=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs+ towgs84=0,0,0"))
+for(i in 1) {
+  r[[i]] <- raster(t(tgch4_mean[, , 2]), xmn=min(lon), xmx=max(lon), ymn=min(lat), ymx=max(lat), crs=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs+ towgs84=0,0,0"))
 }
 
 r_stack <- stack(r)
 
-plot(r_stack[[1:12]])
+plot(r_stack[[1]])
 
 plot(tgch4_sd[[1:12]])
 
 
-sd_sums <- cellStats(r_stack[[1:12]], sum)
+sums <- cellStats(r_stack[[1]], sum)
 
 plot(sums)
 
