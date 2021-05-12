@@ -6420,7 +6420,7 @@ EVI_LAG3 <- stack(paste0(loc, 'grids/ffs/EVI_LAG3.nc')) %>% crop(com_ext)
 ##### Look at grids QC
 
 ```{r}
-plot(EVI_LAG3[[7]])
+plot(EVI_LAG3[7]])
 ```
 
 
@@ -6495,10 +6495,10 @@ data %>%
 ```{r}
 # read in site locations
 sites <- read.csv(paste0(loc, "fluxnet-ch4-data/metadata/fluxnet-ch4-site-metadata.csv"))
-site.coords <- cbind(sites$Longitude,sites$Latitude)
+site.coords <- cbind(sites$Longitude, sites$Latitude)
 
 amflux.sites <- read.csv(paste0(loc, "fluxnet-ch4-data/metadata/ameriflux-validation-metadata.csv"))
-val.coords <- cbind(amflux.sites$Longitude,amflux.sites$Latitude)
+val.coords <- cbind(amflux.sites$Longitude, amflux.sites$Latitude)
 
 ## read in etienne's nmol ensemble output
 nmol <- nc_open(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_nmolm2sec.nc"))
@@ -6562,10 +6562,10 @@ nmol <- nc_open(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_nmolm2sec.n
   length(months) == length(years)
   
    mean_nmol.val <- mean_nmol.val %>% 
-    gather(key = "layer", value = "FCH4P_grid_nmol", 5:220) %>% 
+    gather(key = "layer", value = "mean_FCH4P_grid_nmol", 5:220) %>% 
     mutate(Year = years,
            Month = months) %>% 
-    dplyr::select(1:4, Year, Month, FCH4P_grid_nmol)
+    dplyr::select(ID = Site.Id, 2:4, Year, Month, mean_FCH4P_grid_nmol)
    
    sd_nmol.val <- sd_nmol.val %>% 
      gather(key = "layer", value = "sd_FCH4P_grid_nmol", 5:220) %>% 
@@ -6580,11 +6580,438 @@ write.csv(nmol.val, paste0(loc, "predictions/gridded/nmol/val-site-pred.csv"), r
 
 ```
 
+##### Compare grid predictions at individual training sites 
 
-##### 
+```{r}
+site.pred <- read.csv(paste0(loc, "predictions/gridded/nmol/training-site-pred.csv"))
+
+# select what we need
+site.pred <- site.pred %>% 
+  dplyr::select(ID, Year, Month, mean_FCH4P = mean_FCH4P_grid_nmol, sd_FCH4P = sd_FCH4P_grid_nmol) %>% 
+  group_by(ID, Month) %>% 
+  summarize(mean_FCH4P = mean(mean_FCH4P, na.rm=T),
+            sd_FCH4P = mean(sd_FCH4P, na.rm=T)) 
 ```
+
+###### Read in training site data and get monthly means 
+
+```{r}
+train <- readRDS(paste0(loc, "/mc/data/1000mc_500bs.rds")) %>% 
+  dplyr::select(ID, Year, Month, Week, FCH4, FCH4_UNC) %>% 
+  mutate(ID = paste(substr(ID, 1, 2), substr(ID, 3, 5), sep = "-")) 
+
+train.monthly <- train %>% 
+  group_by(ID, Year, Month) %>% 
+  summarize(mean_FCH4 = mean(FCH4, na.rm = T),
+            sd_FCH4 = mean(FCH4_UNC, na.rm = T))
+
+# join- and remove erroneous RU-COK data above 50 nmol m-2 s-1 
+train.pred <- train.monthly %>% left_join(site.pred) %>% 
+  dplyr::select(ID, Year, Month, everything()) 
+```
+```{r}
+# bog
+train.pred %>% 
+  group_by(ID) %>% 
+  mutate(Month_dec = Month/12,
+         Year_dec = Year+Month_dec) %>% 
+  filter(ID %in% c("BRNpw")) %>%
+  ggplot(aes(x = Year_dec)) +
+  geom_vline(xintercept = c(2011:2016), color = 'grey70', linetype = 'dashed') +
+  geom_ribbon(aes(ymin = mean_FCH4 - sd_FCH4, ymax = mean_FCH4 + sd_FCH4)) + # add observations
+  geom_line(aes(y = mean_FCH4), size = 0.5) +
+  geom_point(aes(y = mean_FCH4), shape = 21, fill = "white") +
+  geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P), alpha = 0.1) + # add predictions
+  geom_line(aes(y = mean_FCH4P), size = 0.5, alpha = 0.3) +
+  facet_wrap(~ID, ncol= 2, scales = "free") +
+  my_theme +
+  labs(x= "Year", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) 
+ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Predictions/Gridded/nmol_summary/figures/",today,"_bog.png", sep = ""),
+       width = 18, height = 20, units = c("cm"), dpi = 300)
+```
+
+
+
+# interesting bog
+train.pred %>% 
+  group_by(ID) %>% 
+  mutate(Month_dec = Month/12,
+         Year_dec = Year+Month_dec) %>% 
+  filter(ID %in% c("NZ-KOP")) %>%
+  ggplot(aes(x = Year_dec)) +
+  geom_vline(xintercept = c(2012:2016), color = 'grey70', linetype = 'dashed') +
+  geom_ribbon(aes(ymin = mean_FCH4 - sd_FCH4, ymax = mean_FCH4 + sd_FCH4)) + # add observations
+  geom_line(aes(y = mean_FCH4), size = 0.5) +
+  geom_point(aes(y = mean_FCH4), shape = 21, fill = "white") +
+  geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P, fill = factor(member)), alpha = 0.1) + # add predictions
+  geom_line(aes(y = mean_FCH4P, color = factor(member)), size = 0.5, alpha = 0.3) +
+  facet_wrap(~ID, ncol= 2, scales = "free") +
+  scale_color_manual(values = rep(c("dark blue", "dark red"), 4)) +
+  scale_fill_manual(values = rep("grey70", 8)) +
+  mytheme +
+  labs(x= "Year", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) 
+ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Predictions/Gridded/nmol_summary/figures/",today,"_interesting_bog.png", sep = ""),
+       width = 12, height = 10, units = c("cm"), dpi = 300)
+
+
+# fen
+train.pred %>% 
+  group_by(ID) %>% 
+  mutate(Month_dec = Month/12,
+         Year_dec = Year+Month_dec) %>% 
+  filter(Class %in% c("Fen")) %>%
+  ggplot(aes(x = Year_dec)) +
+  geom_vline(xintercept = c(2007:2018), color = 'grey70', linetype = 'dashed') +
+  geom_ribbon(aes(ymin = mean_FCH4 - sd_FCH4, ymax = mean_FCH4 + sd_FCH4)) + # add observations
+  geom_line(aes(y = mean_FCH4), size = 0.5) +
+  geom_point(aes(y = mean_FCH4), shape = 21, fill = "white") +
+  geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P, fill = factor(member)), alpha = 0.1) + # add predictions
+  geom_line(aes(y = mean_FCH4P, color = factor(member)), size = 0.5, alpha = 0.3) +
+  facet_wrap(~ID, ncol= 2, scales = "free") +
+  scale_color_manual(values = rep(c("dark blue", "dark red"), 4)) +
+  scale_fill_manual(values = rep("grey70", 8)) +
+  mytheme +
+  labs(x= "Year", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) 
+ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Predictions/Gridded/nmol_summary/figures/",today,"_fen.png", sep = ""),
+       width = 18, height = 20, units = c("cm"), dpi = 300)
+
+# interesting fen
+train.pred %>% 
+  group_by(ID) %>% 
+  mutate(Month_dec = Month/12,
+         Year_dec = Year+Month_dec) %>% 
+  filter(ID %in% c("FI-LOM")) %>%
+  ggplot(aes(x = Year_dec)) +
+  geom_vline(xintercept = c(2006:2011), color = 'grey70', linetype = 'dashed') +
+  geom_ribbon(aes(ymin = mean_FCH4 - sd_FCH4, ymax = mean_FCH4 + sd_FCH4)) + # add observations
+  geom_line(aes(y = mean_FCH4), size = 0.5) +
+  geom_point(aes(y = mean_FCH4), shape = 21, fill = "white") +
+  geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P, fill = factor(member)), alpha = 0.1) + # add predictions
+  geom_line(aes(y = mean_FCH4P, color = factor(member)), size = 0.5, alpha = 0.3) +
+  facet_wrap(~ID, ncol= 2, scales = "free") +
+  scale_color_manual(values = rep(c("dark blue", "dark red"), 4)) +
+  scale_fill_manual(values = rep("grey70", 8)) +
+  mytheme +
+  labs(x= "Year", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) 
+ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Predictions/Gridded/nmol_summary/figures/",today,"_interesting_fen.png", sep = ""),
+       width = 12, height = 10, units = c("cm"), dpi = 300)
+
+
+# marsh
+train.pred %>% 
+  group_by(ID) %>% 
+  mutate(Month_dec = Month/12,
+         Year_dec = Year+Month_dec) %>% 
+  filter(Class %in% c("Marsh")) %>%
+  ggplot(aes(x = Year_dec)) +
+  geom_vline(xintercept = c(2010:2016), color = 'grey70', linetype = 'dashed') +
+  geom_ribbon(aes(ymin = mean_FCH4 - sd_FCH4, ymax = mean_FCH4 + sd_FCH4)) + # add observations
+  geom_line(aes(y = mean_FCH4), size = 0.5) +
+  geom_point(aes(y = mean_FCH4), shape = 21, fill = "white") +
+  geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P, fill = factor(member)), alpha = 0.1) + # add predictions
+  geom_line(aes(y = mean_FCH4P, color = factor(member)), size = 0.5, alpha = 0.3) +
+  facet_wrap(~ID, ncol= 2, scales = "free_y") +
+  scale_color_manual(values = rep(c("dark blue", "dark red"), 4)) +
+  scale_fill_manual(values = rep("grey70", 8)) +
+  mytheme +
+  labs(x= "Year", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) 
+ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Predictions/Gridded/nmol_summary/figures/",today,"_marsh.png", sep = ""),
+       width = 18, height = 20, units = c("cm"), dpi = 300)
+
+# interesting marsh
+train.pred %>% 
+  group_by(ID) %>% 
+  mutate(Month_dec = Month/12,
+         Year_dec = Year+Month_dec) %>% 
+  filter(ID %in% c("US-MYB")) %>%
+  ggplot(aes(x = Year_dec)) +
+  geom_vline(xintercept = c(2010:2018), color = 'grey70', linetype = 'dashed') +
+  geom_ribbon(aes(ymin = mean_FCH4 - sd_FCH4, ymax = mean_FCH4 + sd_FCH4)) + # add observations
+  geom_line(aes(y = mean_FCH4), size = 0.5) +
+  geom_point(aes(y = mean_FCH4), shape = 21, fill = "white") +
+  geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P, fill = factor(member)), alpha = 0.1) + # add predictions
+  geom_line(aes(y = mean_FCH4P, color = factor(member)), size = 0.5, alpha = 0.3) +
+  facet_wrap(~ID, ncol= 2, scales = "free_y") +
+  scale_color_manual(values = rep(c("dark blue", "dark red"), 4)) +
+  scale_fill_manual(values = rep("grey70", 8)) +
+  mytheme +
+  labs(x= "Year", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) 
+ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Predictions/Gridded/nmol_summary/figures/",today,"_interesting_marsh.png", sep = ""),
+       width = 12, height = 10, units = c("cm"), dpi = 300)
+
+# wet tundra
+train.pred %>% 
+  group_by(ID) %>% 
+  mutate(Month_dec = Month/12,
+         Year_dec = Year+Month_dec) %>% 
+  filter(Class %in% c("Wet tundra")) %>%
+  ggplot(aes(x = Year_dec)) +
+  geom_vline(xintercept = c(2010:2016), color = 'grey70', linetype = 'dashed') +
+  geom_ribbon(aes(ymin = mean_FCH4 - sd_FCH4, ymax = mean_FCH4 + sd_FCH4)) + # add observations
+  geom_line(aes(y = mean_FCH4), size = 0.5) +
+  geom_point(aes(y = mean_FCH4), shape = 21, fill = "white") +
+  geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P, fill = factor(member)), alpha = 0.1) + # add predictions
+  geom_line(aes(y = mean_FCH4P, color = factor(member)), size = 0.5, alpha = 0.3) +
+  facet_wrap(~ID, ncol= 2, scales = "free") +
+  scale_color_manual(values = rep(c("dark blue", "dark red"), 4)) +
+  scale_fill_manual(values = rep("grey70", 8)) +
+  mytheme +
+  labs(x= "Year", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) 
+ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Predictions/Gridded/nmol_summary/figures/",today,"_wet_tundra.png", sep = ""),
+       width = 18, height = 20, units = c("cm"), dpi = 300)
+
+# interesting wet tundra
+train.pred %>% 
+  group_by(ID) %>% 
+  mutate(Month_dec = Month/12,
+         Year_dec = Year+Month_dec) %>% 
+  filter(ID %in% c("US-IVO")) %>%
+  ggplot(aes(x = Year_dec)) +
+  geom_vline(xintercept = c(2013:2017), color = 'grey70', linetype = 'dashed') +
+  geom_ribbon(aes(ymin = mean_FCH4 - sd_FCH4, ymax = mean_FCH4 + sd_FCH4)) + # add observations
+  geom_line(aes(y = mean_FCH4), size = 0.5) +
+  geom_point(aes(y = mean_FCH4), shape = 21, fill = "white") +
+  geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P, fill = factor(member)), alpha = 0.1) + # add predictions
+  geom_line(aes(y = mean_FCH4P, color = factor(member)), size = 0.5, alpha = 0.3) +
+  facet_wrap(~ID, ncol= 2, scales = "free") +
+  scale_color_manual(values = rep(c("dark blue", "dark red"), 4)) +
+  scale_fill_manual(values = rep("grey70", 8)) +
+  mytheme +
+  labs(x= "Year", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) 
+ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Predictions/Gridded/nmol_summary/figures/",today,"_interesting_wet_tundra.png", sep = ""),
+       width = 12, height = 10, units = c("cm"), dpi = 300)
+
+# swamp 
+train.pred %>% 
+  group_by(ID) %>% 
+  mutate(Month_dec = Month/12,
+         Year_dec = Year+Month_dec) %>% 
+  filter(Class %in% c("Swamp")) %>%
+  ggplot(aes(x = Year_dec)) +
+  geom_vline(xintercept = c(2012:2016), color = 'grey70', linetype = 'dashed') +
+  geom_ribbon(aes(ymin = mean_FCH4 - sd_FCH4, ymax = mean_FCH4 + sd_FCH4)) + # add observations
+  geom_line(aes(y = mean_FCH4), size = 0.5) +
+  geom_point(aes(y = mean_FCH4), shape = 21, fill = "white") +
+  geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P, fill = factor(member)), alpha = 0.1) + # add predictions
+  geom_line(aes(y = mean_FCH4P, color = factor(member)), size = 0.5, alpha = 0.3) +
+  facet_wrap(~ID, ncol= 1, scales = "free_y") +
+  scale_color_manual(values = rep(c("dark blue", "dark red"), 4)) +
+  scale_fill_manual(values = rep("grey70", 8)) +
+  mytheme +
+  labs(x= "Year", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) 
+ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Predictions/Gridded/nmol_summary/figures/",today,"_swamp.png", sep = ""),
+       width = 12, height = 16, units = c("cm"), dpi = 300)
+
+# interesting swamp
+train.pred %>% 
+  group_by(ID) %>% 
+  mutate(Month_dec = Month/12,
+         Year_dec = Year+Month_dec) %>% 
+  filter(ID %in% c("MY-MLM")) %>%
+  ggplot(aes(x = Year_dec)) +
+  geom_vline(xintercept = c(2014:2016), color = 'grey70', linetype = 'dashed') +
+  geom_ribbon(aes(ymin = mean_FCH4 - sd_FCH4, ymax = mean_FCH4 + sd_FCH4)) + # add observations
+  geom_line(aes(y = mean_FCH4), size = 0.5) +
+  geom_point(aes(y = mean_FCH4), shape = 21, fill = "white") +
+  geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P, fill = factor(member)), alpha = 0.1) + # add predictions
+  geom_line(aes(y = mean_FCH4P, color = factor(member)), size = 0.5, alpha = 0.3) +
+  facet_wrap(~ID, ncol= 1, scales = "free_y") +
+  scale_color_manual(values = rep(c("dark blue", "dark red"), 4)) +
+  scale_fill_manual(values = rep("grey70", 8)) +
+  mytheme +
+  labs(x= "Year", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) 
+ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Predictions/Gridded/nmol_summary/figures/",today,"_interesting_swamp.png", sep = ""),
+       width = 12, height = 10, units = c("cm"), dpi = 300)
+
+# interesting swamp
+train.pred %>% 
+  group_by(ID) %>% 
+  mutate(Month_dec = Month/12,
+         Year_dec = Year+Month_dec) %>% 
+  filter(ID %in% c("US-NC4")) %>%
+  ggplot(aes(x = Year_dec)) +
+  geom_vline(xintercept = c(2014:2016), color = 'grey70', linetype = 'dashed') +
+  geom_ribbon(aes(ymin = mean_FCH4 - sd_FCH4, ymax = mean_FCH4 + sd_FCH4)) + # add observations
+  geom_line(aes(y = mean_FCH4), size = 0.5) +
+  geom_point(aes(y = mean_FCH4), shape = 21, fill = "white") +
+  geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P, fill = factor(member)), alpha = 0.1) + # add predictions
+  geom_line(aes(y = mean_FCH4P, color = factor(member)), size = 0.5, alpha = 0.3) +
+  facet_wrap(~ID, ncol= 1, scales = "free_y") +
+  scale_color_manual(values = rep(c("dark blue", "dark red"), 4)) +
+  scale_fill_manual(values = rep("grey70", 8)) +
+  mytheme +
+  labs(x= "Year", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) 
+ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Predictions/Gridded/nmol_summary/figures/",today,"_interesting_swamp2.png", sep = ""),
+       width = 12, height = 10, units = c("cm"), dpi = 300)
+
+```
+
+
+
+##### Compare grid predictions with training and test (AmeriFlux validation) data
+
+```{r}
+site.pred <- read.csv(paste0(loc, "predictions/gridded/nmol/val-site-pred.csv"))
+
+# select what we need
+site.pred <- site.pred %>% 
+  dplyr::select(ID, Year, Month, mean_FCH4P = mean_FCH4P_grid_nmol, sd_FCH4P = sd_FCH4P_grid_nmol) %>% 
+  group_by(ID, Month) %>% 
+  summarize(mean_FCH4P = mean(mean_FCH4P, na.rm=T),
+            sd_FCH4P = mean(sd_FCH4P, na.rm=T)) 
+```
+
+###### PEQFR
+```{r}
+# read in site data
+PEQFR <- read.csv(paste0(loc, "fluxnet-ch4-data/ameriflux-validation/csv/AMF_PE-QFR_BASE_HH_1-5.csv"), skip = 2) %>%
+  mutate(ID = "PE-QFR",
+         FCH4 = ifelse(FCH4 == -9999, NA, FCH4),
+         Year = as.integer(substr(TIMESTAMP_END, 1, 4)),
+         Month = as.integer(substr(TIMESTAMP_END, 5, 6)),
+         Day = substr(TIMESTAMP_END, 7,8),
+         Date = as_date(paste(Year,Month,Day)),
+         DOY = yday(Date),
+         Week = ceiling(DOY/7),
+         Week = ifelse(Week == 53, 52, Week)) %>% 
+  group_by(Month) %>% 
+  summarize(FCH4 = mean(FCH4, na.rm = TRUE)) 
+
+site.pred %>% 
+  filter(ID == "PE-QFR") %>% 
+  left_join(PEQFR) %>% 
+  ggplot(aes(Month, FCH4)) + 
+  geom_line(aes(y = FCH4), size = 0.5) +
+  geom_point(shape = 21, fill = "white") +
+  geom_line((aes(Month, mean_FCH4P))) +
+  geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P), alpha = 0.1) + # add predictions
+  scale_color_manual(values = rep(c("dark blue", "dark red"), 4)) +
+  scale_fill_manual(values = rep("grey70", 8)) +
+  my_theme +
+  labs(x= "Month", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) +
+  scale_y_continuous(limits = c(0, 300)) +
+  scale_x_continuous(breaks = c(1, 3, 5, 7, 9, 11))
+ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Predictions/Gridded/nmol_summary/figures/",today,"_PE-QFR.png", sep = ""),
+       width = 10, height = 10, units = c("cm"), dpi = 300)
+```
+
+###### USALQ
+```{r}
+# read in site data
+USALQ <- read.csv(paste0(loc, "fluxnet-ch4-data/ameriflux-validation/csv/AMF_US-ALQ_BASE_HH_5-5.csv"), skip = 2) %>%
+  mutate(ID = "US-ALQ",
+         FCH4 = ifelse(FCH4 == -9999, NA, FCH4),
+         Year = as.integer(substr(TIMESTAMP_END, 1, 4)),
+         Month = as.integer(substr(TIMESTAMP_END, 5, 6)),
+         Day = substr(TIMESTAMP_END, 7,8),
+         Date = as_date(paste(Year,Month,Day)),
+         DOY = yday(Date),
+         Week = ceiling(DOY/7),
+         Week = ifelse(Week == 53, 52, Week)) %>% 
+  group_by(Month) %>% 
+  summarize(FCH4 = mean(FCH4, na.rm = TRUE)) 
+
+site.pred %>% 
+  filter(ID == "US-ALQ") %>% 
+  left_join(USALQ) %>% 
+  ggplot(aes(Month, FCH4)) + 
+  geom_line(aes(y = FCH4), size = 0.5) +
+  geom_point(shape = 21, fill = "white") +
+  geom_line(aes(Month, mean_FCH4P)) +
+  geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P), alpha = 0.1) + # add predictions
+  scale_color_manual(values = rep(c("dark blue", "dark red"), 4)) +
+  scale_fill_manual(values = rep("grey70", 8)) +
+  my_theme +
+  labs(x= "Month", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) +
+  scale_y_continuous(limits = c(0, 300)) +
+  scale_x_continuous(breaks = c(1, 3, 5, 7, 9, 11))
+ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Predictions/Gridded/nmol_summary/figures/",today,"_US-ALQ.png", sep = ""),
+       width = 10, height = 10, units = c("cm"), dpi = 300)
+```
+###### CACF2
+```{r}
+# read in site data
+CACF2 <- read.csv(paste0(loc, "fluxnet-ch4-data/ameriflux-validation/csv/AMF_CA-CF2_BASE_HH_1-5.csv"), skip = 2) %>%
+  mutate(ID = "CA-ARF",
+         FCH4 = ifelse(FCH4 == -9999, NA, FCH4),
+         Year = as.integer(substr(TIMESTAMP_END, 1, 4)),
+         Month = as.integer(substr(TIMESTAMP_END, 5, 6)),
+         Day = substr(TIMESTAMP_END, 7,8),
+         Date = as_date(paste(Year,Month,Day)),
+         DOY = yday(Date),
+         Week = ceiling(DOY/7),
+         Week = ifelse(Week == 53, 52, Week)) %>% 
+  group_by(Month) %>% 
+  summarize(FCH4 = mean(FCH4, na.rm = TRUE)) 
+
+site.pred %>% 
+  filter(ID == "CA-CF2") %>% 
+  left_join(USALQ) %>% 
+  ggplot(aes(Month, FCH4)) + 
+  geom_line(aes(y = FCH4), size = 0.5) +
+  geom_point(shape = 21, fill = "white") +
+  geom_line(aes(Month, mean_FCH4P)) +
+  geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P), alpha = 0.1) + # add predictions
+  scale_color_manual(values = rep(c("dark blue", "dark red"), 4)) +
+  scale_fill_manual(values = rep("grey70", 8)) +
+  my_theme +
+  labs(x= "Month", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) +
+  scale_y_continuous(limits = c(0, 300)) +
+  scale_x_continuous(breaks = c(1, 3, 5, 7, 9, 11))
+ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Predictions/Gridded/nmol_summary/figures/",today,"_US-ALQ.png", sep = ""),
+       width = 10, height = 10, units = c("cm"), dpi = 300)
+```
+
+
+```{r}
+joined_alq <- ensemble.site.pred %>% 
+  filter(ID == "US-ALQ") %>% 
+  left_join(USALQ)  %>% 
+  filter(!Month == 1)
+
+# US-ALQ
+cor(joined_alq$mean_FCH4P, joined_alq$FCH4)^2
+sum(abs(joined_alq$mean_FCH4P - joined_alq$FCH4))/(11*8)
+sum(joined_alq$mean_FCH4P - joined_alq$FCH4)/(11*8)
+
+joined_qfr <- ensemble.site.pred %>% 
+  filter(ID == "PE-QFR") %>% 
+  left_join(PEQFR) %>% 
+  filter(!Month == 1)
+
+# PE-QFR
+cor(joined_qfr$mean_FCH4P, joined_qfr$FCH4)^2
+sum(abs(joined_qfr$mean_FCH4P - joined_qfr$FCH4))/(11*8)
+sum(joined_qfr$mean_FCH4P - joined_qfr$FCH4)/(11*8)
+
+# split by even and odd
+joined_qfr_odd <- ensemble.site.pred %>% 
+  filter(ID == "PE-QFR") %>% 
+  left_join(PEQFR) %>% 
+  filter(!Month == 1 & member %in% c(1, 3, 5, 7))
+
+cor(joined_qfr_odd$mean_FCH4P, joined_qfr_odd$FCH4)^2
+sum(abs(joined_qfr_odd$mean_FCH4P - joined_qfr_odd$FCH4))/(11*8)
+sum(joined_qfr_odd$mean_FCH4P - joined_qfr_odd$FCH4)/(11*8)
+
+# split by even and odd
+joined_qfr_even <- ensemble.site.pred %>% 
+  filter(ID == "PE-QFR") %>% 
+  left_join(PEQFR) %>% 
+  filter(!Month == 1 & member %in% c(2, 4, 6, 8))
+
+cor(joined_qfr_even$mean_FCH4P, joined_qfr_even$FCH4)^2
+sum(abs(joined_qfr_even$mean_FCH4P - joined_qfr_even$FCH4))/(11*8)
+sum(joined_qfr_even$mean_FCH4P - joined_qfr_even$FCH4)/(11*8)
+
+```
+
+
+
+
+```{r}
 nmol <- stack(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_nmolm2sec.nc"))
-plot(nmol[[1:12]])
+plot(nmol[[7]])
 
 gc <- stack(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_gCm2day.nc"))
 plot(gc[[1:12]])
@@ -6622,6 +7049,5 @@ plot(tgch4_sd[[1:12]])
 sums <- cellStats(r_stack[[1]], sum)
 
 plot(sums)
-
 ```
 
