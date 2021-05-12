@@ -5404,7 +5404,7 @@ di_curve %>%
   geom_point() +
   geom_smooth(method = 'lm', se = FALSE) +
   # geom_text(x = 0.2, y = 6000, label = lm_eqn(df), parse = TRUE, size = 5) +
-  labs(y = expression(atop("Extraplation Variance", "(nmol m"^{-2}*" s"^{-1}*")"))) +
+  labs(x = "Dissimilairty Index", y = expression(atop("Extraplation Variance", "(nmol m"^{-2}*" s"^{-1}*")"))) +
   my_theme
 ggsave(paste0(loc, "dissimilarity/figures/di_vs_variance.png", sep = ""),
        width = 14, height = 12, units = c("cm"), dpi = 300)
@@ -6383,6 +6383,7 @@ site_month_DI %>%
   geom_point() +
   geom_smooth(method = 'lm', se = FALSE) +
   scale_y_continuous(limits = c(0,300)) +
+  labs(x = "Dissimilarity Index", y = expression(atop("MAE", "(nmol m"^{-2}*" s"^{-1}*")"))) +
   my_theme
 ggsave(paste0(loc, "dissimilarity/figures/error_vs_DI.png"),
        width = 15, height = 12, units = c("cm"), dpi = 300)
