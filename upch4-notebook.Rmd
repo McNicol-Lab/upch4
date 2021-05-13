@@ -4796,7 +4796,26 @@ ggsave(paste(loc, "varimp/var_response_all.png", sep = ""),
 ```
 
 
-##### ShapR
+##### Partial Dependency Plots
+
+```{r}
+# read mc rf model
+rf_model <- readRDS(paste0(loc, "ensembles/cv/best6.rds"))
+
+# Read mc training data csv
+train <- read.csv(paste0(loc, "training-data/final.csv")) # local path
+
+# read folds index
+folds_index <- readRDS(paste0(loc, "training-data/folds_index.rds")) # local path
+
+# pdp
+ice.TA <- rf_model[[1]] %>% 
+  partial(pred.var = c("canopyht"), train = train, plot.engine = "ggplot2", ice = FALSE, center = TRUE)
+plotPartial(ice.TA, colorkey= TRUE) 
+
+```
+
+
 #### 9. Upscaled Model with Monte Carlo (MC)
 
 ##### Forcing Data
