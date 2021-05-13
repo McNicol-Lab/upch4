@@ -4817,7 +4817,6 @@ plotPartial(ice.TA, colorkey= TRUE)
 
 
 #### 9. Upscaled Model with Monte Carlo (MC)
-
 ##### Forcing Data
 
 Six final predictors:
@@ -4970,6 +4969,7 @@ data <- read.csv(paste(loc, "training-data/final.csv", sep = "")) %>%
   dplyr::select(Cluster, ID, Year, Month, Week, FCH4, FCH4_UNC, TA, TA_LAG2, canopyht, wc_mtdq,  wc_pwtm, EVI_LAG3)
 head(data)
 ```
+
 ##### Read in standard deviations (static uncertainties)
 
 ```{r}
@@ -4993,30 +4993,66 @@ data <- data %>%
 
 ```{r warning = F, echo = F, message = F}
 set.seed(23)
-data1 <- data %>% 
+
+# static data
+data_temp <- data %>% 
+  dplyr::select(ID, wc_pwtm, wc_mtdq, canopyht, wc_pwtm_sd, wc_mtdq_sd, canopyht_sd) %>% 
+  distinct()
+
+data_temp
+data_temp <- data_temp[-c(2,8,22,31,34,37,39,41,49),] # remove duplicates (unexpected issue)
+  
+data1 <- data_temp %>% 
+  group_by(ID) %>% 
+  mutate(wc_mtdq_mc = list(rnorm(1000, mean = wc_mtdq, sd = wc_mtdq_sd)),
+         wc_pwtm_mc = list(rnorm(1000, mean = wc_pwtm, sd = wc_pwtm_sd)),
+         canopyht_mc = list(rnorm(1000, mean = canopyht, sd = canopyht_sd))) %>% 
+  unnest(cols = c(wc_mtdq_mc, wc_pwtm_mc, canopyht_mc)) %>% 
+  group_by(ID) %>% 
+  mutate(mc_i = 1:n()) %>% 
+  dplyr::select(mc_i, ID, wc_mtdq_mc, wc_pwtm_mc, canopyht_mc)
+
+# check the spread for different sites
+data1 %>% 
+  filter(ID == "CASCB") %>% 
+  ggplot(aes(canopyht_mc)) +
+  geom_histogram()
+
+# temporal data
+data2 <- data %>% 
+  dplyr::select(Cluster, ID, Year, Month, Week, FCH4, FCH4_UNC, TA, TA_LAG2, EVI_LAG3) %>% 
   rowwise() %>% 
   mutate(FCH4_mc = list(rlaplace(1000, location = FCH4, scale = FCH4_UNC/2)),
          TA_mc = list(rnorm(1000, mean = TA, sd = 0.5)),
          TA_LAG2_mc = list(rnorm(1000, mean = TA_LAG2, sd = 0.5)),
-         EVI_LAG3_mc = list(rnorm(1000, mean = EVI_LAG3, sd = 0.015)),
-         wc_mtdq_mc = list(rnorm(1000, mean = wc_mtdq, sd = wc_mtdq_sd)),
-         wc_pwtm_mc = list(rnorm(1000, mean = wc_pwtm, sd = wc_pwtm_sd)),
-         canopyht_mc = list(rnorm(1000, mean = canopyht, sd = canopyht_sd))) %>% 
-  unnest(cols = c(FCH4_mc, TA_mc, TA_LAG2_mc, EVI_LAG3_mc, wc_mtdq_mc, wc_pwtm_mc, 
-                  canopyht_mc))
+         EVI_LAG3_mc = list(rnorm(1000, mean = EVI_LAG3, sd = 0.015))) %>% 
+  unnest(cols = c(FCH4_mc, TA_mc, TA_LAG2_mc, EVI_LAG3_mc)) %>% 
+  group_by(ID, Year, Month, Week) %>% 
+  mutate(mc_i = 1:n()) %>% 
+  dplyr::select(mc_i, Cluster, ID, Year, Month, Week, FCH4, FCH4_UNC, FCH4_mc, TA_mc, TA_LAG2_mc, EVI_LAG3_mc)
+
+# check the spread for different sites
+data2 %>% 
+  filter(ID == "USMyb" & Year == "2014" & Week == "13") %>% 
+  ggplot(aes(FCH4_mc)) +
+  geom_histogram()
+
+# rejoin temporal and static
+data2 <- data2 %>% left_join(data1, by = c("mc_i", "ID")) %>% arrange(mc_i)
 ```
 
 ###### For each observation (week/row) sample 500/1000, with replacement, and split into 500 training datasets
 
 ```{r}
-data2 <- data1 %>% 
+data3 <- data2 %>% 
   group_by(ID, Year, Month, Week) %>% 
   sample_n(500, replace = T) %>% 
-  mutate(mc_i = 1:n()) %>% 
+  arrange(mc_i) %>% 
   group_by(mc_i) %>% 
   group_split() 
 
-data3 <- data2 %>% bind_rows() %>% dplyr::select(mc_i, everything()) 
+
+data4 <- data3 %>% bind_rows() %>% dplyr::select(mc_i, everything()) 
 ```
 
 ##### Now drop IDs at random from each of the 500 datasets (and always drop USOWC)
@@ -5024,29 +5060,29 @@ data3 <- data2 %>% bind_rows() %>% dplyr::select(mc_i, everything())
 ```{r}
 cluster.drop <- sample(1:26, 500, replace = T)
 
-data4 <- list()
+data5 <- list()
 for(i in 1:500){
-  data4[[i]] <- data3 %>% 
+  data5[[i]] <- data4 %>% 
     filter(mc_i == i) %>% 
     filter(Cluster != cluster.drop[i] & ID != "USOWC")
 }
 
 # bind rows
-data5 <- data4 %>% bind_rows()
+data6 <- data5 %>% bind_rows()
 
-saveRDS(data5, 
+saveRDS(data6, 
         paste(loc, "mc/data/1000mc_500bs.rds", sep = ""))
 ```
 
 ##### Identify which site was left out then subset those data
 
 ```{r warning = F, message = F, echo = F}
-ID.names <- data3 %>% dplyr::select(ID) %>% mutate(ID = factor(ID)) %>% distinct()
+ID.names <- data4 %>% dplyr::select(ID) %>% mutate(ID = factor(ID)) %>% distinct()
 
 # get IDs for each mc_i
 IDs <- list()
 for(i in 1:500){
-  IDs[[i]] <- data5 %>% 
+  IDs[[i]] <- data6 %>% 
     filter(mc_i == i) %>% 
     dplyr::select(ID) %>% 
     distinct()
@@ -5073,16 +5109,16 @@ write.csv(ID.drop,
 ##### Finally, subset the held-out site data from each mc_i
 
 ```{r}
-data6 <- list()
+data7 <- list()
 for(i in 1:500){
-  data6[[i]] <- data3 %>% 
+  data7[[i]] <- data4 %>% 
     filter(mc_i == i & ID %in% ID.drop.list[[i]]$ID )
   
 }
 
-data6 <- bind_rows(data6)
+data7 <- bind_rows(data7)
 
-saveRDS(data6, 
+saveRDS(data7, 
         paste(loc, "mc/data/1000mc_500bs_heldout.rds", sep = ""))
 ```
 
@@ -5092,6 +5128,7 @@ saveRDS(data6,
 
 ```{r}
 data <- readRDS(paste0(loc, "/mc/data/1000mc_500bs.rds")) # local path
+str(data)
 ```
 
 ##### Get features
@@ -5099,7 +5136,7 @@ data <- readRDS(paste0(loc, "/mc/data/1000mc_500bs.rds")) # local path
 ```{r}
 names(data)
 mc.feat <- data %>% 
-  dplyr::select(19:24) %>% 
+  dplyr::select(10:15) %>% 
   names()
 ```
 
@@ -5125,7 +5162,7 @@ train_feat <- list()
 train_label <- list()
 
 folds_retained <- list()
-for(i in 1:length(cluster.drop)){
+for(i in 1:500){
   folds_retained[[i]] <- c(1:26) %>% as_tibble() %>% anti_join(as_tibble(cluster.drop[i]))
 }
 
@@ -5157,7 +5194,7 @@ saveRDS(folds_index, paste0(loc, 'mc/data/folds_index.rds'))
 
 ##### Train RF
 
-```{r echo = F, warning = F}
+```{r echo = F, warning = F, message = F}
 folds_index <- readRDS(paste0(loc, "mc/data/folds_index.rds"))
 
 set.seed(23)
@@ -5180,7 +5217,7 @@ for (i in 1:500) {
     myControl <- trainControl(
       method = "cv",
       allowParallel = TRUE,
-      verboseIter = TRUE, 
+      verboseIter = F, 
       returnData = FALSE,
       index = folds_index[[i]]
     )
@@ -5193,6 +5230,7 @@ for (i in 1:500) {
       trControl = myControl,
       tuneGrid = tgrid,
       num.trees = 60,
+      importance = "permutation",
       metric = 'MAE'
     )
     print(i)
@@ -5201,7 +5239,7 @@ for (i in 1:500) {
 
 saveRDS(rf_model, 
         paste0(loc, "ensembles/mc/rf.rds"),
-        )# local dir.
+        ) # local dir.
 
 ```
 
@@ -5309,7 +5347,7 @@ summary %>%
   ggplot(aes(year_dec, meanFCH4P)) + 
   geom_errorbar(aes(year_dec, ymin = meanFCH4P - 2*sdFCH4P, ymax = meanFCH4P + 2*sdFCH4P), alpha = 0.9, color = 'grey') +
   geom_point(color = "blue", alpha = 0.7) + 
-  geom_point(aes(year_dec, meanFCH4), size = 0.5) +
+  geom_point(aes(year_dec, meanFCH4_mc), size = 0.5) +
   facet_wrap(~ID, scales = 'free') + 
   labs(x = "Decimal Year", y = expression("FCH4 Predicted (nmol m"^{-2}*" s"^{-1}*")")) +
   my_theme
@@ -5345,9 +5383,7 @@ ggsave(paste0(loc, "mc/predictions/correlations.png", sep = ""),
 
 ```
 
-##### MC Prediction Variance vs. Dissimilarity
-
-Output held-out data summary
+##### Output held-out data summary
 
 ```{r}
 hold_out <- readRDS(paste0(loc, "mc/data/1000mc_500bs_heldout.rds"))
@@ -5358,77 +5394,6 @@ hold_out %>%
   write.csv(paste0(loc, "mc/data/heldout_sample_size.csv"),
             row.names = F)
 
-```
-
-##### Subset prediction data
-
-```{r}
-pred <- data %>% dplyr::select(mc_i, Cluster, ID, Year, Month, Week, FCH4Pe = FCH4P)
-```
-
-##### Calculate the monthly mean and variance of each prediction across mc iterations
-
-```{r}
-pred_full <- pred %>% 
-  group_by(Cluster, ID, Year, Month) %>% 
-  summarize(mean = mean(FCH4Pe, na.rm = TRUE),
-            var = var(FCH4Pe, na.rm = TRUE)) 
-```
-
-#### Read in DI
-
-```{r}
-di <- read.csv(paste0(loc, "dissimilarity/output/stats/all_sites_DI.csv"))
-```
-
-##### Output DI summary
-
-```{r}
-di %>%
-  group_by(Cluster) %>%
-  summarize(DI_cluster_mean = mean(DI)) %>%
-  arrange(desc(DI_cluster_mean)) %>%
-  write.csv(paste0(loc, "dissimilarity/output/stats/mean_cluster_DI.csv"), 
-            row.names = F)
-```
-
-##### Set up model and create label function
-
-```{r}
-di_curve <- di %>% 
-  left_join(pred_full, by = c("Cluster", "ID", "Month")) %>% 
-  filter(!is.na(mean))
-
-lm_eqn <- function(df){
-  m <- lm(y ~ x, df);
-  eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2, 
-                   list(a = format(unname(coef(m)[1]), digits = 2),
-                        b = format(unname(coef(m)[2]), digits = 2),
-                        r2 = format(summary(m)$r.squared, digits = 3)))
-  as.character(as.expression(eq));
-}
-
-```
-
-##### Convert to simple data frame
-
-No interesting result.
-
-```{r}
-df <- di_curve %>% dplyr::select(y = var, x = DI)
-
-di_curve %>%
-  filter(!ID == "USOWC") %>%
-  ggplot(aes(DI, var)) +
-  geom_point() +
-  geom_smooth(method = 'lm', se = FALSE) +
-  # geom_text(x = 0.2, y = 6000, label = lm_eqn(df), parse = TRUE, size = 5) +
-  labs(x = "Dissimilairty Index", y = expression(atop("Extraplation Variance", "(nmol m"^{-2}*" s"^{-1}*")"))) +
-  my_theme
-ggsave(paste0(loc, "dissimilarity/figures/di_vs_variance.png", sep = ""),
-       width = 14, height = 12, units = c("cm"), dpi = 300)
-
-summary(lm(y ~ x, data = df))
 ```
 
 ##### Test `mc_i` with mc `rf_model` to check fit on training data 
@@ -6369,12 +6334,10 @@ all_sites_DI %>%
 ##### Get perfrmance and DI info
 
 ```{r}
-
 site_month_metrics <- read.csv(paste0(loc, "predictions/cv/global.csv"))
 site_month_DI <- read.csv(paste0(loc, "dissimilarity/output/stats/all_sites_DI.csv"))
 data <- read.csv(paste0(loc, "training-data/final.csv")) # local path
 fold_names <- data %>% group_by(Cluster) %>% summarize(Name = ID[1]) 
-
 ```
 
 ##### Plot histogram of site-month DIs
@@ -6390,6 +6353,76 @@ site_month_DI %>%
 ggsave(paste0(loc, "dissimilarity/figures/all_sites_DI_monthly_histogram.png"),
        width = 20, height = 20, units = c("cm"), dpi = 300)
 ```
+
+
+##### MC Prediction Variance and Error vs. Dissimilarity
+
+##### Read in MC data
+
+```{r}
+data <- read.csv(paste0(loc, "mc/predictions/rf_mc.csv"))
+```
+
+##### Subset MC Prediction data
+
+```{r}
+pred <- data %>% dplyr::select(mc_i, Cluster, ID, Year, Month, Week, FCH4Pe = FCH4P)
+```
+
+##### Calculate the monthly mean and variance of each prediction across mc iterations
+
+```{r}
+pred_full <- pred %>% 
+  group_by(Cluster, ID, Year, Month) %>% 
+  summarize(mean = mean(FCH4Pe, na.rm = TRUE),
+            var = var(FCH4Pe, na.rm = TRUE)) 
+```
+
+##### Read in DI
+
+```{r}
+di <- read.csv(paste0(loc, "dissimilarity/output/stats/all_sites_DI.csv"))
+```
+
+##### Set up model and create label function
+
+```{r}
+di_curve <- di %>% 
+  left_join(pred_full, by = c("Cluster", "ID", "Month")) %>% 
+  filter(!is.na(mean))
+
+lm_eqn <- function(df){
+  m <- lm(y ~ x, df);
+  eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2, 
+                   list(a = format(unname(coef(m)[1]), digits = 2),
+                        b = format(unname(coef(m)[2]), digits = 2),
+                        r2 = format(summary(m)$r.squared, digits = 3)))
+  as.character(as.expression(eq));
+}
+
+```
+
+##### Convert to simple data frame
+
+No interesting result.
+
+```{r}
+df <- di_curve %>% dplyr::select(y = var, x = DI)
+
+di_curve %>%
+  filter(!ID == "USOWC") %>%
+  ggplot(aes(DI, var)) +
+  geom_point() +
+  geom_smooth(method = 'lm', se = FALSE) +
+  # geom_text(x = 0.2, y = 6000, label = lm_eqn(df), parse = TRUE, size = 5) +
+  labs(x = "Dissimilairty Index", y = expression(atop("Extraplation Variance", "(nmol m"^{-2}*" s"^{-1}*")"))) +
+  my_theme
+ggsave(paste0(loc, "dissimilarity/figures/di_vs_variance.png", sep = ""),
+       width = 14, height = 12, units = c("cm"), dpi = 300)
+
+summary(lm(y ~ x, data = df))
+```
+
 
 ##### Look at relationship (MAE vs. DI)
 
