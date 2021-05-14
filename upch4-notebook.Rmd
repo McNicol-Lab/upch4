@@ -6354,7 +6354,7 @@ all_sites_DI %>%
 
 #### 10. (cont.) Dissimilarity - Extrapolation Error
 
-##### Get perfrmance and DI info
+##### Get performance and DI info
 
 ```{r}
 site_month_metrics <- read.csv(paste0(loc, "predictions/cv/global.csv"))
