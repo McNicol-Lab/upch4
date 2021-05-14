@@ -5326,6 +5326,8 @@ ggsave(paste0(loc, "mc/predictions/rf_mc_heldout.png", sep = ""),
 ```
 #### 9. (cont.) Partial Dependency Plots for MC
 
+They look reasonable.
+
 ```{r}
 # read mc rf model
 rf_model <- readRDS(paste0(loc, "ensembles/mc/rf.rds"))
@@ -5338,7 +5340,7 @@ folds_index <- readRDS(paste0(loc, "mc/data/folds_index.rds")) # local path
 
 # pdp
 ice.TA <- rf_model[[1]] %>% 
-  partial(pred.var = c("canopyht_mc"), train = train, plot.engine = "ggplot2", ice = FALSE, center = TRUE)
+  partial(pred.var = c("wc_pwtm_mc"), train = train[folds_index[[1]][[1]],], plot.engine = "ggplot2", ice = FALSE, center = TRUE)
 plotPartial(ice.TA, colorkey= TRUE) 
 
 ```
@@ -5370,8 +5372,8 @@ summary %>%
          year_dec = Year+week_dec) %>% 
   ggplot(aes(year_dec, meanFCH4P)) + 
   geom_errorbar(aes(year_dec, ymin = meanFCH4P - 2*sdFCH4P, ymax = meanFCH4P + 2*sdFCH4P), alpha = 0.9, color = 'grey') +
-  geom_point(color = "blue", alpha = 0.7) + 
-  geom_point(aes(year_dec, meanFCH4_mc), size = 0.5) +
+  geom_point(color = "blue", alpha = 0.7, size = 0.5) + 
+  geom_point(aes(year_dec, meanFCH4), size = 0.5) +
   facet_wrap(~ID, scales = 'free') + 
   labs(x = "Decimal Year", y = expression("FCH4 Predicted (nmol m"^{-2}*" s"^{-1}*")")) +
   my_theme
@@ -5385,7 +5387,7 @@ summary %>%
          year_dec = Year+week_dec) %>% 
   ggplot(aes(year_dec, meanFCH4P)) + 
   geom_errorbar(aes(year_dec, ymin = meanFCH4P - 2*sdFCH4P, ymax = meanFCH4P + 2*sdFCH4P), alpha = 0.9, color = 'grey') +
-  geom_point(color = "blue", alpha = 0.7) + 
+  geom_point(color = "blue", alpha = 0.7, size = 0.3) + 
   geom_point(aes(year_dec, meanFCH4), size = 0.5) +
   facet_wrap(~ID, scales = 'free_x') + 
   labs(x = "Decimal Year", y = expression("FCH4 Predicted (nmol m"^{-2}*" s"^{-1}*")")) +
@@ -5469,9 +5471,6 @@ ggsave(paste0(loc, "mc/predictions/timeseries_train_example_fixed.png", sep = ""
        width = 50, height = 35, units = c("cm"), dpi = 300)
 
 ```
-
-
-
 
 #### 10. Data Representativeness
 
