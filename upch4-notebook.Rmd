@@ -32,6 +32,7 @@ library(vegan)
 library(rworldmap)
 library(rgdal)
 library(VGAM)
+library(pdp)
 library(rnaturalearth)
 library(rnaturalearthdata)
 # source(paste(loc, "dissimilarity/rplots/import_libraries.r", sep=  "")) update this with all libraries
@@ -5058,7 +5059,9 @@ data4 <- data3 %>% bind_rows() %>% dplyr::select(mc_i, everything())
 ##### Now drop IDs at random from each of the 500 datasets (and always drop USOWC)
 
 ```{r}
+set.seed(23)
 cluster.drop <- sample(1:26, 500, replace = T)
+write.csv(cluster.drop, paste0(loc, "mc/data/cluster.drop.csv"), row.names = F)
 
 data5 <- list()
 for(i in 1:500){
@@ -5156,7 +5159,9 @@ iteration_l <- length(data$mc_i)/mc_iterations
 
 ##### Setup folds
 
-```{r}
+```{r warning = F, message = F, echo = F}
+cluster.drop <- read.csv(paste0(loc, "mc/data/cluster.drop.csv")) %>% pull()
+
 # set up mc iterations
 train_feat <- list()
 train_label <- list()
@@ -5229,7 +5234,7 @@ for (i in 1:500) {
       method = 'ranger',
       trControl = myControl,
       tuneGrid = tgrid,
-      num.trees = 60,
+      num.trees = 100,
       importance = "permutation",
       metric = 'MAE'
     )
@@ -5319,6 +5324,25 @@ rf.pred.all %>%
 ggsave(paste0(loc, "mc/predictions/rf_mc_heldout.png", sep = ""),
        width = 24, height = 24, units = c("cm"), dpi = 300)
 ```
+#### 9. (cont.) Partial Dependency Plots for MC
+
+```{r}
+# read mc rf model
+rf_model <- readRDS(paste0(loc, "ensembles/mc/rf.rds"))
+
+# Read mc training data csv
+train <- readRDS(paste0(loc, "mc/data/1000mc_500bs.rds")) # local path
+
+# read folds index
+folds_index <- readRDS(paste0(loc, "mc/data/folds_index.rds")) # local path
+
+# pdp
+ice.TA <- rf_model[[1]] %>% 
+  partial(pred.var = c("canopyht_mc"), train = train, plot.engine = "ggplot2", ice = FALSE, center = TRUE)
+plotPartial(ice.TA, colorkey= TRUE) 
+
+```
+
 
 #### 9. (cont.) MC Validation and Error Scaling
 
