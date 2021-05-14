@@ -6526,8 +6526,8 @@ for(i in 1:216){
 ```{r}
 upscaling_stack <- list()
 for (i in 1:216){
-  upscaling_stack[[i]]<- stack(canopyht, wc_mtdq, wc_pwtm, TA[[i]], TA_LAG2[[i]], EVI_LAG3[[i]]) 
-  names(upscaling_stack[[i]]) <- c("canopyht", "wc_mtdq", "wc_pwtm", "TA", "TA_LAG2", "EVI_LAG3")
+  upscaling_stack[[i]]<- stack(TA[[i]], TA_LAG2[[i]], EVI_LAG3[[i]], wc_mtdq, wc_pwtm, canopyht) 
+  names(upscaling_stack[[i]]) <- c( "TA", "TA_LAG2", "EVI_LAG3", "wc_mtdq", "wc_pwtm", "canopyht")
 }
 
 plot(upscaling_stack[[7]])
@@ -6550,6 +6550,14 @@ for(i in 1:216){
 
 
 #### 11. (cont.) Upscaling: INSERT CLUSTER COMPUTING CODE (Etienne) 
+
+```{r}
+# test running one rf model on first timestep
+
+forcing_data <- stack("/Volumes/Samsung_T5/Stanford/upch4_local/grids/ffs/forcing/forcing_001.nc")
+ts1 <- predict(forcing_data, rf_model[[1]])
+  
+```
 
 
 #### 11. (cont.) Upscaling Evaluation 
