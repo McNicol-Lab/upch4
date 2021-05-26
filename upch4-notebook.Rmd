@@ -6572,7 +6572,11 @@ head(data)
 # check that bootstrap mean equals Tg grids
 data %>% 
   group_by(t) %>% 
-  summarize(boot_mean = mean(sum_TgCH4month)) %>% head(30) 
+  summarize(boot_mean = mean(sum_TgCH4month),
+            boot_sd = sd(sum_TgCH4month)) %>% 
+  ggplot(aes(t/12+2001, boot_mean)) +
+  geom_line() + 
+  geom_ribbon()
 ```
 
 
@@ -6643,8 +6647,8 @@ nmol <- nc_open(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_nmolm2sec.n
   nmol.site <- mean_nmol.site %>% left_join(sd_nmol.site)
   
   # gather into long files
-  months <- rep(c(rep(1:12, each = 7)), 18) # 18 years x 12 months x 7 sites
-  years <- c(rep(2001:2018, each = 12*7)) # 
+  months <- rep(c(rep(1:12, each = 8)), 18) # 18 years x 12 months x 8 sites
+  years <- c(rep(2001:2018, each = 12*8)) # 
   length(months) == length(years)
   
    mean_nmol.val <- mean_nmol.val %>% 
@@ -6692,14 +6696,14 @@ PEQFR <- read.csv(paste0(loc, "fluxnet-ch4-data/ameriflux-validation/csv/AMF_PE-
          DOY = yday(Date),
          Week = ceiling(DOY/7),
          Week = ifelse(Week == 53, 52, Week)) %>% 
-  group_by(Month) %>% 
+  group_by(Year, Month) %>% 
   summarize(FCH4 = mean(FCH4, na.rm = TRUE)) 
 
 site.pred %>% 
   filter(ID == "PE-QFR") %>% 
   left_join(PEQFR) %>% 
   ggplot(aes(Month, FCH4)) + 
-  geom_line(aes(y = FCH4), size = 0.5) +
+  # geom_line(aes(y = FCH4), size = 0.5) +
   geom_point(shape = 21, fill = "white") +
   geom_line((aes(Month, mean_FCH4P))) +
   geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P), alpha = 0.1) + # add predictions
@@ -6707,7 +6711,7 @@ site.pred %>%
   scale_fill_manual(values = rep("grey70", 8)) +
   my_theme +
   labs(x= "Month", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) +
-  scale_y_continuous(limits = c(0, 300)) +
+  scale_y_continuous(limits = c(0, 100)) +
   scale_x_continuous(breaks = c(1, 3, 5, 7, 9, 11))
 ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Predictions/Gridded/nmol_summary/figures/",today,"_PE-QFR.png", sep = ""),
        width = 10, height = 10, units = c("cm"), dpi = 300)
@@ -6726,14 +6730,14 @@ USALQ <- read.csv(paste0(loc, "fluxnet-ch4-data/ameriflux-validation/csv/AMF_US-
          DOY = yday(Date),
          Week = ceiling(DOY/7),
          Week = ifelse(Week == 53, 52, Week)) %>% 
-  group_by(Month) %>% 
+  group_by(Year, Month) %>% 
   summarize(FCH4 = mean(FCH4, na.rm = TRUE)) 
 
 site.pred %>% 
   filter(ID == "US-ALQ") %>% 
   left_join(USALQ) %>% 
   ggplot(aes(Month, FCH4)) + 
-  geom_line(aes(y = FCH4), size = 0.5) +
+  # geom_line(aes(y = FCH4), size = 0.5) +
   geom_point(shape = 21, fill = "white") +
   geom_line(aes(Month, mean_FCH4P)) +
   geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P), alpha = 0.1) + # add predictions
@@ -6741,7 +6745,7 @@ site.pred %>%
   scale_fill_manual(values = rep("grey70", 8)) +
   my_theme +
   labs(x= "Month", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) +
-  scale_y_continuous(limits = c(0, 300)) +
+  scale_y_continuous(limits = c(0, 100)) +
   scale_x_continuous(breaks = c(1, 3, 5, 7, 9, 11))
 ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Predictions/Gridded/nmol_summary/figures/",today,"_US-ALQ.png", sep = ""),
        width = 10, height = 10, units = c("cm"), dpi = 300)
@@ -6761,14 +6765,14 @@ CACF2 <- read.csv(paste0(loc, "fluxnet-ch4-data/ameriflux-validation/csv/AMF_CA-
          DOY = yday(Date),
          Week = ceiling(DOY/7),
          Week = ifelse(Week == 53, 52, Week)) %>% 
-  group_by(Month) %>% 
+  group_by(Year, Month) %>% 
   summarize(FCH4 = mean(FCH4, na.rm = TRUE)) 
 
 site.pred %>% 
   filter(ID == "CA-CF2") %>% 
-  left_join(USALQ) %>% 
+  left_join(CACF2) %>% 
   ggplot(aes(Month, FCH4)) + 
-  geom_line(aes(y = FCH4), size = 0.5) +
+  # geom_line(aes(y = FCH4), size = 0.5) +
   geom_point(shape = 21, fill = "white") +
   geom_line(aes(Month, mean_FCH4P)) +
   geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P), alpha = 0.1) + # add predictions
@@ -6776,12 +6780,45 @@ site.pred %>%
   scale_fill_manual(values = rep("grey70", 8)) +
   my_theme +
   labs(x= "Month", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) +
-  scale_y_continuous(limits = c(0, 300)) +
+  scale_y_continuous(limits = c(0, 100)) +
   scale_x_continuous(breaks = c(1, 3, 5, 7, 9, 11))
 ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Predictions/Gridded/nmol_summary/figures/",today,"_US-ALQ.png", sep = ""),
        width = 10, height = 10, units = c("cm"), dpi = 300)
 ```
 
+###### US-MBP
+```{r}
+# read in site data
+USMBP <- read.csv(paste0(loc, "fluxnet-ch4-data/ameriflux-validation/csv/AMF_US-MBP_BASE_HH_1-5.csv"), skip = 2) %>%
+  mutate(ID = "US-MBP",
+         FCH4 = ifelse(FCH4 == -9999, NA, FCH4),
+         Year = as.integer(substr(TIMESTAMP_END, 1, 4)),
+         Month = as.integer(substr(TIMESTAMP_END, 5, 6)),
+         Day = substr(TIMESTAMP_END, 7,8),
+         Date = as_date(paste(Year,Month,Day)),
+         DOY = yday(Date),
+         Week = ceiling(DOY/7),
+         Week = ifelse(Week == 53, 52, Week)) %>% 
+  group_by(Year, Month) %>% 
+  summarize(FCH4 = mean(FCH4, na.rm = TRUE)) 
+
+site.pred %>% 
+  filter(ID == "US-MBP") %>% 
+  left_join(USMBP) %>% 
+  ggplot(aes(Month, FCH4)) + 
+  # geom_line(aes(y = FCH4), size = 0.5) +
+  geom_point(shape = 21, fill = "white") +
+  geom_line((aes(Month, mean_FCH4P))) +
+  geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P), alpha = 0.1) + # add predictions
+  scale_color_manual(values = rep(c("dark blue", "dark red"), 4)) +
+  scale_fill_manual(values = rep("grey70", 8)) +
+  my_theme +
+  labs(x= "Month", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) +
+  scale_y_continuous(limits = c(0, 130)) +
+  scale_x_continuous(breaks = c(1, 3, 5, 7, 9, 11))
+ggsave(paste("/Volumes/LACIE SHARE/Stanford CH4/June 2020 Upscaling/Predictions/Gridded/nmol_summary/figures/",today,"_PE-QFR.png", sep = ""),
+       width = 10, height = 10, units = c("cm"), dpi = 300)
+```
 
 ```{r}
 joined_alq <- ensemble.site.pred %>% 
