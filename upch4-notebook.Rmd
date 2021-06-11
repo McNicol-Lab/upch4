@@ -5324,6 +5324,7 @@ rf.pred.all %>%
 ggsave(paste0(loc, "mc/predictions/rf_mc_heldout.png", sep = ""),
        width = 24, height = 24, units = c("cm"), dpi = 300)
 ```
+
 #### 9. (cont.) Partial Dependency Plots for MC
 
 They look reasonable.
@@ -7139,7 +7140,10 @@ sum(joined_mbp$mean_FCH4P - joined_mbp$FCH4)/length(joined_mbp$mean_FCH4P)
 length(joined_mbp$mean_FCH4P)
 ```
 
-##### Calculate Global Grid Tg Totals (METHOD 1: Grid output summed means and summed sd)
+##### Calculate Global Grid Tg Totals (METHOD 1: Grid output summed means and summed sd) 
+
+###### I chose the output of this method for the global sums! For the other two methods, we do not have the individual bootstrap sums for each region, only globally
+###### I then adapted this method to output sums and sds for each region (the regionalization code is commented out)
 
 ```{r}
 tgch4 <- nc_open(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_TgCH4month_Aw.nc"))
@@ -7167,8 +7171,28 @@ for(i in 1:216) {
 r_mean_stack <- stack(r_mean)
 r_sd_stack <- stack(r_sd)
 
-sums_mean <- cellStats(r_mean_stack, sum)
-sums_sd <- cellStats(r_sd_stack, sum)
+regions <- c("global", "arctic_boreal", "hbl", "wsl", "northern", "temperate", "tropics", "ppr")
+
+e1 <- extent(-180, 180, -90, 90)
+e2 <- extent(-180, 180, 60, 90)
+e3 <- extent(-96, -75, 50, 60)
+e4 <- extent(60, 94.5, 52, 74) 
+e5 <- extent(-180, 180, 45, 90)
+e6 <- extent(-180, 180, 30, 60)
+e7 <- extent(-180, 180, -90, 30)
+e8 <- extent(-114.5363, -92.52392, 41.71808, 54.66925)
+
+extents <- list(e1, e2, e3, e4, e5, e6, e7, e8)
+
+for (i in 1:length(regions)){
+
+ # Regional extents
+  e <- extents[[1]]
+  regional_r_mean <- crop(r_mean_stack, e)
+  regional_r_sd <- crop(r_sd_stack, e)
+
+sums_mean <- cellStats(regional_r_mean, sum)
+sums_sd <- cellStats(regional_r_sd, sum)
 
 upscaling_sums <- cbind(sums_mean, sums_sd) %>% 
   as_tibble() %>% 
@@ -7187,13 +7211,15 @@ monthly_cycle <- upscaling_sums %>%
   summarize(sum_mean_tg = mean(sums_mean),
             sum_sd_tg = mean(sums_sd))
 
-write.csv(upscaling_sums, paste0(loc, "predictions/gridded/tg/sums_method1/upscaling_sums.csv"), row.names = F)
-write.csv(annual_sums, paste0(loc, "predictions/gridded/tg/sums_method1/annual_sums.csv"), row.names = F)
-write.csv(monthly_cycle, paste0(loc, "predictions/gridded/tg/sums_method1/monthly_cycle.csv"), row.names = F)
+write.csv(upscaling_sums, paste0(loc, "predictions/gridded/tg/sums_method1/", regions[i], "/upscaling_sums.csv"), row.names = F)
+write.csv(annual_sums, paste0(loc, "predictions/gridded/tg/sums_method1/", regions[i], "/annual_sums.csv"), row.names = F)
+write.csv(monthly_cycle, paste0(loc, "predictions/gridded/tg/sums_method1/", regions[i], "/monthly_cycle.csv"), row.names = F)
+
+}
 ```
 
-##### Calculate Global Grid Tg Totals
-###### (METHOD 2: Mean bootstrap sum and variance)
+##### Calculate Global Grid Tg Totals 
+###### (METHOD 2: Mean bootstrap sum and variance) ## PROBLEM: We cannot use this method for regional totals because we do not have the individual bootstrap sums for each region
 
 ```{r}
 # read in csv bootstrap member sum from upscaling output (b = bootstrap, m = forcing data member, t = time)
@@ -7212,7 +7238,7 @@ bootstrap_sums %>%
   write.csv(paste0(loc, "predictions/gridded/tg/sums_method2/upscaling_sums.csv"), row.names = F)
 ```
 
-###### (METHOD 3: Individual bootstrap cumsums and variance)
+###### (METHOD 3: Individual bootstrap cumsums and variance) ## PROBLEM: We cannot use this method for regional totals because we do not have the individual bootstrap sums for each region
 
 ```{r}
 # read in csv bootstrap member sum from upscaling output (b = bootstrap, m = forcing data member, t = time)
@@ -7230,7 +7256,22 @@ bootstrap_sums %>%
   summarize(mean_cum_sum_TgCH4year = mean(cum_sum_TgCH4year),
             sd_cum_sum_TgCH4year = sd(cum_sum_TgCH4year)) %>% 
     write.csv(paste0(loc, "predictions/gridded/tg/sums_method3/upscaling_sums.csv"), row.names = F)
+
+
 ```
+
+###### Calculate the time series average from the output of METHOD 1
+
+```{r}
+sums <- read.csv(paste0(loc, "predictions/gridded/tg/sums_method1/ppr/annual_sums.csv"))
+
+sums %>% 
+  summarize(timeseries_sum_mean_tg = mean(sum_mean_tg),
+            timeseries_sum_ci_tg = mean(sum_sd_tg)*1.96)
+
+```
+
+
 
 ###### Plot bootstrap sum histograms
 
@@ -7292,3 +7333,5 @@ bootstrap_sums %>%
 ggsave(paste0(loc, "/predictions/gridded/tg/figures/monthly_sums_histogram_2.png"),
        width = 12, height = 24, units = c("cm"), dpi = 300)
 ```
+
+
