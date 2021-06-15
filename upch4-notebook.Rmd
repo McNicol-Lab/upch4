@@ -7331,6 +7331,86 @@ ggsave(paste0(loc, "/predictions/gridded/tg/figures/monthly_sums_histogram_2.png
        width = 12, height = 24, units = c("cm"), dpi = 300)
 ```
 
+#### 11. (cont.) Timeseries plots of different Tg gridded products
+
+```{r warning = F, message = F, echo = F}
+# read in upscaling monthly mean and variance
+upscaling <- read.csv(paste0(loc, "predictions/gridded/tg/sums_method1/global/upscaling_sums.csv")) %>% 
+  dplyr::select(-row) 
+
+# read in carbon tracker (Top down model)
+files <- list.files(paste0(loc, "grids/ch4-models/carbontracker/"))
+
+# check units
+nc_open(paste0(loc, "grids/ch4-models/carbontracker/", files[1])) ##       units: mgCH4/m2/day (`natural` variable)
+# date range is 2000-2010
+
+
+
+# read in gcp models
+files <- list.files(paste0(loc, "grids/ch4-models/gcp-ch4_ncdfs/prescribed/"))
+
+# # check units
+# nc_open(paste0(loc, "grids/ch4-models/gcp-ch4_ncdfs/prescribed/", files[1])) ##       units: gCH4/m2/month
+# date range is 2000-2017 
+
+gcp <- list()
+gcp_tg <- list()
+gcp_tg_sums <- list()
+for(i in 1:length(files)){
+  gcp[[i]] <- stack(paste0(loc, "grids/ch4-models/gcp-ch4_ncdfs/prescribed/", files[i]))
+  gcp[[i]] <- gcp[[i]]
+  gcp_tg[[i]] <- gcp[[i]] * area(gcp[[i]]) * 10^6
+  gcp_tg_sums[[i]] <-  cellStats(gcp_tg[[i]], sum) / 10^12
+}
+
+gcp_tg_sums_vector <- list()
+for(i in 1:length(files)){
+  gcp_tg_sums_vector[[i]] <- unname(gcp_tg_sums[[i]])
+}
+
+gcp_tg_sums_all <- bind_cols(gcp_tg_sums_vector) 
+names(gcp_tg_sums_all) <- substr(files, 1, 10)
+
+gcp_tg_sums_all <- gcp_tg_sums_all %>% 
+  mutate(Year = rep(2001:2017, each = 12), 
+         Month = rep(1:12, 17)) 
+
+upscaling %>% 
+  left_join(gcp_tg_sums_all) %>% 
+  mutate(Dec_year = Year + Month/12) %>%
+  ggplot(aes(Dec_year, sums_mean)) +
+  
+  geom_line(aes(Dec_year, `CLASS-CTEM`), color = 'grey70', alpha = 0.7) +
+  geom_line(aes(Dec_year, `DLEM_ech4_`), color = 'grey70', alpha = 0.7) +
+  geom_line(aes(Dec_year, `ELM_ech4_c`), color = 'grey70', alpha = 0.7) +
+  geom_line(aes(Dec_year, `JSBACH_ech`), color = 'grey70', alpha = 0.7) +
+  geom_line(aes(Dec_year, `JULES_ech4`), color = 'grey70', alpha = 0.7) +
+  geom_line(aes(Dec_year, `LPJ-GUESS_`), color = 'grey70', alpha = 0.7) +
+  geom_line(aes(Dec_year, `LPJ-MPI_ec`), color = 'grey70', alpha = 0.7) +
+  geom_line(aes(Dec_year, `LPJ-WSL_ec`), color = 'grey70', alpha = 0.7) +
+  geom_line(aes(Dec_year, `LPX_ech4_c`), color = 'grey70', alpha = 0.7) +
+  geom_line(aes(Dec_year, `ORCHIDEE_e`), color = 'grey70', alpha = 0.7) +
+  geom_line(aes(Dec_year, `TEM-MDM_ec`), color = 'grey70', alpha = 0.7) +
+  geom_line(aes(Dec_year, `TRIPLEX-GH`), color = 'grey70', alpha = 0.7) +
+  geom_line(aes(Dec_year, `VISIT_ech4`), color = 'grey70', alpha = 0.7) +
+  
+    geom_ribbon(aes(ymin = sums_mean - sums_sd, ymax = sums_mean + sums_sd), fill =  "light pink", alpha = 0.4) + # add observations
+      geom_line(color = 'dark red') +
+  
+  labs(x = "Year", y = expression("Wetland Emissions\n(Tg CH4 per month)")) +
+  my_theme
+
+
+upscaling %>% 
+  left_join(gcp_tg_sums_all) %>% 
+  write.csv(paste0(loc, "predictions/gridded/tg/model_timeseries/gridded_sums_all.csv"), 
+            row.names = F)
+
+``` 
+
+
+
 #### 11. (cont.) Gridded variance vs. dissimilarity (not used!)
 
 ##### Prediction variance appears to be much more related to FCH4 variance for tower constituencies
