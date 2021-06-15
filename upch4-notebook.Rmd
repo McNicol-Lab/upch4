@@ -6465,7 +6465,6 @@ ggsave(paste0(loc, "dissimilarity/figures/error_vs_DI.png"),
        width = 15, height = 12, units = c("cm"), dpi = 300)
 ```
 
-
 #### 11. Upscaling
 ##### Create Forcing Data
 
@@ -7271,8 +7270,6 @@ sums %>%
 
 ```
 
-
-
 ###### Plot bootstrap sum histograms
 
 ```{r}
@@ -7334,4 +7331,60 @@ ggsave(paste0(loc, "/predictions/gridded/tg/figures/monthly_sums_histogram_2.png
        width = 12, height = 24, units = c("cm"), dpi = 300)
 ```
 
+#### 11. (cont.) Gridded variance vs. dissimilarity (not used!)
 
+##### Prediction variance appears to be much more related to FCH4 variance for tower constituencies
+
+```{r}
+# read in upscaling sd
+ch4 <- nc_open(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_nmolm2sec.nc"))
+ch4_sd <- ncvar_get(tgch4, "sd_ch4")
+
+lon <- ncvar_get(ch4, "longitude")
+lat <- ncvar_get(ch4, "latitude", verbose = F)
+t <- ncvar_get(ch4, "Time")
+
+fillvalue <- ncatt_get(ch4, "mean_ch4", "_FillValue")
+
+nc_close(ch4) 
+
+ch4_sd[ch4_sd == fillvalue$value] <- NA
+
+r_sd <- list()
+for(i in 1:216) {
+  r_sd[[i]] <- raster(t(ch4_sd[, , i]), xmn=min(lon), xmx=max(lon), ymn=min(lat), ymx=max(lat), crs=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs+ towgs84=0,0,0"))
+}
+
+r_sd_stack <- stack(r_sd)
+
+plot(r_sd_stack[[7]])
+
+# read in global dissimilarity
+di <- read.csv(paste0(loc, "dissimilarity/output/stats/all_monthly_global_DI7.csv"))
+x <- raster(xmn = -179.875, xmx = 179.875, ymn = -55.875, ymx = 84.875, res = c(0.2498264, 0.2495567), crs="+proj=longlat +datum=WGS84")
+di_global <- rasterize(di[, c('x', 'y')], x, di[, 'DI'])
+extent(di_global) <- extent(r_sd_stack[[7]])
+plot(di_global)
+
+# create stack
+sd_di_global <- stack(r_sd_stack[[7]], di_global)
+
+random_x <- sample(seq(-180, 180, 0.25), size = 5000, replace = T)
+random_y <- sample(seq(-55, 85, 0.25), size = 5000, replace = T)
+coords <- cbind(random_x, random_y)
+
+sd_di_extract <- extract(sd_di_global, coords) %>%
+  as_tibble() %>% 
+  filter(!is.na(layer.7) & !is.na(layer)) %>% 
+  rename("StDev" = layer.7, "DI" = layer)
+
+# look at relationship
+sd_di_extract %>% 
+  ggplot(aes(DI, StDev)) + 
+  geom_point() +
+  geom_smooth()
+
+# look at maps
+plot(sd_di_global)
+
+```
