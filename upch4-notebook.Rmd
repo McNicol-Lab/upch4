@@ -7345,7 +7345,16 @@ files <- list.files(paste0(loc, "grids/ch4-models/carbontracker/"))
 nc_open(paste0(loc, "grids/ch4-models/carbontracker/", files[1])) ##       units: mgCH4/m2/day (`natural` variable)
 # date range is 2000-2010
 
-
+ctracker <- stack(paste0(loc, "grids/ch4-models/carbontracker/", files), varname = "natural")
+ctracker_tg <- ctracker * area(ctracker) * 10^6 * 30 # area and time conversion 
+ctracker_tg_sums <- cellStats(ctracker_tg, sum) / 10^15 
+ctracker_tg_sums_vector <- unname(ctracker_tg_sums)
+ctracker_tg_sums_all <- ctracker_tg_sums_vector %>% 
+  as_tibble() %>% 
+  mutate(Year = rep(2000:2010, each = 12), 
+         Month = rep(1:12, 11)) %>% 
+  rename("ctracker" = "value")
+  
 
 # read in gcp models
 files <- list.files(paste0(loc, "grids/ch4-models/gcp-ch4_ncdfs/prescribed/"))
@@ -7359,7 +7368,6 @@ gcp_tg <- list()
 gcp_tg_sums <- list()
 for(i in 1:length(files)){
   gcp[[i]] <- stack(paste0(loc, "grids/ch4-models/gcp-ch4_ncdfs/prescribed/", files[i]))
-  gcp[[i]] <- gcp[[i]]
   gcp_tg[[i]] <- gcp[[i]] * area(gcp[[i]]) * 10^6
   gcp_tg_sums[[i]] <-  cellStats(gcp_tg[[i]], sum) / 10^12
 }
@@ -7373,11 +7381,12 @@ gcp_tg_sums_all <- bind_cols(gcp_tg_sums_vector)
 names(gcp_tg_sums_all) <- substr(files, 1, 10)
 
 gcp_tg_sums_all <- gcp_tg_sums_all %>% 
-  mutate(Year = rep(2001:2017, each = 12), 
-         Month = rep(1:12, 17)) 
+  mutate(Year = rep(2000:2017, each = 12), 
+         Month = rep(1:12, 18)) 
 
 upscaling %>% 
   left_join(gcp_tg_sums_all) %>% 
+  left_join(ctracker_tg_sums_all) %>% 
   mutate(Dec_year = Year + Month/12) %>%
   ggplot(aes(Dec_year, sums_mean)) +
   
@@ -7394,16 +7403,25 @@ upscaling %>%
   geom_line(aes(Dec_year, `TEM-MDM_ec`), color = 'grey70', alpha = 0.7) +
   geom_line(aes(Dec_year, `TRIPLEX-GH`), color = 'grey70', alpha = 0.7) +
   geom_line(aes(Dec_year, `VISIT_ech4`), color = 'grey70', alpha = 0.7) +
-  
-    geom_ribbon(aes(ymin = sums_mean - sums_sd, ymax = sums_mean + sums_sd), fill =  "light pink", alpha = 0.4) + # add observations
-      geom_line(color = 'dark red') +
-  
-  labs(x = "Year", y = expression("Wetland Emissions\n(Tg CH4 per month)")) +
-  my_theme
 
+   
+    geom_ribbon(aes(ymin = sums_mean - sums_sd, ymax = sums_mean + sums_sd), fill =  "light pink", alpha = 0.4) + # add observations
+    geom_line(color = 'dark red') +
+  
+    geom_line(aes(Dec_year, ctracker), color = "black") +
+  
+  scale_y_continuous(limits = c(0, 30)) +
+  scale_x_continuous(breaks = c(seq(2000, 2018, 2))) +
+  
+  labs(x = "Year", y = expression("Wetland Emissions (Tg "*CH[4]*~month^{-1}*")")) +
+  my_theme
+ggsave(paste(loc, "/predictions/gridded/tg/figures/model_timeseries.png", sep = ""),
+         width = 25, height = 16, units = c("cm"), dpi = 300)
+ 
 
 upscaling %>% 
   left_join(gcp_tg_sums_all) %>% 
+  left_join(ctracker_tg_sums_all) %>% 
   write.csv(paste0(loc, "predictions/gridded/tg/model_timeseries/gridded_sums_all.csv"), 
             row.names = F)
 
