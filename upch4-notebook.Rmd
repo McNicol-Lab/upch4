@@ -7139,6 +7139,61 @@ sum(joined_mbp$mean_FCH4P - joined_mbp$FCH4)/length(joined_mbp$mean_FCH4P)
 length(joined_mbp$mean_FCH4P)
 ```
 
+##### Tropical Africa flux comparisons (Jacob Shaw)
+
+```{r}
+# read in mg CH4 m-2 d-1 flux map - weighted by wetland area
+mgch4 <- stack(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_mgCH4m2day_Aw.nc"))
+bangweulu <- c(30.083333, -11.6)
+kafue <- c(27.283333, -15.716667)
+lukanga <- c(27.783333, -14.483333)
+coords <- rbind(bangweulu, kafue, lukanga)
+
+plot(mgch4[[1]])
+points(coords)
+
+mgch4_coords <- extract(mgch4, coords)
+
+# wrangle
+mgch4_coords <- mgch4_coords %>% as_tibble() %>% 
+  mutate(wetland = c("bangawulu", "kafue", "lukanga")) %>% 
+  dplyr::select(wetland, everything()) %>% 
+  gather(key = "timestep", value = "mgch4day", 2:217) %>% 
+  arrange(wetland) %>% 
+  mutate(year = rep(rep(2001:2018, each = 12), 3),
+         month = rep(rep(1:12, 18), 3)) %>% 
+  dplyr::select(year, month, wetland, mgch4day) %>% 
+  mutate(mgch4hr_weighted = mgch4day / 24) %>% 
+  group_by(wetland, month) %>% 
+  summarize(mgch4hr_weighted = mean(mgch4hr_weighted)) 
+
+write.csv(mgch4_coords, paste0(loc, "predictions/gridded/jacob_shaw_zambia/mgch4hr_weighted.csv"), row.names = F)
+  
+
+# read in nmol m-2 s-1 flux map - NOT weighted by wetland area
+nmolch4 <- stack(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_nmolm2sec.nc"))
+
+nmolch4_coords <- extract(nmolch4, coords)
+
+# wrangle
+nmolch4_coords <- nmolch4_coords %>% as_tibble() %>% 
+  mutate(wetland = c("bangawulu", "kafue", "lukanga")) %>% 
+  dplyr::select(wetland, everything()) %>% 
+  gather(key = "timestep", value = "nmolch4", 2:217) %>% 
+  arrange(wetland) %>% 
+  mutate(year = rep(rep(2001:2018, each = 12), 3),
+         month = rep(rep(1:12, 18), 3)) %>% 
+  dplyr::select(year, month, wetland, nmolch4) %>% 
+  mutate(mgch4hr_unweighted = nmolch4 * 3600 * 10^-6 * 16.04) %>% 
+  group_by(wetland, month) %>% 
+  summarize(mgch4hr_unweighted = mean(mgch4hr_unweighted))
+
+write.csv(nmolch4_coords, paste0(loc, "predictions/gridded/jacob_shaw_zambia/mgch4hr_unweighted.csv"), row.names = F)
+
+
+```
+
+
 ##### Calculate Global Grid Tg Totals (METHOD 1: Grid output summed means and summed sd) 
 
 ###### I chose the output of this method for the global sums! For the other two methods, we do not have the individual bootstrap sums for each region, only globally
@@ -7262,11 +7317,11 @@ bootstrap_sums %>%
 ###### Calculate the time series average from the output of METHOD 1
 
 ```{r}
-sums <- read.csv(paste0(loc, "predictions/gridded/tg/sums_method1/ppr/annual_sums.csv"))
+sums <- read.csv(paste0(loc, "predictions/gridded/tg/sums_method1/global/annual_sums.csv"))
 
 sums %>% 
   summarize(timeseries_sum_mean_tg = mean(sum_mean_tg),
-            timeseries_sum_ci_tg = mean(sum_sd_tg)*1.96)
+            timeseries_sum_ci_tg = mean(sum_sd_tg))
 
 ```
 
