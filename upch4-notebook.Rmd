@@ -7479,9 +7479,34 @@ upscaling %>%
   left_join(ctracker_tg_sums_all) %>% 
   write.csv(paste0(loc, "predictions/gridded/tg/model_timeseries/gridded_sums_all.csv"), 
             row.names = F)
-
 ``` 
 
+##### Compare annual totals for GCP and Carbon Tracker, and NSE values
+
+```{r}
+grid_sums <- read.csv(paste0(loc, "predictions/gridded/tg/model_timeseries/gridded_sums_all.csv"))
+
+grid_sums %>% 
+  group_by(Year) %>% 
+  summarize_all(list(~sum(., na.rm = T)))
+
+grid_sums %>% 
+  group_by(Year) %>% 
+  summarize_all(list(~sum(., na.rm = T))) %>% 
+  ungroup() %>% 
+  summarize_all(list(~mean(., na.rm = T)))
+
+grid_sums %>% 
+  filter(!Year == 2018) %>% 
+  gather(key = "gcp_model", value = "sum", 5:17) %>% 
+  group_by(gcp_model) %>% 
+  summarize(R2 = cor(sum, sums_mean)^2,
+            MADiff = sum(abs(sums_mean - sum))/n(),
+            Diff = mean(sum - sums_mean)) %>% 
+  arrange(MADiff) %>% 
+  write.csv(paste0(loc, "predictions/gridded/tg/model_timeseries/gcp_metrics.csv"), row.names = F)
+  
+```
 
 
 #### 11. (cont.) Gridded variance vs. dissimilarity (not used!)
