@@ -7199,7 +7199,7 @@ write.csv(nmolch4_coords, paste0(loc, "predictions/gridded/jacob_shaw_zambia/mgc
 ###### I chose the output of this method for the global sums! For the other two methods, we do not have the individual bootstrap sums for each region, only globally
 ###### I then adapted this method to output sums and sds for each region (the regionalization code is commented out)
 
-```{r}
+```{r echo = F, warning = F, message = F}
 tgch4 <- nc_open(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_TgCH4month_Aw.nc"))
 tgch4_mean <- ncvar_get(tgch4, "mean_ch4")
 tgch4_sd <- ncvar_get(tgch4, "sd_ch4")
@@ -7321,7 +7321,7 @@ bootstrap_sums %>%
 ###### Calculate the time series average from the output of METHOD 1
 
 ```{r}
-sums <- read.csv(paste0(loc, "predictions/gridded/tg/sums_method1/global/annual_sums.csv"))
+sums <- read.csv(paste0(loc, "predictions/gridded/tg/sums_method1/indonesia/annual_sums.csv"))
 
 sums %>% 
   summarize(timeseries_sum_mean_tg = mean(sum_mean_tg),
