@@ -7240,12 +7240,12 @@ e10 <- extent(28, 34.5, 5, 10)
 e11 <- extent(15, 23, -5, 3)
 e12 <- extent(95, 120, -4, 5)
 
-extents <- list(e1, e2, e3, e4, e5, e6, e7, e8, e9)
+extents <- list(e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12)
 
 for (i in 1:length(regions)){
 
  # Regional extents
-  e <- extents[[1]]
+  e <- extents[[i]]
   regional_r_mean <- crop(r_mean_stack, e)
   regional_r_sd <- crop(r_sd_stack, e)
 
