@@ -7321,7 +7321,7 @@ bootstrap_sums %>%
 ###### Calculate the time series average from the output of METHOD 1
 
 ```{r}
-sums <- read.csv(paste0(loc, "predictions/gridded/tg/sums_method1/indonesia/annual_sums.csv"))
+sums <- read.csv(paste0(loc, "predictions/gridded/tg/sums_method1/tropics/annual_sums.csv"))
 
 sums %>% 
   summarize(timeseries_sum_mean_tg = mean(sum_mean_tg),
@@ -7494,9 +7494,19 @@ grid_sums %>%
   group_by(Year) %>% 
   summarize_all(list(~sum(., na.rm = T)))
 
+# gcp sums
 grid_sums %>% 
   group_by(Year) %>% 
   summarize_all(list(~sum(., na.rm = T))) %>% 
+  ungroup() %>% 
+  summarize_all(list(~mean(., na.rm = T)))
+
+# ctracker sums
+grid_sums %>% 
+  group_by(Year) %>% 
+  summarize_all(list(~sum(., na.rm = T))) %>% 
+  dplyr::select(Year, Month, ctracker) %>% 
+  filter(ctracker != 0) %>% 
   ungroup() %>% 
   summarize_all(list(~mean(., na.rm = T)))
 
