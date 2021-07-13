@@ -2784,7 +2784,21 @@ all_data <- read.csv(paste(loc, "/training-data/all_data.csv", sep = "")) %>%
   dplyr::select(-`Upland.Class`)
 ```
 
-##### Subset only days with at least one observation
+##### What is the distribution of imputed %s?
+
+```{r}
+all_data %>% 
+  mutate(exclude = ifelse(imputed > 0.857, "yes", "no")) %>% 
+  ggplot(aes(imputed, fill = exclude, color = exclude)) +
+  geom_histogram(alpha = 0.2) +
+  geom_vline(xintercept = 0.857) +
+  labs(x = "Imputed fraction", y = "Number of weeks") +
+  my_theme
+ggsave(paste0(loc, "training-data/missingness/fch4-gap-distribution.png"),
+       width = 15, height = 10, units = c("cm"), dpi = 900)
+```
+
+##### Subset only weeks with at least one day (14%) of observations
 
 ```{r}
 all_data <- all_data %>% 
