@@ -31,6 +31,7 @@ library(proxy)
 library(vegan)
 library(rworldmap)
 library(rgdal)
+library(rgeos)
 library(VGAM)
 library(pdp)
 library(rnaturalearth)
@@ -2910,6 +2911,7 @@ raster.names <- list.files(paste0(loc, "grids/WAD2M/"), pattern = "nc$", full.na
 stack <- stack(paste0(loc, "grids/WAD2M/", raster.names[1]))
 
 # get maximum wetland extent (August)
+# cellStats(stack, sum)
 max <- stack[[8]]
 
 # convert to spatial dataframe
@@ -2920,7 +2922,7 @@ colnames(max_df) <- c("value", "x", "y")
 st_crs(cluster_count) <- 4236
 
 # get colors
-col_vector <-  c("#E78AC3","#F1E2CC","#33A02C","#377EB8","#E41A1C","#999999")
+col_vector <-  c("#E78AC3","orange","#33A02C","#377EB8","#E41A1C","#999999")
 
 # load worldmap
 world <- ne_countries(scale = "medium", returnclass = "sf")
@@ -3532,7 +3534,7 @@ col_vector = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_co
 col_vector_values = sample(col_vector, length(levels(factor(rf.pred.all$Cluster))), replace=FALSE)
 col_vector_values[1:6]
 
-class_col_vector <- c("#E78AC3","#F1E2CC","#33A02C","#377EB8","#E41A1C","#999999")
+class_col_vector <- c("#E78AC3","orange","#33A02C","#377EB8","#E41A1C","#999999")
 ```
 
 ##### Create a Climate-by-latitude class
@@ -3965,6 +3967,8 @@ write.csv(sitemean_data, paste(loc, "predictions/cv/sitemean_wo_usowc.csv", sep 
 ##### Other sitemean plots
 
 ```{r}
+
+sitemean_data <- read.csv(paste0(loc, "predictions/cv/sitemean_wo_usowc.csv"))
 
 # plot histogram of site year performance: BIAS
 sitemean_data %>% 
