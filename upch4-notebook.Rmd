@@ -7218,13 +7218,16 @@ write.csv(nmolch4_coords, paste0(loc, "predictions/gridded/jacob_shaw_zambia/mgc
 ###### I then adapted this method to output sums and sds for each region (the regionalization code is commented out)
 
 ```{r echo = F, warning = F, message = F}
-tgch4 <- nc_open(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_TgCH4month_Aw.nc"))
+
+# CHOOSE WAD2M OR GIEMS OUTPUT
+tgch4 <- nc_open(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_TgCH4month_Aw_giems2.nc"))
 tgch4_mean <- ncvar_get(tgch4, "mean_ch4")
 tgch4_sd <- ncvar_get(tgch4, "sd_ch4")
 
 lon <- ncvar_get(tgch4, "longitude")
 lat <- ncvar_get(tgch4, "latitude", verbose = F)
 t <- ncvar_get(tgch4, "Time")
+years <- length(t)/12
 
 fillvalue <- ncatt_get(tgch4, "mean_ch4", "_FillValue")
 
@@ -7235,7 +7238,7 @@ tgch4_sd[tgch4_sd == fillvalue$value] <- NA
 
 r_mean <- list()
 r_sd <- list()
-for(i in 1:216) {
+for(i in 1:length(t)) { 
   r_mean[[i]] <- raster(t(tgch4_mean[, , i]), xmn=min(lon), xmx=max(lon), ymn=min(lat), ymx=max(lat), crs=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs+ towgs84=0,0,0"))
   r_sd[[i]] <- raster(t(tgch4_sd[, , i]), xmn=min(lon), xmx=max(lon), ymn=min(lat), ymx=max(lat), crs=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs+ towgs84=0,0,0"))
 }
@@ -7273,8 +7276,8 @@ sums_sd <- cellStats(regional_r_sd, sum)
 upscaling_sums <- cbind(sums_mean, sums_sd) %>% 
   as_tibble() %>% 
   mutate(row = 1:n(),
-         Year = rep(2001:2018, each = 12),
-         Month = rep(1:12, 18)) %>% 
+         Year = rep(2001:(2001+years-1), each = 12),
+         Month = rep(1:12, years)) %>% 
   dplyr::select(row, Year, Month, sums_mean, sums_sd)
 
 annual_sums <- upscaling_sums %>% 
@@ -7287,9 +7290,9 @@ monthly_cycle <- upscaling_sums %>%
   summarize(sum_mean_tg = mean(sums_mean),
             sum_sd_tg = mean(sums_sd))
 
-write.csv(upscaling_sums, paste0(loc, "predictions/gridded/tg/sums_method1/", regions[i], "/upscaling_sums.csv"), row.names = F)
-write.csv(annual_sums, paste0(loc, "predictions/gridded/tg/sums_method1/", regions[i], "/annual_sums.csv"), row.names = F)
-write.csv(monthly_cycle, paste0(loc, "predictions/gridded/tg/sums_method1/", regions[i], "/monthly_cycle.csv"), row.names = F)
+write.csv(upscaling_sums, paste0(loc, "predictions/gridded/tg/sums_method1/", regions[i], "/upscaling_sums_giems2.csv"), row.names = F)
+write.csv(annual_sums, paste0(loc, "predictions/gridded/tg/sums_method1/", regions[i], "/annual_sums_giems2.csv"), row.names = F)
+write.csv(monthly_cycle, paste0(loc, "predictions/gridded/tg/sums_method1/", regions[i], "/monthly_cycle_giems2.csv"), row.names = F)
 
 }
 ```
