@@ -2910,8 +2910,16 @@ cluster_count <- read.csv(paste0(loc, "training-data/clusters/cluster_bycluster.
 raster.names <- list.files(paste0(loc, "grids/WAD2M/"), pattern = "nc$", full.names = F)
 stack <- stack(paste0(loc, "grids/WAD2M/", raster.names[1]))
 
+# # get monthly wetland area 
+# wad2m_global_area <- cellStats(stack, sum)
+# wad2m_global_area %>% 
+#   unname() %>% 
+#   as_tibble() %>% 
+#   rename(area = value) %>% 
+#   mutate(timestep = 1:length(wad2m_global_area)) %>% 
+#   write.csv(paste0(loc, "/training-data/clusters/wad2m-area.csv"))
+
 # get maximum wetland extent (August)
-# cellStats(stack, sum)
 max <- stack[[8]]
 
 # convert to spatial dataframe
