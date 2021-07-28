@@ -2966,7 +2966,19 @@ ggsave(paste0(loc, "training-data/clusters/clusters_map.png"),
 write.csv(all_data, paste(loc, "training-data/final.csv", sep  = ""), row.names = F)
 ```
 
-##### Rank predictors using FFS (ALL)
+##### Summarize/visualize the temporal distribution of data
+
+```{r}
+all_data <- read.csv(paste0(loc, "training-data/final.csv"))
+
+head(all_data)
+all_data %>% 
+  group_by(Year) %>% 
+  summarize(count = n(),
+            percentage = count/length(all_data$Cluster)*100) %>% 
+  write.csv(paste0(loc, "/training-data/temporal_distribution.csv"))
+```
+
 
 #### 6. (cont.) Read in final data and predictor metadata
 
