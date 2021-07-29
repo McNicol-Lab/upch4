@@ -3612,7 +3612,7 @@ ggsave(paste(loc, "predictions/cv/residuals_error.png", sep = ""),
        width = 13, height = 15, units = c("cm"), dpi = 300)
 ```
 
-###### Global Metrics
+##### Global Metrics
 
 ```{r}
 global <- ungroup(rf.pred.all) %>% 
@@ -3735,7 +3735,7 @@ write.csv(global,
           row.names = F)
 ```
 
-###### Site-mean metrics
+##### Site-mean metrics
 
 ```{r}
 ## performance metrics broken down by site-means, seasonal cycle and weekly/daily anomalies
