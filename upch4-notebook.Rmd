@@ -6617,6 +6617,68 @@ data %>%
 ```
 
 
+##### Make map of nmol predictions (unweighted)
+
+```{r}
+# read in nmol flux map - unweighted by wetland area
+nmol <- stack(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_nmolm2sec.nc"))
+
+# get WAD2M
+raster.names <- list.files(paste0(loc, "grids/WAD2M/"), pattern = "nc$", full.names = F)
+stack <- stack(paste0(loc, "grids/WAD2M/", raster.names[1]))
+
+# get maximum wetland extent (August)
+max <- stack[[8]]
+
+plot(max)
+
+# set all pixels corresponding to WAD2M august NAs to NA throughout the nmol stack
+for(i in 1:nlayers(nmol)){
+  nmol[[i]][is.na(max)] <- NA
+
+}
+
+plot(nmol[[8]])
+
+# convert to spatial dataframe
+nmol_spdf <- as(nmol, "SpatialPixelsDataFrame")
+head(nmol_spdf)
+nmol_df <- as.data.frame(nmol_spdf) %>% 
+  gather(key = "timestep", value = "ch4_flux_nmol", 1:216) 
+head(nmol_df)
+
+# compute mean of "at least some wetland area" cover
+nmol_df %>% 
+  dplyr::select(ch4_flux_nmol) %>% 
+  ggplot(aes(ch4_flux_nmol)) +
+  geom_histogram() +
+  my_theme +
+  labs(x = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'), y = "Count")
+ggsave(paste0(loc, "predictions/gridded/nmol/figures/nmol_global_distribution.png"), 
+              width = 15, height = 12, units = c("cm"), dpi = 300)
+
+# # assign all NAs to zero so that we can compute a mean flux across all grids
+nmol[is.na(nmol)] <- 0
+
+# compute mean raster for a figure
+nmol_mean <- mean(nmol)
+
+# remove all zero wetland cover
+nmol_mean[is.na(max)] <- NA
+
+plot(nmol_mean)
+
+
+
+coords <- c(-150, 0) %>% matrix(ncol = 2)
+
+test <- extract(nmol[[7]], coords)
+
+
+
+```
+
+
 ##### Get the upscaling grid predictions at each site
 
 ```{r}
@@ -7362,7 +7424,7 @@ bootstrap_sums %>%
 ###### Calculate the time series average from the output of METHOD 1
 
 ```{r}
-sums <- read.csv(paste0(loc, "predictions/gridded/tg/sums_method1/tropics/annual_sums.csv"))
+sums <- read.csv(paste0(loc, "predictions/gridded/tg/sums_method1/tropics/annual_sums_giems2.csv"))
 
 sums %>% 
   summarize(timeseries_sum_mean_tg = mean(sum_mean_tg),
