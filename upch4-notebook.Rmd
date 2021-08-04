@@ -7424,7 +7424,7 @@ bootstrap_sums %>%
 ###### Calculate the time series average from the output of METHOD 1
 
 ```{r}
-sums <- read.csv(paste0(loc, "predictions/gridded/tg/sums_method1/global/annual_sums.csv"))
+sums <- read.csv(paste0(loc, "predictions/gridded/tg/sums_method1/tropics/annual_sums.csv"))
 
 sums %>% 
   summarize(timeseries_sum_mean_tg = mean(sum_mean_tg),
@@ -7640,24 +7640,24 @@ col_vector <-  c("#33A02C","#377EB8","black","#E78AC3")
 # make global figure
 fig6_sums %>% 
   arrange(order) %>% 
-  filter(domain == "Congo") %>% 
+  filter(domain == "HBL") %>% 
   mutate(ref = factor(ref, levels = ref)) %>%  
   ggplot(aes(ref, annual, shape = class, color = class)) +
-    # geom_hline(
-    #   yintercept = fig6_sums[which(fig6_sums$ref == "McNicol et al. WAD2M"
-    #                                & fig6_sums$domain == "Amazon"), 6],
-    #   linetype = 2, color = "grey") +
+    geom_hline(
+      yintercept = fig6_sums[which(fig6_sums$ref == "McNicol et al. WAD2M"
+                                   & fig6_sums$domain == "HBL"), 6],
+      linetype = 2, color = "grey") +
   geom_point(size = 4) +
   geom_errorbar(aes(ref, ymin = lower, ymax = upper, width = 0)) +
   # geom_polygon(aes(x = c(1,10), y = c(2.1, 3.4))) +
   labs(x = "Reference", y = expression(atop("Global CH"[4]*" Emissions",
                                   "(Tg yr"^{-1}*")"))) +
-  scale_color_manual(values = c("#377EB8","black","#E78AC3")) +
-  scale_shape_manual(values = c(17, 15, 16)) +
+  scale_color_manual(values = col_vector) +
+  # scale_shape_manual(values = c(16, 15, 3)) +
   coord_flip() +
   my_theme
-ggsave(paste0(loc, "predictions/gridded/tg/figures/congo_comparison.png"),
-       width = 20, height = 10, units = c("cm"), dpi = 300)
+ggsave(paste0(loc, "predictions/gridded/tg/figures/hbl_comparison.png"),
+       width = 20, height = 15, units = c("cm"), dpi = 300)
 
 
 ```
