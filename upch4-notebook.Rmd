@@ -6794,6 +6794,29 @@ site.data <- read.csv(paste0(loc, "training-data/final.csv")) %>%
 site.all <- site.pred %>% left_join(site.data)
   
 ```
+###### Summary Stats
+
+```{r}
+# global metrics
+ungroup(site.all) %>% 
+  filter(!is.na(mean_FCH4) & !is.na(mean_FCH4P)) %>% 
+  # filter(!ID == "USOWC") %>%
+  summarize(samples = n(),
+            R2 = cor(mean_FCH4P, mean_FCH4)^2,
+            NSE = 1 - sum((mean_FCH4 - mean_FCH4P)^2) / sum((mean_FCH4 - mean(mean_FCH4))^2),
+            MAE = sum(abs(mean_FCH4 - mean_FCH4P))/n(),
+            nMAE = MAE/sd(mean_FCH4),
+            MeanO = mean(mean_FCH4),
+            MedO = median(mean_FCH4),
+            sdO = sd(mean_FCH4),
+            MeanP = mean(mean_FCH4P),
+            MedP = median(mean_FCH4P),
+            sdP = sd(mean_FCH4P),
+            nSD = sdP/sdO,
+            Bias = mean(mean_FCH4P - mean_FCH4),
+            cBias = abs(Bias)/sum(abs(Bias))*100)
+```
+
 
 ###### Bog
 
