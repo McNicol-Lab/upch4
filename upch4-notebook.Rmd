@@ -7118,9 +7118,10 @@ joined_qfr <- site.pred %>%
   left_join(PEQFR)  %>% 
   filter(!is.na(FCH4))
 
-cor(joined_qfr$mean_FCH4P, joined_qfr$FCH4)^2
-sum(abs(joined_qfr$mean_FCH4P - joined_qfr$FCH4))/length(joined_qfr$mean_FCH4P)
-sum(joined_qfr$mean_FCH4P - joined_qfr$FCH4)/length(joined_qfr$mean_FCH4P)
+cor(joined_qfr$mean_FCH4P, joined_qfr$FCH4)^2 # r2
+sum(abs(joined_qfr$mean_FCH4P - joined_qfr$FCH4))/length(joined_qfr$mean_FCH4P) # mae
+sum(abs(joined_qfr$mean_FCH4P - joined_qfr$FCH4))/length(joined_qfr$mean_FCH4P)/sd(joined_qfr$FCH4) # nmae
+sum(joined_qfr$mean_FCH4P - joined_qfr$FCH4)/length(joined_qfr$mean_FCH4P) # bias
 length(joined_qfr$mean_FCH4P)
 ```
 
@@ -7164,9 +7165,10 @@ joined_alq <- site.pred %>%
   left_join(USALQ)  %>% 
   filter(!is.na(FCH4))
 
-cor(joined_alq$mean_FCH4P, joined_alq$FCH4)^2
-sum(abs(joined_alq$mean_FCH4P - joined_alq$FCH4))/length(joined_alq$mean_FCH4P)
-sum(joined_alq$mean_FCH4P - joined_alq$FCH4)/length(joined_alq$mean_FCH4P)
+cor(joined_alq$mean_FCH4P, joined_alq$FCH4)^2 #r2
+sum(abs(joined_alq$mean_FCH4P - joined_alq$FCH4))/length(joined_alq$mean_FCH4P) #mae
+sum(abs(joined_alq$mean_FCH4P - joined_alq$FCH4))/length(joined_alq$mean_FCH4P)/sd(joined_alq$FCH4) # nmae
+sum(joined_alq$mean_FCH4P - joined_alq$FCH4)/length(joined_alq$mean_FCH4P) #bias
 length(joined_alq$mean_FCH4P)
 ```
 
@@ -7212,6 +7214,7 @@ joined_cf2 <- site.pred %>%
 
 cor(joined_cf2$mean_FCH4P, joined_cf2$FCH4)^2
 sum(abs(joined_cf2$mean_FCH4P - joined_cf2$FCH4))/length(joined_cf2$mean_FCH4P)
+sum(abs(joined_cf2$mean_FCH4P - joined_cf2$FCH4))/length(joined_cf2$mean_FCH4P)/sd(joined_cf2$FCH4) # nmae
 sum(joined_cf2$mean_FCH4P - joined_cf2$FCH4)/length(joined_cf2$mean_FCH4P)
 length(joined_cf2$mean_FCH4P)
 ```
@@ -7258,6 +7261,7 @@ joined_mbp <- site.pred %>%
 
 cor(joined_mbp$mean_FCH4P, joined_mbp$FCH4)^2
 sum(abs(joined_mbp$mean_FCH4P - joined_mbp$FCH4))/length(joined_mbp$mean_FCH4P)
+sum(abs(joined_mbp$mean_FCH4P - joined_mbp$FCH4))/length(joined_mbp$mean_FCH4P)/sd(joined_mbp$FCH4) # nmae
 sum(joined_mbp$mean_FCH4P - joined_mbp$FCH4)/length(joined_mbp$mean_FCH4P)
 length(joined_mbp$mean_FCH4P)
 ```
