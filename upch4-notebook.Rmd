@@ -6149,6 +6149,11 @@ for(i in 1:12){
 monthly_global_DI_subset <- bind_rows(monthly_global_DI_subset)
 write.csv(monthly_global_DI_subset, paste0(loc, "dissimilarity/output/stats/all_monthly_global_DI_subset.csv"), row.names = F)
 ```
+#### Read in DI data
+
+```{r}
+monthly_global_DI <- read.csv(paste0(loc, "dissimilarity/output/stats/all_monthly_global_DI_subset.csv"))
+```
 
 ##### Look at the distribution of distances 
 
@@ -6231,7 +6236,7 @@ monthly_global_DI %>%
 ##### look at constituency size, and the relationship with mean dissimilarity from the tower 
 
 ```{r}
-monthly_global_DI %>% 
+monthly_global_DI_plot <- monthly_global_DI %>% 
   dplyr::select(closest_tower, DI) %>% 
   mutate(closest_tower = substr(closest_tower,1,5)) %>% 
   mutate(closest_tower = as.factor(closest_tower),
@@ -6241,9 +6246,14 @@ monthly_global_DI %>%
             DI = mean(DI)) %>% 
   ungroup() %>% 
   mutate(cover = pixels/sum(pixels)*100) %>% 
-  arrange(desc(cover)) %>% 
+  arrange(desc(cover)) 
+
+summary(lm(monthly_global_DI_plot$DI ~ monthly_global_DI_plot$cover))
+  
+monthly_global_DI_plot %>% 
   ggplot(aes(cover, DI)) + 
   geom_point() +
+  geom_smooth(method = "lm", se = F) +
   labs(x = "Global Cover (%)", y = "Dissimilarity Index") +
   my_theme
 ggsave(paste0(loc, "dissimilarity/figures/all_constituency_size_DI.png"),
@@ -6471,11 +6481,13 @@ No interesting result.
 ```{r}
 df <- di_curve %>% dplyr::select(y = var, x = DI)
 
+summary(lm(di_curve$var ~ di_curve$DI)) # get p value
+
 di_curve %>%
   filter(!ID == "USOWC") %>%
   ggplot(aes(DI, var)) +
   geom_point() +
-  geom_smooth(method = 'lm', se = FALSE) +
+  geom_smooth(method = 'lm', formula = formula, se = FALSE) +
   # geom_text(x = 0.2, y = 6000, label = lm_eqn(df), parse = TRUE, size = 5) +
   labs(x = "Dissimilairty Index", y = expression(atop("Extraplation Variance", "(nmol m"^{-2}*" s"^{-1}*")"))) +
   my_theme
@@ -6489,7 +6501,15 @@ summary(lm(y ~ x, data = df))
 ##### Look at relationship (MAE vs. DI)
 
 ```{r}
-site_month_DI %>% 
+site_month_DI_metrics <- site_month_DI  %>% 
+  filter(ID != "USOWC") %>% 
+  dplyr::select(ID, Month, min_dist, mean_cvCluster_dist, DI) %>% 
+  right_join(site_month_metrics, by = c("ID", "Month"))
+
+summary(lm(site_month_DI_metrics$MAE ~ site_month_DI_metrics$DI)) # get p value
+
+
+site_month_DI_metrics %>% 
   filter(ID != "USOWC") %>% 
   dplyr::select(ID, Month, min_dist, mean_cvCluster_dist, DI) %>% 
   right_join(site_month_metrics, by = c("ID", "Month")) %>% 
