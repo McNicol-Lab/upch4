@@ -7545,7 +7545,16 @@ ggsave(paste0(loc, "/predictions/gridded/tg/figures/monthly_sums_histogram_2.png
 ```{r warning = F, message = F, echo = F}
 # read in upscaling monthly mean and variance
 upscaling <- read.csv(paste0(loc, "predictions/gridded/tg/sums_method1/global/upscaling_sums.csv")) %>% 
-  dplyr::select(-row) 
+  dplyr::select(-row) %>% 
+  mutate(wetlands = "WAD2M")
+
+# read in GIEMS-2 upscaling monthly mean and variance
+upscaling_giems <- read.csv(paste0(loc, "predictions/gridded/tg/sums_method1/global/upscaling_sums_giems2.csv")) %>% 
+  dplyr::select(-row) %>% 
+  mutate(wetlands = "GIEMS-2")
+
+# combine
+upscaling <- bind_rows(upscaling, upscaling_giems)
 
 # read in carbon tracker (Top down model)
 files <- list.files(paste0(loc, "grids/ch4-models/carbontracker/"))
@@ -7597,7 +7606,7 @@ upscaling %>%
   left_join(gcp_tg_sums_all) %>% 
   left_join(ctracker_tg_sums_all) %>% 
   mutate(Dec_year = Year + Month/12) %>%
-  ggplot(aes(Dec_year, sums_mean)) +
+  ggplot(aes(Dec_year, sums_mean, linetype = wetlands)) +
   
   geom_line(aes(Dec_year, `CLASS-CTEM`), color = 'grey70', alpha = 0.7) +
   geom_line(aes(Dec_year, `DLEM_ech4_`), color = 'grey70', alpha = 0.7) +
@@ -7614,13 +7623,16 @@ upscaling %>%
   geom_line(aes(Dec_year, `VISIT_ech4`), color = 'grey70', alpha = 0.7) +
 
    
-    geom_ribbon(aes(ymin = sums_mean - sums_sd, ymax = sums_mean + sums_sd), fill =  "light pink", alpha = 0.4) + # add observations
-    geom_line(color = 'dark red') +
+    geom_ribbon(aes(ymin = sums_mean - sums_sd, ymax = sums_mean + sums_sd, fill = wetlands), alpha = 0.2) + # add observations
+    geom_line(aes(color = wetlands)) +
   
-    geom_line(aes(Dec_year, ctracker), color = "black") +
+    geom_line(aes(Dec_year, ctracker), color = "dark green", linetype = "F1") +
   
   scale_y_continuous(limits = c(0, 30)) +
   scale_x_continuous(breaks = c(seq(2000, 2018, 2))) +
+  scale_linetype_manual(values = c("longdash", "solid")) +
+  scale_fill_manual(values = c("yellow", "purple")) +
+  scale_color_manual(values = c("black", "black")) +
   
   labs(x = "Year", y = expression("Wetland Emissions (Tg "*CH[4]*~month^{-1}*")")) +
   my_theme
