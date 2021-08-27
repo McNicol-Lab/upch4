@@ -2959,8 +2959,7 @@ ggplot() +
   ggtitle("LOOCV Clusters", subtitle = paste0("(43 sites in ", length(unique(cluster_count$Cluster))," clusters)")) + 
   theme_map +
   theme(legend.position = 'right',
-        legend.direction = 'vertical') +
-  coord_proj("+proj=robin +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
+        legend.direction = 'vertical') 
 
 ggsave(paste0(loc, "training-data/clusters/clusters_map.png"),
        width = 24, height = 20, units = c("cm"), dpi = 900)
