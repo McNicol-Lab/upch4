@@ -3738,6 +3738,56 @@ write.csv(global,
           row.names = F)
 ```
 
+##### Northern latitude metrics
+
+For comparison to Peltola et al. (2019)
+```{r}
+# for monthly global comparisons
+ungroup(rf.pred.all) %>% 
+  filter(!ID == "USOWC") %>%
+  group_by(ID, Year, Month) %>% 
+  summarize(FCH4 = mean(FCH4, na.rm = T),
+         FCH4P = mean(FCH4P, na.rm = T)) %>% 
+  ungroup() %>% 
+  summarize(samples = n(),
+            R2 = cor(FCH4P, FCH4)^2,
+            NSE = 1 - sum((FCH4 - FCH4P)^2) / sum((FCH4 - mean(FCH4))^2),
+            MAE = sum(abs(FCH4 - FCH4P))/n(),
+            nMAE = MAE/sd(FCH4),
+            MeanO = mean(FCH4),
+            MedO = median(FCH4),
+            sdO = sd(FCH4),
+            MeanP = mean(FCH4P),
+            MedP = median(FCH4P),
+            sdP = sd(FCH4P),
+            nSD = sdP/sdO,
+            Bias = mean(FCH4P - FCH4),
+            cBias = abs(Bias)/sum(abs(Bias))*100) 
+
+# for monthly northern comparisons
+ungroup(rf.pred.all) %>% 
+  filter(!ID == "USOWC" & Latitude >= 45) %>%
+  group_by(ID, Year, Month) %>% 
+  summarize(FCH4 = mean(FCH4, na.rm = T),
+         FCH4P = mean(FCH4P, na.rm = T)) %>% 
+  ungroup() %>% 
+  summarize(samples = n(),
+            R2 = cor(FCH4P, FCH4)^2,
+            NSE = 1 - sum((FCH4 - FCH4P)^2) / sum((FCH4 - mean(FCH4))^2),
+            MAE = sum(abs(FCH4 - FCH4P))/n(),
+            nMAE = MAE/sd(FCH4),
+            MeanO = mean(FCH4),
+            MedO = median(FCH4),
+            sdO = sd(FCH4),
+            MeanP = mean(FCH4P),
+            MedP = median(FCH4P),
+            sdP = sd(FCH4P),
+            nSD = sdP/sdO,
+            Bias = mean(FCH4P - FCH4),
+            cBias = abs(Bias)/sum(abs(Bias))*100) 
+```
+
+
 ##### Site-mean metrics
 
 ```{r}
