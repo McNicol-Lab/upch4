@@ -2440,6 +2440,7 @@ all_data %>%
 all_data %>% 
   filter(is.na(wc_mtdq))
 ```
+
 ##### Fix by set Month 2, Week 8 equal to Month 2 Week 7: [ for daily data only ]
 
 ```{r}
@@ -2712,12 +2713,12 @@ all_data %>%
   mutate(obs_threshold = ifelse(imputed < 0.857, "yes", "no")) %>% 
     ggplot(aes(Week, TA, color = obs_threshold, alpha = obs_threshold)) +
     geom_point() +
-    facet_wrap(~ID, scales = 'free') + 
+    facet_wrap(~ID, scales = 'free', ncol = 5) + 
     labs(y = expression("Air Temperature ("*degree*"C)")) +
     my_theme +
     scale_color_manual(values = c("grey", "black")) + scale_alpha_manual(values = c(0.3, 1))
 ggsave(paste(loc, "/training-data/imputation-qc/weekly/TA.png", sep = ""),
-               width = 40, height = 30, units = c("cm"), dpi = 300)
+               width = 30, height = 40, units = c("cm"), dpi = 300)
 
 # PA
 all_data %>% 
@@ -4084,10 +4085,10 @@ ungroup(rf.pred.all) %>%
   # scale_x_log10(limits = c(6,700)) +
   # scale_y_log10(limits = c(6,700)) +
   geom_point(size = 4, alpha = 0.85) +
-  geom_abline(slope = 1, intercept = 0, colour = 'grey') +
+  geom_abline(slope = 1, intercept = 0, colour = 'black', linetype = 2) +
   scale_color_manual(values = class_col_vector) +
   my_theme +
-  labs(x= expression('Obs. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'), y = expression('Pred. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'))
+  labs(x= expression('Observed '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'), y = expression('Predicted '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'))
 ggsave(paste(loc, "predictions/cv/sitemean_pvo.png", sep = ""),
        width = 20, height = 13, units = c("cm"), dpi = 300)
 
@@ -4489,10 +4490,16 @@ ggsave(paste(loc, "predictions/cv/msc_pvo_climate.png", sep = ""),
 climate_names <- c(`1` = "Tundra", `2` = "Boreal", `3` = "Temperate", `4` = "Tropical")
 
 ungroup(rf.pred.all) %>% 
-  group_by(ID) %>%
+  filter(!ID == "USOWC") %>%
+  mutate(Climate_letter = ifelse(Climate == 1, "(a)", NA),
+         Climate_letter = ifelse(Climate == 2, "(b)", Climate_letter),
+         Climate_letter = ifelse(Climate == 3, "(c)", Climate_letter),
+         Climate_letter = ifelse(Climate == 4, "(d)", Climate_letter)) %>% 
+  mutate(`Site ID` = paste0(Climate_letter, " ",substr(ID, 1, 2), "-", substr(ID, 3, 5))) %>% 
+  group_by(`Site ID`) %>%
   mutate(annual_meanO = mean(FCH4, na.rm=TRUE),
          annual_meanP = mean(FCH4P, na.rm=TRUE)) %>% 
-  group_by(ID, Month) %>% 
+  group_by(`Site ID`, Month) %>% 
   summarize(annual_meanO = annual_meanO[1],
             annual_meanP = annual_meanP[1],
             mscO = abs(mean(FCH4, na.rm=TRUE)-annual_meanO),
@@ -4501,21 +4508,26 @@ ungroup(rf.pred.all) %>%
             Climate = Climate[1],
             Months = n()) %>% 
   ungroup() %>% 
-  ggplot(aes(mscO, mscP, col = ID)) +
-  geom_abline(slope = 1, intercept = 0, colour = 'black') +
-  geom_point(size = 2) +
-  geom_smooth(method = 'lm', se = FALSE) +
+  ggplot(aes(mscO, mscP, col = `Site ID`, shape = `Site ID`, fill = `Site ID`)) +
+  geom_line(stat = "smooth", method = 'lm', se = FALSE, size = 1.2, alpha = 0.9, lineend = "round") +
+  geom_point(size = 2.5, alpha = 0.8) +
+  geom_abline(slope = 1, intercept = 0, colour = 'black', linetype = 2) +
   facet_wrap(~Climate, ncol = 2, scales = 'free', labeller = labeller(Climate = climate_names)) +
-  # scale_y_continuous(limits = c(1,200)) +
-  # scale_x_continuous(limits = c(1,200)) +
+  scale_y_continuous(limits = c(0,200)) +
+  scale_x_continuous(limits = c(0,200)) +
   scale_color_manual(values = rep(col_vector_values,2)) +
+  scale_fill_manual(values = rep(col_vector_values,2)) +
+  scale_shape_manual(values = rep(15:25,4)) +
   theme(legend.position = "right",
         legend.direction = 'vertical') +
   my_theme +
   labs(x= expression("Observed "*CH[4]*' MSC (nmol m'^{-2}*' s'^{-1}*')'), y = expression("Predicted "*CH[4]*' MSC (nmol m'^{-2}*' s'^{-1}*')')) 
 ggsave(paste(loc, "predictions/cv/msc_pvo_id.png", sep = ""),
        width = 20, height = 26, units = c("cm"), dpi = 300)
+```
 
+
+```{r}
 # timeseries
 ungroup(rf.pred.all) %>% 
   group_by(ID) %>%
@@ -4566,6 +4578,50 @@ ggsave(paste(loc, "predictions/cv/msc_highlowights.png", sep = ""),
        width = 24, height = 14, units = c("cm"), dpi = 300)
 
 
+```
+
+##### Look at JP-BBY hysteresis 
+
+```{r jp-bby-hysteresis}
+head(rf.pred.all)
+rf.pred.all %>% 
+  filter(ID == "JPBBY",
+         Year %in% c(2015, 2016, 2017)) %>% 
+  dplyr::select(ID, Year, Week, FCH4, FCH4P, TA, TA_LAG2) %>% 
+  pivot_longer(
+    4:5,
+    names_to = "data",
+    values_to = "ch4_flux"
+  ) %>% 
+  ggplot(aes(TA, ch4_flux, color = Week)) +
+    geom_point(size = 3) +
+  facet_wrap(~Year+data, ncol = 2) +
+  labs(x = expression("Air Temperature ("*degree*"C)"),
+       y = expression(CH[4]*" Flux (nmol m"^{-2}*" s"^{-1}*")")) +
+  scale_color_gradient2(low = "red", mid = "white", high = "blue", midpoint = 30) +
+  my_theme
+ggsave("/Volumes/Samsung_T5/Stanford/upch4_local/figures-writing/GBC/SI Figures/hysteresis.png", height = 10, width = 8)
+```
+
+##### Look at all site hysteresis 
+
+```{r jp-bby-hysteresis}
+head(rf.pred.all)
+rf.pred.all %>% 
+  filter(TA > 0) %>% 
+  dplyr::select(ID, Year, Week, FCH4, FCH4P, TA, TA_LAG2) %>% 
+  pivot_longer(
+    4:5,
+    names_to = "data",
+    values_to = "ch4_flux"
+  ) %>% 
+  group_by(ID, Year) %>% 
+  mutate(warm_cool = ifelse(Week < 30, "warming", "cooling")) %>% 
+  ggplot(aes(TA, ch4_flux, color = Week)) +
+    geom_point(size = 1) +
+  geom_smooth(color = "black", se = TRUE) +
+  facet_wrap(~data+warm_cool, ncol = 2) +
+  my_theme
 ```
 
 ##### Anomalies (i.e., excursions from mean seasonal cycle)
@@ -5891,7 +5947,7 @@ writeRaster(all_stack_weighted_full, paste0(loc, "dissimilarity/output/stacks/al
 ##### Read in all stack weighted (for subsequent attempts)
 
 ```{r}
-all_stack_weighted_full <- stack(paste0(loc, "dissimilarity/output/stacks/all_stack_weighted_full.nc"))
+all_stack_weighted_full <- stack(paste0(loc, "dissimilarity/output/stacks/all_weighted.nc"))
 month_vector_st <- c(seq(1,72,6))
 month_vector_end <- month_vector_st+5
 
@@ -5931,7 +5987,7 @@ plot(all_stack[[6]])
 writeRaster(all_stack_masked_full, paste0(loc, "dissimilarity/output/stacks/all_weighted_masked.nc"), format='CDF', overwrite = TRUE)
 ```
 
-##### Read in all stack masked and weighted (for subsequent attempts)
+##### Read in all stack masked and weighted (for subsequent attempts)!!!!!!
 
 ```{r}
 all_stack_masked_full <- stack(paste0(loc, "dissimilarity/output/stacks/all_weighted_masked.nc"))
@@ -6121,42 +6177,42 @@ for (i in 1:12){ # months
   map_outline_df <- fortify(coastsCoarse)
   sPDF <- getMap()[getMap()$ADMIN!='Antarctica',]
 
-  # # dissimilarity plots
-  # ggplot() +
-  #   geom_polygon(data=sPDF, aes(long, lat, group=group), fill="grey90") +
-  #   geom_tile(data = all_stack_masked_df_wdist, aes(x = x, y = y, fill = DI)) +
-  #   geom_point(data = coords[,4:5],
-  #              aes(x = Longitude, y = Latitude), size = 1.5, color = "blue") +
-  #   geom_path(data = map_outline_df, aes(long, lat, group = group), color = 'grey20', size = 0.3) +
-  #   coord_equal() +
-  #   scale_fill_gradient2(low = muted("blue"), mid = 'white', high = "red", midpoint = all_sites_DI_AOA) +
-  #   scale_y_continuous(limits=c(-60, 85)) +
-  #   labs(title = "Global Dissimilarity Index from 43 FLUXNET-CH4 Wetlands") +
-  #   theme_map(8) +
-  #   theme(legend.position = 'right')
-  # 
-  # ggsave(file = paste("all_DI_aoa",i,".png", sep=""),
-  #        path = paste0(loc, "dissimilarity/figures/"),
-  #        width = 188, height = 100, dpi = 600, units = "mm")
-  
-  # constituency plots
+  # dissimilarity plots
   ggplot() +
     geom_polygon(data=sPDF, aes(long, lat, group=group), fill="grey90") +
-    geom_tile(data = all_stack_masked_df_wdist, aes(x = x, y = y, fill = closest_Cluster)) +
+    geom_tile(data = all_stack_masked_df_wdist, aes(x = x, y = y, fill = DI)) +
     geom_point(data = coords[,4:5],
                aes(x = Longitude, y = Latitude), size = 1.5, color = "blue") +
     geom_path(data = map_outline_df, aes(long, lat, group = group), color = 'grey20', size = 0.3) +
     coord_equal() +
-    scale_fill_manual(values = col_vector_values) +
+    scale_fill_gradient2(low = "white", mid = 'black', high = "black", midpoint = all_sites_DI_AOA) +
     scale_y_continuous(limits=c(-60, 85)) +
-    labs(title = "Tower Constituency") +
+    labs(title = "Global Dissimilarity Index from 43 FLUXNET-CH4 Wetlands") +
     theme_map(8) +
     theme(legend.position = 'right')
-    
 
-  ggsave(file = paste("all_tower_constituency",i,".png", sep=""),
+  ggsave(file = paste("all_DI_aoa_newramp_",i,".png", sep=""),
          path = paste0(loc, "dissimilarity/figures/"),
          width = 188, height = 100, dpi = 600, units = "mm")
+  
+  # constituency plots
+  # ggplot() +
+  #   geom_polygon(data=sPDF, aes(long, lat, group=group), fill="grey90") +
+  #   geom_tile(data = all_stack_masked_df_wdist, aes(x = x, y = y, fill = closest_Cluster)) +
+  #   geom_point(data = coords[,4:5],
+  #              aes(x = Longitude, y = Latitude), size = 1.5, color = "blue") +
+  #   geom_path(data = map_outline_df, aes(long, lat, group = group), color = 'grey20', size = 0.3) +
+  #   coord_equal() +
+  #   scale_fill_manual(values = col_vector_values) +
+  #   scale_y_continuous(limits=c(-60, 85)) +
+  #   labs(title = "Tower Constituency") +
+  #   theme_map(8) +
+  #   theme(legend.position = 'right')
+    
+
+  # ggsave(file = paste("all_tower_constituency",i,".png", sep=""),
+  #        path = paste0(loc, "dissimilarity/figures/"),
+  #        width = 188, height = 100, dpi = 600, units = "mm")
 }
 ```
 
@@ -6679,14 +6735,13 @@ ts1 <- predict(forcing_data, rf_model[[1]])
 data <- read.csv(paste0(loc, "upscaling-output-raw/sums/boot_sum_TgCH4month_m1.csv")) %>% dplyr::select(2:5)
 head(data)
 
-# check that bootstrap mean equals Tg grids
+# check the overall 2001-2018 mean global emission = 146.616 Tg CH4 y-1 (which matches following method 1)
 data %>% 
-  group_by(t) %>% 
-  summarize(boot_mean = mean(sum_TgCH4month),
-            boot_sd = sd(sum_TgCH4month)) %>% 
-  ggplot(aes(t/12+2001, boot_mean)) +
-  geom_line() + 
-  geom_ribbon()
+  mutate(year = rep(2001:2018, each = 500*12)) %>% 
+  group_by(year,b) %>% 
+  summarize(yearly_sum = sum(sum_TgCH4month)) %>% 
+  group_by(year) %>% 
+  summarize(boot_mean = mean(yearly_sum)) %>% pull(boot_mean) %>% mean()
 ```
 
 
@@ -7165,22 +7220,25 @@ PEQFR <- read.csv(paste0(loc, "fluxnet-ch4-data/ameriflux-validation/csv/AMF_PE-
          DOY = yday(Date),
          Week = ceiling(DOY/7),
          Week = ifelse(Week == 53, 52, Week)) %>% 
-  group_by(Year, Month) %>% 
-  summarize(FCH4 = mean(FCH4, na.rm = TRUE)) 
+  group_by(Month) %>% 
+  summarize(FCH4_mean = mean(FCH4, na.rm = TRUE),
+            FCH4_25 = quantile(FCH4, probs = 0.25, na.rm = TRUE),
+            FCH4_75 = quantile(FCH4, probs = 0.75, na.rm = TRUE),) 
 
 site.pred %>% 
   filter(ID == "PE-QFR") %>% 
   left_join(PEQFR) %>% 
-  ggplot(aes(Month, FCH4)) + 
+  ggplot(aes(Month, FCH4_mean)) + 
   # geom_line(aes(y = FCH4), size = 0.5) +
   geom_point(shape = 21, fill = "white") +
+  geom_errorbar(aes(ymin = FCH4_25, ymax = FCH4_75), width = 0, alpha = 0.5) +
   geom_line((aes(Month, mean_FCH4P))) +
   geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P), alpha = 0.1) + # add predictions
   scale_color_manual(values = rep(c("dark blue", "dark red"), 4)) +
   scale_fill_manual(values = rep("grey70", 8)) +
   my_theme +
   labs(x= "Month", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) +
-  scale_y_continuous(limits = c(0, 100)) +
+  # scale_y_continuous(limits = c(0, 100)) +
   scale_x_continuous(breaks = c(1:12), limits = c(1,12))
 ggsave(paste0(loc, "/predictions/gridded/nmol/figures/PE-QFR.png"),
        width = 14, height = 12, units = c("cm"), dpi = 300)
@@ -7212,22 +7270,24 @@ USALQ <- read.csv(paste0(loc, "fluxnet-ch4-data/ameriflux-validation/csv/AMF_US-
          DOY = yday(Date),
          Week = ceiling(DOY/7),
          Week = ifelse(Week == 53, 52, Week)) %>% 
-  group_by(Year, Month) %>% 
-  summarize(FCH4 = mean(FCH4, na.rm = TRUE)) 
+  group_by(Month) %>% 
+  summarize(FCH4_mean = mean(FCH4, na.rm = TRUE),
+            FCH4_sd = sd(FCH4, na.rm = TRUE)) 
 
 site.pred %>% 
   filter(ID == "US-ALQ") %>% 
   left_join(USALQ) %>% 
-  ggplot(aes(Month, FCH4)) + 
+  ggplot(aes(Month, FCH4_mean)) + 
   # geom_line(aes(y = FCH4), size = 0.5) +
   geom_point(shape = 21, fill = "white") +
+  geom_errorbar(aes(ymin = FCH4_mean - FCH4_sd, ymax = FCH4_mean + FCH4_sd), width = 0, alpha = 0.5) +
   geom_line(aes(Month, mean_FCH4P)) +
   geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P), alpha = 0.1) + # add predictions
   scale_color_manual(values = rep(c("dark blue", "dark red"), 4)) +
   scale_fill_manual(values = rep("grey70", 8)) +
   my_theme +
   labs(x= "Month", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) +
-  scale_y_continuous(limits = c(0, 100)) +
+  # scale_y_continuous(limits = c(0, 100)) +
   scale_x_continuous(breaks = c(1:12), limits = c(1,12))
 ggsave(paste0(loc, "/predictions/gridded/nmol/figures/US-ALQ.png"),
        width = 14, height = 12, units = c("cm"), dpi = 300)
@@ -7259,15 +7319,17 @@ CACF2 <- read.csv(paste0(loc, "fluxnet-ch4-data/ameriflux-validation/csv/AMF_CA-
          DOY = yday(Date),
          Week = ceiling(DOY/7),
          Week = ifelse(Week == 53, 52, Week)) %>% 
-  group_by(Year, Month) %>% 
-  summarize(FCH4 = mean(FCH4, na.rm = TRUE)) 
+  group_by(Month) %>% 
+  summarize(FCH4_mean = mean(FCH4, na.rm = TRUE),
+            FCH4_sd = sd(FCH4, na.rm = TRUE)) 
 
 site.pred %>% 
   filter(ID == "CA-CF2") %>% 
   left_join(CACF2) %>% 
-  ggplot(aes(Month, FCH4)) + 
+  ggplot(aes(Month, FCH4_mean)) + 
   # geom_line(aes(y = FCH4), size = 0.5) +
   geom_point(shape = 21, fill = "white") +
+  geom_errorbar(aes(ymin = FCH4_mean - FCH4_sd, ymax = FCH4_mean + FCH4_sd), width = 0, alpha = 0.5) +
   geom_line(aes(Month, mean_FCH4P)) +
   geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P), alpha = 0.1) + # add predictions
   scale_color_manual(values = rep(c("dark blue", "dark red"), 4)) +
@@ -7306,22 +7368,24 @@ USMBP <- read.csv(paste0(loc, "fluxnet-ch4-data/ameriflux-validation/csv/AMF_US-
          DOY = yday(Date),
          Week = ceiling(DOY/7),
          Week = ifelse(Week == 53, 52, Week)) %>% 
-  group_by(Year, Month) %>% 
-  summarize(FCH4 = mean(FCH4, na.rm = TRUE)) 
+  group_by(Month) %>% 
+  summarize(FCH4_mean = mean(FCH4, na.rm = TRUE),
+            FCH4_sd = sd(FCH4, na.rm = TRUE)) 
 
 site.pred %>% 
   filter(ID == "US-MBP") %>% 
   left_join(USMBP) %>% 
-  ggplot(aes(Month, FCH4)) + 
+  ggplot(aes(Month, FCH4_mean)) + 
   # geom_line(aes(y = FCH4), size = 0.5) +
   geom_point(shape = 21, fill = "white") +
+  geom_errorbar(aes(ymin = FCH4_mean - FCH4_sd, ymax = FCH4_mean + FCH4_sd), width = 0, alpha = 0.5) +
   geom_line((aes(Month, mean_FCH4P))) +
   geom_ribbon(aes(ymin = mean_FCH4P - sd_FCH4P, ymax = mean_FCH4P + sd_FCH4P), alpha = 0.1) + # add predictions
   scale_color_manual(values = rep(c("dark blue", "dark red"), 4)) +
   scale_fill_manual(values = rep("grey70", 8)) +
   my_theme +
   labs(x= "Month", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) +
-  scale_y_continuous(limits = c(0, 130)) +
+  # scale_y_continuous(limits = c(0, 130)) +
   scale_x_continuous(breaks = c(1:12), limits = c(1,12))
 ggsave(paste0(loc, "/predictions/gridded/nmol/figures/US-MBP.png"),
        width = 14, height = 12, units = c("cm"), dpi = 300)
@@ -7402,7 +7466,7 @@ write.csv(nmolch4_coords, paste0(loc, "predictions/gridded/jacob_shaw_zambia/mgc
 ```{r echo = F, warning = F, message = F}
 
 # CHOOSE WAD2M OR GIEMS OUTPUT
-tgch4 <- nc_open(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_TgCH4month_Aw_giems2.nc"))
+tgch4 <- nc_open(paste0(loc, "upscaling-output-raw/grids/upch4_v04_m1_TgCH4month_Aw.nc"))
 tgch4_mean <- ncvar_get(tgch4, "mean_ch4")
 tgch4_sd <- ncvar_get(tgch4, "sd_ch4")
 
@@ -7428,22 +7492,28 @@ for(i in 1:length(t)) {
 r_mean_stack <- stack(r_mean)
 r_sd_stack <- stack(r_sd)
 
-regions <- c("global", "arctic_boreal", "hbl", "wsl", "northern", "temperate", "tropics", "ppr", "amazon", "sudd", "congo", "indonesia")
 
-e1 <- extent(-180, 180, -90, 90)
-e2 <- extent(-180, 180, 60, 90)
-e3 <- extent(-96, -75, 50, 60)
-e4 <- extent(60, 94.5, 52, 74) 
-e5 <- extent(-180, 180, 45, 90)
-e6 <- extent(-180, 180, 30, 60)
-e7 <- extent(-180, 180, -90, 30)
-e8 <- extent(-114.5363, -92.52392, 41.71808, 54.66925)
-e9 <- extent(-80, -50, -20, 5)
-e10 <- extent(28, 34.5, 5, 10)
-e11 <- extent(15, 23, -5, 3)
-e12 <- extent(95, 120, -4, 5)
+# regions <- c("global", "arctic_boreal", "hbl", "wsl", "northern", "temperate", "tropics", "ppr", "amazon", "sudd", "congo", "indonesia")
+regions <- c("australia", "sahel", "csamerica")
 
-extents <- list(e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12)
+# e1 <- extent(-180, 180, -90, 90)
+# e2 <- extent(-180, 180, 60, 90)
+# e3 <- extent(-96, -75, 50, 60)
+# e4 <- extent(60, 94.5, 52, 74) 
+# e5 <- extent(-180, 180, 45, 90)
+# e6 <- extent(-180, 180, 30, 60)
+# e7 <- extent(-180, 180, -90, 30)
+# e8 <- extent(-114.5363, -92.52392, 41.71808, 54.66925)
+# e9 <- extent(-80, -50, -20, 5)
+# e10 <- extent(28, 34.5, 5, 10)
+# e11 <- extent(15, 23, -5, 3)
+# e12 <- extent(95, 120, -4, 5)
+e13 <- extent(110, 150, -40, -15)
+e14 <- extent(-15, 40, 10, 20)
+e15 <- extent(-65, -55, -40, -15)
+
+# extents <- list(e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12)
+extents <- list(e13, e14, e15)
 
 for (i in 1:length(regions)){
 
@@ -7472,12 +7542,62 @@ monthly_cycle <- upscaling_sums %>%
   summarize(sum_mean_tg = mean(sums_mean),
             sum_sd_tg = mean(sums_sd))
 
-write.csv(upscaling_sums, paste0(loc, "predictions/gridded/tg/sums_method1/", regions[i], "/upscaling_sums_giems2.csv"), row.names = F)
-write.csv(annual_sums, paste0(loc, "predictions/gridded/tg/sums_method1/", regions[i], "/annual_sums_giems2.csv"), row.names = F)
-write.csv(monthly_cycle, paste0(loc, "predictions/gridded/tg/sums_method1/", regions[i], "/monthly_cycle_giems2.csv"), row.names = F)
+write.csv(upscaling_sums, paste0(loc, "predictions/gridded/tg/sums_method1/", regions[i], "/upscaling_sums.csv"), row.names = F)
+write.csv(annual_sums, paste0(loc, "predictions/gridded/tg/sums_method1/", regions[i], "/annual_sums.csv"), row.names = F)
+write.csv(monthly_cycle, paste0(loc, "predictions/gridded/tg/sums_method1/", regions[i], "/monthly_cycle.csv"), row.names = F)
 
 }
 ```
+##### Get regional sums for GCP TD and BU
+```{r}
+# get file names
+files <- list.files("/Volumes/Samsung_T5/Stanford/upch4_local/grids/ch4-models/gcp-ch4_ncdfs/bu_td_mean_sd/")
+
+r_mean <- stack(paste0("/Volumes/Samsung_T5/Stanford/upch4_local/grids/ch4-models/gcp-ch4_ncdfs/bu_td_mean_sd/", files[1]))
+r_sd <- stack(paste0("/Volumes/Samsung_T5/Stanford/upch4_local/grids/ch4-models/gcp-ch4_ncdfs/bu_td_mean_sd/", files[2]))
+
+
+regions <- c("global", "arctic_boreal", "hbl", "wsl", "northern", "temperate", "tropics", "ppr", "amazon", "sudd", "congo", "indonesia", "australia", "sahel", "csamerica")
+
+e1 <- extent(-180, 180, -90, 90)
+e2 <- extent(-180, 180, 60, 90)
+e3 <- extent(-96, -75, 50, 60)
+e4 <- extent(60, 94.5, 52, 74)
+e5 <- extent(-180, 180, 45, 90)
+e6 <- extent(-180, 180, 30, 60)
+e7 <- extent(-180, 180, -90, 30)
+e8 <- extent(-114.5363, -92.52392, 41.71808, 54.66925)
+e9 <- extent(-80, -50, -20, 5)
+e10 <- extent(28, 34.5, 5, 10)
+e11 <- extent(15, 23, -5, 3)
+e12 <- extent(95, 120, -4, 5)
+e13 <- extent(110, 150, -40, -15)
+e14 <- extent(-15, 40, 10, 20)
+e15 <- extent(-65, -55, -40, -15)
+
+extents <- list(e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15)
+
+for (i in 1:length(regions)){
+
+ # Regional extents
+  e <- extents[[i]]
+  regional_r_mean <- crop(r_mean, e)
+  regional_r_sd <- crop(r_sd, e)
+
+sums_mean <- cellStats(regional_r_mean, sum)
+sums_sd <- cellStats(regional_r_sd, sum)
+
+upscaling_sums <- cbind(sums_mean, sums_sd) %>% 
+  as_tibble() %>% 
+  mutate(row = 1:n()) %>% 
+  dplyr::select(row, sums_mean, sums_sd)
+
+write.csv(upscaling_sums, paste0(loc, "predictions/gridded/tg/sums_method1/", regions[i], "/gcp_bu_sums.csv"), row.names = F)
+}
+
+```
+
+
 
 ##### Calculate Global Grid Tg Totals 
 ###### (METHOD 2: Mean bootstrap sum and variance) ## PROBLEM: We cannot use this method for regional totals because we do not have the individual bootstrap sums for each region
@@ -7517,6 +7637,19 @@ bootstrap_sums %>%
   summarize(mean_cum_sum_TgCH4year = mean(cum_sum_TgCH4year),
             sd_cum_sum_TgCH4year = sd(cum_sum_TgCH4year)) %>% 
     write.csv(paste0(loc, "predictions/gridded/tg/sums_method3/upscaling_sums.csv"), row.names = F)
+
+
+# compute average across all years for each bootstrap model (for Kuang-yu manuscript)
+bootstrap_sums %>% 
+  arrange(b) %>% 
+  mutate(Year = rep(rep(2001:2018, each = 12), 500),
+         Month = rep(rep(1:12, 18), 500)) %>% 
+  group_by(b, Year) %>% 
+  summarize(cum_sum_TgCH4year = cumsum(sum_TgCH4month)) %>% 
+  filter(cum_sum_TgCH4year == max(cum_sum_TgCH4year)) %>% 
+  group_by(b) %>% 
+  summarize(mean_cum_sum_TgCH4year = mean(cum_sum_TgCH4year)) %>% 
+    write.csv(paste0(loc, "predictions/gridded/tg/sums_method3/upscaling_sums_by_bootstrap.csv"), row.names = F)
 
 
 ```
@@ -7609,23 +7742,24 @@ upscaling_giems <- read.csv(paste0(loc, "predictions/gridded/tg/sums_method1/glo
 # combine
 upscaling <- bind_rows(upscaling, upscaling_giems)
 
-# read in carbon tracker (Top down model)
-files <- list.files(paste0(loc, "grids/ch4-models/carbontracker/"))
-
-# check units
-nc_open(paste0(loc, "grids/ch4-models/carbontracker/", files[1])) ##       units: mgCH4/m2/day (`natural` variable)
-# date range is 2000-2010
-
-ctracker <- stack(paste0(loc, "grids/ch4-models/carbontracker/", files), varname = "natural")
-ctracker_tg <- ctracker * area(ctracker) * 10^6 * 30 # area and time conversion 
-ctracker_tg_sums <- cellStats(ctracker_tg, sum) / 10^15 
-ctracker_tg_sums_vector <- unname(ctracker_tg_sums)
-ctracker_tg_sums_all <- ctracker_tg_sums_vector %>% 
-  as_tibble() %>% 
-  mutate(Year = rep(2000:2010, each = 12), 
-         Month = rep(1:12, 11)) %>% 
-  rename("ctracker" = "value")
-  
+## CarbonTracker no longer used, replaced with Saunois et al 2020 TD ensemble subset
+# # read in carbon tracker (Top down model)
+# files <- list.files(paste0(loc, "grids/ch4-models/carbontracker/"))
+# 
+# # check units
+# nc_open(paste0(loc, "grids/ch4-models/carbontracker/", files[1])) ##       units: mgCH4/m2/day (`natural` variable)
+# # date range is 2000-2010
+# 
+# ctracker <- stack(paste0(loc, "grids/ch4-models/carbontracker/", files), varname = "natural")
+# ctracker_tg <- ctracker * area(ctracker) * 10^6 * 30 # area and time conversion 
+# ctracker_tg_sums <- cellStats(ctracker_tg, sum) / 10^15 
+# ctracker_tg_sums_vector <- unname(ctracker_tg_sums)
+# ctracker_tg_sums_all <- ctracker_tg_sums_vector %>% 
+#   as_tibble() %>% 
+#   mutate(Year = rep(2000:2010, each = 12), 
+#          Month = rep(1:12, 11)) %>% 
+#   rename("ctracker" = "value")
+#   
 
 # read in gcp models
 files <- list.files(paste0(loc, "grids/ch4-models/gcp-ch4_ncdfs/prescribed/"))
@@ -7653,87 +7787,139 @@ names(gcp_tg_sums_all) <- substr(files, 1, 10)
 
 gcp_tg_sums_all <- gcp_tg_sums_all %>% 
   mutate(Year = rep(2000:2017, each = 12), 
-         Month = rep(1:12, 18)) 
+         Month = rep(1:12, 18)) %>% 
+  rowwise() %>% 
+  mutate(gcp_mean = mean(c_across(1:13)),
+         gcp_sd = sd(c_across(1:13)))
+
+# read in top-down gridded sums data
+gcp_td <- read_csv(paste0(loc, "upscaling-output-raw/data_for_figures_Jan2022/td_ch4_sum_2010_2017_indiv.csv"), col_select = c(2,3,4)) %>%
+  mutate(date = as_date(date),
+         Year = year(date),
+         Month = month(date)) %>% 
+  pivot_wider(names_from = model,
+              values_from = flux_TgMonth) %>% 
+  dplyr::select(-date)  %>% 
+  rowwise() %>% 
+  mutate(gcp_td_mean = mean(c_across(2:19)),
+         gcp_td_sd = sd(c_across(2:19)))
 
 upscaling %>% 
   left_join(gcp_tg_sums_all) %>% 
+  left_join(gcp_td) %>% 
   left_join(ctracker_tg_sums_all) %>% 
+  mutate(Dec_year = Year + Month/12) %>%
+  write.csv(paste0(loc, "predictions/gridded/tg/model_timeseries/gridded_sums_all.csv"), 
+            row.names = F)
+```
+
+# Creating the timeseries figure
+
+```{r}
+upscaling <- read.csv(paste0(loc, "predictions/gridded/tg/model_timeseries/gridded_sums_all.csv"))
+
+upscaling %>% 
+  mutate(wetlands = ifelse(wetlands == "WAD2M", "UpCH4-WAD2M", "UpCH4-GIEMS-2")) %>% 
   mutate(Dec_year = Year + Month/12) %>%
   ggplot(aes(Dec_year, sums_mean, linetype = wetlands)) +
   
-  geom_line(aes(Dec_year, `CLASS-CTEM`), color = 'grey70', alpha = 0.7) +
-  geom_line(aes(Dec_year, `DLEM_ech4_`), color = 'grey70', alpha = 0.7) +
-  geom_line(aes(Dec_year, `ELM_ech4_c`), color = 'grey70', alpha = 0.7) +
-  geom_line(aes(Dec_year, `JSBACH_ech`), color = 'grey70', alpha = 0.7) +
-  geom_line(aes(Dec_year, `JULES_ech4`), color = 'grey70', alpha = 0.7) +
-  geom_line(aes(Dec_year, `LPJ-GUESS_`), color = 'grey70', alpha = 0.7) +
-  geom_line(aes(Dec_year, `LPJ-MPI_ec`), color = 'grey70', alpha = 0.7) +
-  geom_line(aes(Dec_year, `LPJ-WSL_ec`), color = 'grey70', alpha = 0.7) +
-  geom_line(aes(Dec_year, `LPX_ech4_c`), color = 'grey70', alpha = 0.7) +
-  geom_line(aes(Dec_year, `ORCHIDEE_e`), color = 'grey70', alpha = 0.7) +
-  geom_line(aes(Dec_year, `TEM-MDM_ec`), color = 'grey70', alpha = 0.7) +
-  geom_line(aes(Dec_year, `TRIPLEX-GH`), color = 'grey70', alpha = 0.7) +
-  geom_line(aes(Dec_year, `VISIT_ech4`), color = 'grey70', alpha = 0.7) +
-
-   
-    geom_ribbon(aes(ymin = sums_mean - sums_sd, ymax = sums_mean + sums_sd, fill = wetlands), alpha = 0.2) + # add observations
-    geom_line(aes(color = wetlands)) +
+  geom_ribbon(aes(ymin = gcp_mean - gcp_sd, ymax = gcp_mean + gcp_sd), fill = 'orange', alpha = 0.2) + 
+  geom_ribbon(aes(ymin = gcp_td_mean - gcp_td_sd, ymax = gcp_td_mean + gcp_td_sd), fill = 'dark green', alpha = 0.1) + 
   
-    geom_line(aes(Dec_year, ctracker), color = "dark green", linetype = "F1") +
+    geom_line(aes(Dec_year, `gcp_mean`), color = 'orange', alpha = 1, size = 0.3, linetype = "dashed") +
+  geom_line(aes(Dec_year, `gcp_td_mean`), color = 'dark green', alpha = 1, size = 0.3, linetype = "longdash") +
+
+    geom_ribbon(aes(ymin = sums_mean - sums_sd, ymax = sums_mean + sums_sd, fill = wetlands), alpha = 0.1) + # add observations
+    geom_line(aes(color = wetlands), size = 0.3) +
   
   scale_y_continuous(limits = c(0, 30)) +
   scale_x_continuous(breaks = c(seq(2000, 2018, 2))) +
-  scale_linetype_manual(values = c("longdash", "solid")) +
+  scale_linetype_manual(values = c("dotdash", "solid")) +
   scale_fill_manual(values = c("yellow", "purple")) +
-  scale_color_manual(values = c("black", "black")) +
+  scale_color_manual(values = c("black", "purple")) +
   
   labs(x = "Year", y = expression("Wetland Emissions (Tg "*CH[4]*~month^{-1}*")")) +
   my_theme
 ggsave(paste(loc, "/predictions/gridded/tg/figures/model_timeseries.png", sep = ""),
          width = 25, height = 16, units = c("cm"), dpi = 300)
- 
+```
 
-upscaling %>% 
-  left_join(gcp_tg_sums_all) %>% 
-  left_join(ctracker_tg_sums_all) %>% 
-  write.csv(paste0(loc, "predictions/gridded/tg/model_timeseries/gridded_sums_all.csv"), 
-            row.names = F)
-``` 
+
 
 ##### Compare annual totals for GCP and Carbon Tracker, and NSE values
 
 ```{r}
 grid_sums <- read.csv(paste0(loc, "predictions/gridded/tg/model_timeseries/gridded_sums_all.csv"))
 
+# BU mean sum
 grid_sums %>% 
-  group_by(Year) %>% 
-  summarize_all(list(~sum(., na.rm = T)))
-
-# gcp sums
-grid_sums %>% 
-  group_by(Year) %>% 
+  group_by(Year, wetlands) %>% 
   summarize_all(list(~sum(., na.rm = T))) %>% 
   ungroup() %>% 
-  summarize_all(list(~mean(., na.rm = T)))
+  summarize_all(list(~mean(., na.rm = T))) 
 
-# ctracker sums
+# TD mean sum
 grid_sums %>% 
-  group_by(Year) %>% 
+  filter(Year %in% c(2010:2017)) %>% 
+  group_by(Year, wetlands) %>% 
   summarize_all(list(~sum(., na.rm = T))) %>% 
-  dplyr::select(Year, Month, ctracker) %>% 
-  filter(ctracker != 0) %>% 
   ungroup() %>% 
-  summarize_all(list(~mean(., na.rm = T)))
+  summarize_all(list(~mean(., na.rm = T))) 
 
 grid_sums %>% 
-  filter(!Year == 2018) %>% 
-  gather(key = "gcp_model", value = "sum", 5:17) %>% 
-  group_by(gcp_model) %>% 
-  summarize(R2 = cor(sum, sums_mean)^2,
-            MADiff = sum(abs(sums_mean - sum))/n(),
-            Diff = mean(sum - sums_mean)) %>% 
+  pivot_longer(
+    6:39,
+    names_to = "model",
+    values_to = "emissions"
+  ) %>% 
+  filter(complete.cases(.)) %>% 
+  group_by(wetlands, model) %>% 
+  summarize(R2 = cor(emissions, sums_mean)^2,
+            MADiff = sum(abs(sums_mean - emissions))/n(),
+            Diff = mean(emissions - sums_mean)) %>% 
   arrange(MADiff) %>% 
   write.csv(paste0(loc, "predictions/gridded/tg/model_timeseries/gcp_metrics.csv"), row.names = F)
+
+## sanity check some low R2 for ELM and LPJ.MPI
+
+grid_sums %>% 
+  pivot_longer(
+    6:19,
+    names_to = "model",
+    values_to = "emissions"
+  ) %>% 
+  filter(wetlands == "WAD2M") %>% 
+  # filter(model %in% c("LPJ.MPI_ec", "ELM_ech4_c")) %>% 
+  ggplot(aes(Dec_year, emissions)) +
+  geom_line() +
+  geom_line(aes(Dec_year, sums_mean), color = "red") +
+  facet_wrap(~model, ncol = 2) +
+  labs(x = "Year", y = expression("Wetland Emissions (Tg "*CH[4]*~month^{-1}*")")) +
+  my_theme
+ggsave(paste(loc, "/predictions/gridded/tg/figures/individual_bu_model_timeseries_comparisons.png", sep = ""),
+         width = 20, height = 30, units = c("cm"), dpi = 300)
+  
+
+grid_sums %>% 
+  pivot_longer(
+    21:38,
+    names_to = "model",
+    values_to = "emissions"
+  ) %>% 
+  mutate(model = str_remove(model, "_post_GCP2019_MASK11.nc"),
+         model = str_remove(model, "_post_GCP2019_MASK11_v2.nc")) %>% 
+  filter(wetlands == "WAD2M",
+         Year %in% c(2010:2017)) %>% 
+  # filter(model %in% c("LPJ.MPI_ec", "ELM_ech4_c")) %>% 
+  ggplot(aes(Dec_year, emissions)) +
+  geom_line() +
+  geom_line(aes(Dec_year, sums_mean), color = "red") +
+  facet_wrap(~model, ncol = 2) +
+  labs(x = "Year", y = expression("Wetland Emissions (Tg "*CH[4]*~month^{-1}*")")) +
+  scale_x_continuous(breaks = c(2011, 2013, 2015, 2017)) +
+  my_theme
+ggsave(paste(loc, "/predictions/gridded/tg/figures/individual_td_model_timeseries_comparisons.png", sep = ""),
+         width = 20, height = 30, units = c("cm"), dpi = 300)
   
 ```
 
@@ -7741,7 +7927,7 @@ grid_sums %>%
 #### 11. (cont.) Plots of Global and Regional Totals (Tg)
 
 ```{r}
-# load global and regionanl comparison dataset
+# load global and regional comparison dataset
 fig6_sums <- read.csv(paste0(loc, "predictions/gridded/tg/Figure6 Data/Tidy Tg Comparions for Fig 6.csv"))
 
 # get colors
@@ -7752,12 +7938,12 @@ col_vector <-  c("#33A02C","#377EB8","black","#E78AC3")
 # make global figure
 fig6_sums %>% 
   arrange(order) %>% 
-  filter(domain == "HBL") %>% 
+  filter(domain == "Global") %>% 
   mutate(ref = factor(ref, levels = ref)) %>%  
   ggplot(aes(ref, annual, shape = class, color = class)) +
     geom_hline(
       yintercept = fig6_sums[which(fig6_sums$ref == "McNicol et al. WAD2M"
-                                   & fig6_sums$domain == "HBL"), 6],
+                                   & fig6_sums$domain == "global"), 8],
       linetype = 2, color = "grey") +
   geom_point(size = 4) +
   geom_errorbar(aes(ref, ymin = lower, ymax = upper, width = 0)) +
@@ -7768,7 +7954,7 @@ fig6_sums %>%
   # scale_shape_manual(values = c(16, 15, 3)) +
   coord_flip() +
   my_theme
-ggsave(paste0(loc, "predictions/gridded/tg/figures/hbl_comparison.png"),
+ggsave(paste0(loc, "predictions/gridded/tg/figures/global_comparison.png"),
        width = 20, height = 15, units = c("cm"), dpi = 300)
 
 

@@ -1,0 +1,294 @@
+---
+title: "visualize-ecoregion-ch4-flux"
+author: "Gavin McNicol"
+date: "2/20/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Purpose
+
+Code to visualize global wetland methane fluxes (TgCH4) based upon a 1) paint-by-numbers approach which assumes towers are representative of their constituency and 2) the UpCH4 predictions which does not make that assumption but which may be the case by chance.
+
+## Packages
+
+```{r load-packages, message = F}
+rm(list=ls())
+library(tidyverse) 
+library(raster)
+library(ncdf4)
+library(sf)
+library(rworldmap)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(ggthemes)
+source("ggplot_theme.R")
+```
+
+## Get data
+
+```{r get-data}
+fluxes <- read_csv("/Volumes/Samsung_T5/Stanford/upch4_local/training-data/final.csv")
+upch4_mean <- read_rds("/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/upch4_mean_stack.rds")[[2]]
+upch4_sd <- read_rds("/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/upch4_sd_stack.rds")[[2]]
+regions <- read_csv("/Volumes/Samsung_T5/Stanford/upch4_local/dissimilarity/output/stats/all_monthly_global_DI_subset.csv") %>% mutate(region = as.numeric(factor(closest_fold)))
+wetlands <- stack("/Volumes/Samsung_T5/Stanford/upch4_local/grids/WAD2M/gcp-ch4_wetlands_2000-2018_025deg.nc")
+```
+
+## Create mask from x-y points
+
+```{r}
+xy <- list()
+x <- list()
+for(i in 1:26){
+  xy[[i]] <- x
+}
+
+for(i in 1:26){
+  for(j in 1:12){
+  
+x <- regions %>% 
+  filter(region == i,
+         Month == j) %>% 
+  dplyr::select(x,y) %>% 
+  distinct() %>% 
+  dplyr::select(x) %>% 
+  pull()
+
+y <- regions %>% 
+  filter(region == i,
+         Month == j) %>% 
+  dplyr::select(x,y) %>% 
+  distinct() %>% 
+  dplyr::select(y) %>% 
+  pull()
+  
+
+xy[[i]][[j]] <- cbind(x, y)
+
+
+# z <- regions %>% 
+#   filter(Month == i) %>% 
+#   dplyr::select(region) 
+#   
+# r <- raster(ncols = 360*4, nrows = 180*4)
+# crs(r) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0" 
+#   
+# region_mask[[i]] <- rasterize(xy, r, field = z)
+#   
+} 
+}
+# 
+# plot(upch4_mean[[8]])
+# points(xy[[1]][[8]])
+```
+
+## Get UpCH4 TD predictions for each constituency
+
+```{r}
+region_month_tg <- list()
+x <- list()
+for(i in 1:26){
+  region_month_tg[[i]] <- x
+}
+
+year_vector <- rep(2001:2018, each = 12)
+month_vector <- rep(1:12, 18)
+
+for (i in 1:26){
+  for (j in 1:216){
+    
+    if (length(xy[[i]][[ month_vector[j] ]]) == 0) {
+      next
+    }
+  
+    region_month_tg[[i]][[j]] <-
+      raster::extract(upch4_mean[[j]], xy[[i]][[ month_vector[j] ]]) %>%
+      as_tibble() %>%
+      # pivot_longer(1:216,
+      #              names_to = "timestep",
+      #              values_to = "fch4_tg") %>%
+      # mutate(timestep = as.numeric(str_extract(timestep, '\\b\\w+$'))) %>%
+      # group_by(timestep) %>%
+      summarize(fch4_tg = sum(value, na.rm = T)) %>% 
+      mutate(region = i,
+             month = month_vector[j],
+             year = year_vector[j]) %>% 
+      dplyr::select(region, year, month, fch4_tg)
+    
+  }
+}
+
+upch4_region_month_tg <- bind_rows(region_month_tg) 
+
+# extract_tg(stack = upch4_mean, xy[[1]])
+# region_tg <- lapply(xy, extract_tg, stack = upch4_mean) 
+```
+
+## Get 2000-2018 monthly wetland area for each constituency
+
+```{r}
+region_month_wa <- list()
+x <- list()
+for(i in 1:26){
+  region_month_wa[[i]] <- x
+}
+
+year_vector <- rep(2000:2018, each = 12)
+month_vector <- rep(1:12, 19)
+
+for (i in 1:26){
+  for (j in 1:228){
+    
+    if (length(xy[[i]][[ month_vector[j] ]]) == 0) {
+      next
+    }
+
+    region_month_wa[[i]][[j]] <-
+      raster::extract(wetlands[[j]] * area(wetlands[[j]]) * 10^6, xy[[i]][[ month_vector[j] ]] ) %>%
+      as_tibble() %>%
+      summarize(wetlands_m2 = sum(value, na.rm = T)) %>% 
+      mutate(region = i,
+             month = month_vector[j],
+             year = year_vector[j]) %>% 
+      dplyr::select(region, year, month, wetlands_m2)
+    
+  }
+}
+
+region_month_wa <- bind_rows(region_month_wa) 
+
+# just get the monthly averages
+region_month_wa <- region_month_wa %>% 
+  group_by(region, month) %>% 
+  summarize(wetlands_m2 = mean(wetlands_m2))
+```
+
+## Compute region-mean flux
+
+```{r compute-mean-by-region}
+tower_fch4_tg <- fluxes %>% 
+  group_by(Cluster, Month) %>% 
+  rename(region = Cluster, month = Month) %>% 
+  summarize(region_mean_fch4 = mean(FCH4, na.rm = T)) %>% 
+    left_join(region_month_wa) %>% 
+  mutate(region_mean_fch4_tg = region_mean_fch4 * 16.04 * 10^-9 * 10^-12 * (60*60*24*30) * wetlands_m2) %>% 
+  group_by(region) %>% 
+  summarize(tower_fch4_tg = sum(region_mean_fch4_tg))
+```
+
+## Summarize results
+
+```{r}
+region_sums <- upch4_region_month_tg %>% 
+  group_by(region, month) %>% 
+  summarize(mean_fch4_tg = mean(fch4_tg)) %>% 
+  group_by(region) %>% 
+  summarize(upch4_fch4_tg = sum(mean_fch4_tg))
+
+region_names <- regions %>% 
+  dplyr::select(region_id = closest_fold, region) %>% 
+  distinct()
+
+region_names %>% 
+  left_join(region_sums) %>% 
+  left_join(tower_fch4_tg) %>% 
+  mutate(upch4_tower_diff = upch4_fch4_tg - tower_fch4_tg) %>% 
+  arrange(desc(upch4_tower_diff)) %>% 
+write_csv("/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/paint-by-numbers/constituency-methane-sums.csv")
+```
+
+## Map August constituencies with same colors (max wetland area)
+
+```{r}
+# get colors
+col_vector_values <- read_csv("/Volumes/Samsung_T5/Stanford/upch4_local/dissimilarity/figures/200827_color_ramp_constituency.csv") %>% 
+  dplyr::select(color_id) %>% 
+  pull()
+
+# get constituency areas for August 
+xy_subset <- list()
+for(i in 1:26){
+  xy_subset[[i]] <- xy[[i]][[8]] %>% 
+    as_tibble() %>% 
+    mutate(region = i)
+}
+xy_august <- bind_rows(xy_subset) 
+
+# add difference in emissions
+region_diff <- read_csv("/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/paint-by-numbers/constituency-methane-sums.csv") %>% dplyr::select(region_id, region, upch4_tower_diff) %>% 
+  mutate(region_id = paste0(substr(region_id, 1, 2), "-", substr(region_id, 3, 5))) %>% 
+  arrange(desc(upch4_tower_diff)) %>% 
+  mutate(order = 1:n(),
+         alpha_set = ifelse(abs(upch4_tower_diff) > quantile(abs(upch4_tower_diff), 0.5), 1, 0.5))
+
+# merge
+xy_august <- xy_august %>% 
+  left_join(region_diff)
+
+# get coordinates for tower locations
+xy_august_subset <- xy_august %>% 
+  dplyr::select(region_id, order) %>% 
+  distinct() 
+
+sites <- read_csv("/Volumes/Samsung_T5/Stanford/upch4_local/fluxnet-ch4-data/metadata/fluxnet-ch4-site-metadata.csv") %>% 
+  dplyr::select(region_id = ID, x = Longitude, y = Latitude) %>% 
+  right_join(xy_august_subset) 
+
+## Make an outline of the countries for the plot
+data(coastsCoarse)
+map_outline_df <- fortify(coastsCoarse)
+sPDF <- getMap()[getMap()$ADMIN!='Antarctica',]
+
+abs(xy_august$upch4_tower_diff)/quantile(abs(xy_august$upch4_tower_diff), 0.1)
+
+# constituency plots
+ggplot() +
+  geom_polygon(data= sPDF, aes(long, lat, group=group), fill = "grey90") +
+  geom_tile(data = xy_august, aes(x = x, y = y, fill = fct_reorder(region_id, order), 
+                                  alpha = alpha_set)) +
+  geom_point(data = sites,
+             aes(x = x, y = y,
+                 color = fct_reorder(region_id, order)), 
+             size = 1,
+             shape = 21, 
+             color = "black") +
+  geom_path(data = map_outline_df, aes(long, lat, group = group), color = 'grey20', size = 0.3) +
+  coord_equal() +
+  scale_fill_manual(values = rev(col_vector_values[1:26])) +
+  # scale_color_manual(values = rev(col_vector_values[1:26])) +
+  scale_y_continuous(limits = c(-60, 85)) +
+  labs(title = "Tower Constituency") +
+  theme_map(8) +
+  theme(legend.position = 'right')
+ggsave("/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/paint-by-numbers/constituency_tower_rep.png", height = 4.5, width = 8)
+
+```
+
+## Noticed that FR-LGt extrapolates a bit strangely, check differnces inputs
+
+```{r}
+data <- read_csv("/Volumes/Samsung_T5/Stanford/upch4_local/training-data/final.csv")
+
+feat <- read_csv("/Volumes/Samsung_T5/Stanford/upch4_local/ffs/stepwise/feat_best_row_final.csv") %>%
+  dplyr::select(feat) %>% pull() %>% as.character()
+feat <- c("TA", "canopyht", feat[2:length(feat)])
+feat <- feat[1:6] # select best
+feat_l <- length(feat)
+
+data %>% 
+  dplyr::select(ID, feat) %>% 
+  group_by(ID) %>% 
+  summarize_all(.funs = mean) %>% 
+  arrange(wc_mtdq)
+
+
+```
+
+
+
+

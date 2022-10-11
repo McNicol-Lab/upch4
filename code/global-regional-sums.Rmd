@@ -1,0 +1,1081 @@
+---
+title: "global-regional-sums"
+author: "Gavin McNicol"
+date: "2/17/2022"
+output: html_document
+---
+
+## Purpose
+
+A method to compute global and regional methane flux sums (teragrams of methane) from the following globally-gridded wetland methane flux products:
+
+1. UpCH4-WAD2M (2001-2018 monthly timeseries; TgCH4 m-2 month-1; wetland area WAD2M) 
+2. UpCH4-GIEMS2 (2001-2015 monthly timeseries; TgCH4 m-2 month-1; wetland area GIEMS2)
+3. GCP-BU (13-members, 2000-2017 monthly timeseries; gCH4 m-2 month-1)
+4. GCP-TD (17-members, 2010-2017 monthly timeseries)
+
+
+## Packages
+
+```{r load-packages, message = F}
+rm(list=ls())
+library(tidyverse) 
+library(raster)
+library(ncdf4)
+library(sf)
+source("ggplot_theme.R")
+```
+
+## File Paths
+
+```{r assign-local-file-paths}
+file_paths <- list(
+  upch4 = "/Volumes/Samsung_T5/Stanford/upch4_local/upscaling-output-raw/grids/tg/",
+  gcp_bu = "/Volumes/Samsung_T5/Stanford/upch4_local/grids/ch4-models/gcp-ch4_ncdfs/prescribed/",
+  gcp_td = "/Volumes/Samsung_T5/Stanford/upch4_local/grids/ch4-models/gcp-ch4_ncdfs/gcp-td-post/wetlands/"
+  )
+file_paths
+```
+
+## File Names
+
+```{r get-file-names}
+file_names <- list(
+  upch4 = list.files(file_paths$upch4),
+  gcp_bu = list.files(file_paths$gcp_bu),
+  gcp_td = list.files(file_paths$gcp_td)
+)
+file_names
+```
+
+## Define region bounding
+
+```{r define-output-regions}
+
+regions <- tibble(
+  
+  region = c(
+  "global",
+  "arctic_boreal",
+  "hbl", 
+  "wsl", 
+  "northern", 
+  "temperate", 
+  "tropics", 
+  "ppr",
+  "amazon", 
+  "sudd", 
+  "congo", 
+  "indonesia",
+  "australia",
+  "sahel",
+  "csamerica"
+  ),
+  
+  xmin = c(
+    -180,
+    -180,
+    -96,
+    60,
+    -180,
+    -180,
+    -180,
+    -115,
+    -80,
+    28,
+    15,
+    95,
+    110,
+    -15,
+    -65
+  ),
+  
+  xmax = c(
+    180, 
+    180,
+    -75, 
+    95,
+    180,
+    180,
+    180,
+    -92,
+    50,
+    35,
+    23,
+    120,
+    150,
+    40,
+    -55
+  ),
+  
+  ymin = c(
+    -90,
+    60,
+    50,
+    52,
+    45,
+    30,
+    -90,
+    42,
+    -20,
+    5,
+    -5,
+    -4,
+    -40,
+    10,
+    -40
+  ),
+  
+  ymax = c(
+    90,
+    90,
+    60,
+    74,
+    90,
+    60,
+    30,
+    55,
+    5,
+    10,
+    3,
+    5,
+    -15,
+    20,
+    -15
+  )
+  
+)
+write_csv(regions, "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/regions.csv")
+```
+
+## Get extents
+
+```{r get-region-extents}
+extents <- list()
+for(i in 1:length(regions$region)){
+extents[[i]] <- regions %>% 
+  slice(i) %>% 
+  dplyr::select(2:5) %>% 
+  unlist(., use.names=FALSE)
+}
+names(extents) <- regions$region
+extents <- lapply(extents, extent)
+```
+
+# 1. UpCH4 Sums
+
+## Create raster stacks from .nc files
+
+```{r create-raster-stacks}
+upch4_mean_stack <- list()
+upch4_sd_stack <- list()
+
+for(j in 1:2){
+
+    # get .nc data
+  upch4_nc <- nc_open(paste0(file_paths$upch4, file_names$upch4[j]))
+  
+  upch4_mean <- ncvar_get(upch4_nc, "mean_ch4")
+  upch4_sd <- ncvar_get(upch4_nc, "sd_ch4")
+  lon <- ncvar_get(upch4_nc, "longitude")
+  lat <- ncvar_get(upch4_nc, "latitude", verbose = F)
+  t <- ncvar_get(upch4_nc, "Time")
+  fillvalue <- ncatt_get(upch4_nc, "mean_ch4", "_FillValue")
+  
+  nc_close(upch4_nc) 
+  
+  # add NAs and reformat to rasters
+  upch4_mean[upch4_mean == fillvalue$value] <- NA
+  upch4_sd[upch4_sd == fillvalue$value] <- NA
+  
+  r_mean <- list()
+  r_sd <- list()
+  
+  for(i in 1:length(t)) { 
+    
+     r_mean[[i]] <- raster(
+       t(upch4_mean[, , i]), 
+       xmn=min(lon), xmx=max(lon), 
+       ymn=min(lat), ymx=max(lat), 
+       crs=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs+ towgs84=0,0,0")
+       )
+  
+       r_sd[[i]] <- raster(
+         t(upch4_sd[, , i]), 
+         xmn=min(lon), xmx=max(lon), 
+         ymn=min(lat), ymx=max(lat), 
+         crs=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs+ towgs84=0,0,0")
+       )
+       }
+  
+    # stack monthly rasters into full timeseries
+  upch4_mean_stack[[j]] <- stack(r_mean)
+  upch4_sd_stack[[j]] <- stack(r_sd)
+  
+}
+
+# check lenth
+print("Timeseries length == nlayers");nlayers(upch4_mean_stack[[1]])==180;nlayers(upch4_mean_stack[[2]])==216;nlayers(upch4_sd_stack[[1]])==180;nlayers(upch4_sd_stack[[2]])==216;
+```
+
+## Output UpCH4 mean and sd stacks 
+
+```{r write-upch4-stacks}
+write_rds(upch4_mean_stack, "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/upch4_mean_stack.rds")
+write_rds(upch4_sd_stack, "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/upch4_sd_stack.rds")
+```
+
+## Get sums for each region
+
+```{r get-sums, message = F, warning = F, echo = F}
+product_names <- c("upch4_giems",
+                   "upch4_wad2m")
+
+for (j in 1:length(upch4_mean_stack)) {
+  for (i in 1:length(extents)) {
+    # define extent
+    e <- extents[i][[1]]
+    
+    regional_r_mean <- crop(upch4_mean_stack[[j]], e)
+    regional_r_sd <- crop(upch4_sd_stack[[j]], e)
+    
+    sums_mean <- cellStats(regional_r_mean, sum)
+    sums_sd <- cellStats(regional_r_sd, sum)
+    
+    upscaling_sums <- cbind(sums_mean, sums_sd) %>%
+      as_tibble() %>%
+      mutate(
+        row = 1:n(),
+        year = rep(2001:(
+          2001 + nlayers(upch4_mean_stack[[j]]) / 12 - 1
+        ), each = 12),
+        month = rep(1:12, nlayers(upch4_mean_stack[[j]]) / 12)
+      ) %>%
+      dplyr::select(row, year, month, sums_mean, sums_sd)
+    
+    annual_sums <- upscaling_sums %>%
+      group_by(year) %>%
+      summarize(sum_mean_tg = sum(sums_mean),
+                sum_sd_tg = sum(sums_sd))
+    
+    monthly_cycle <- upscaling_sums %>%
+      group_by(month) %>%
+      summarize(sum_mean_tg = mean(sums_mean),
+                sum_sd_tg = mean(sums_sd))
+    
+    write_csv(
+      upscaling_sums,
+      paste0(
+        "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/",
+        product_names[j],
+        "/",
+        regions$region[i],
+        "_",
+        "timeseries.csv"
+      )
+    )
+    write_csv(
+      annual_sums,
+      paste0(
+        "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/",
+        product_names[j],
+        "/",
+        regions$region[i],
+        "_",
+        "annual.csv"
+      )
+    )
+    write_csv(
+      monthly_cycle,
+      paste0(
+        "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/",
+        product_names[j],
+        "/",
+        regions$region[i],
+        "_",
+        "mean_seasonal_cycle.csv"
+      )
+    )
+  }
+}
+```
+
+## Compile all the regional results into a table
+
+```{r compile-sums, message = F}
+product_names <- c("upch4_giems",
+                   "upch4_wad2m")
+
+upch4_sums <- list()
+x <- list()
+for(i in 1:length(extents)){
+  upch4_sums[[i]] <- x
+}
+
+for (i in 1:length(extents)) {
+  for (j in 1:2){
+      upch4_sums[[i]][[j]] <- read_csv(
+    paste0(
+      "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/",
+      product_names[j],
+      "/",
+      regions$region[i],
+      "_",
+      "annual.csv"
+    )
+  ) %>%
+    mutate(product = substr(product_names[j], 1, 5),
+           wetlands = substr(product_names[j], 7, 11),
+           region = regions$region[i]) %>%
+    dplyr::select(product, wetlands, region, everything()) %>%
+    pivot_longer(5:6,
+                 names_to = "mean_sd",
+                 values_to = "tg_ch4")
+  }
+}
+
+# compile all rows
+upch4_sums <- bind_rows(upch4_sums)
+
+write_csv(upch4_sums, "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/upch4_sums.csv")
+
+# get just overall means
+upch4_sums_mean <- upch4_sums %>% 
+  group_by(product, wetlands, region, mean_sd) %>% 
+  summarize(tg_ch4 = mean(tg_ch4))
+
+write_csv(upch4_sums_mean, "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/upch4_sums_mean.csv")
+```
+
+# 2. Get GCP-BU emissions
+
+## Create raster stacks from .nc files
+
+```{r}
+gcp_bu_stack <- list()
+
+for(j in 1:13){
+
+    # get .nc data
+  gcp_bu_nc <- nc_open(paste0(file_paths$gcp_bu, file_names$gcp_bu[j]))
+  
+  gcp_bu <- ncvar_get(gcp_bu_nc, "ech4")
+  lon <- ncvar_get(gcp_bu_nc, "lon")
+  lat <- ncvar_get(gcp_bu_nc, "lat", verbose = F)
+  t <- ncvar_get(gcp_bu_nc, "months")
+  fillvalue <- ncatt_get(gcp_bu_nc, "ech4", "_FillValue")
+  
+  nc_close(gcp_bu_nc) 
+  
+  # add NAs and reformat to rasters
+  gcp_bu[gcp_bu == fillvalue$value] <- NA
+
+  r_mean <- list()
+  
+  for(i in 1:length(t)) { 
+    
+     r_mean[[i]] <- raster(
+       t(gcp_bu[, , i]), 
+       xmn=min(lon), xmx=max(lon), 
+       ymn=min(lat), ymx=max(lat), 
+       crs=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs+ towgs84=0,0,0")
+       )
+       }
+  
+    # stack monthly rasters into full timeseries
+  gcp_bu_stack[[j]] <- stack(r_mean)
+
+}
+
+# check length
+for(i in 1:13){
+  print(nlayers(gcp_bu_stack[[i]]) == 216)
+}
+
+```
+
+## Output GCP BU stacks
+
+```{r write-upch4-stacks}
+for(i in 1:13){
+  write_rds(gcp_bu_stack[[i]],paste0( "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/gcp-bu/",
+                                      str_extract(file_names$gcp_bu[i], "([:upper:]|[:dash:]){2,}"),
+                                      "-stack.rds")
+  )
+}
+```
+
+## Get sums for each region
+
+Units are gC m-2 month-1
+
+```{r get-sums, message = F, warning = F, echo = F}
+product_names <- str_extract(file_names$gcp_bu, "([:upper:]|[:dash:]){2,}")
+                             
+for (j in 1:length(gcp_bu_stack)) {
+  for (i in 1:length(extents)) {
+    # define extent
+    e <- extents[i][[1]]
+    
+    regional_r <- crop(gcp_bu_stack[[j]], e)
+    
+    regional_tg <- regional_r * area(regional_r) * 10^6
+    sums <- cellStats(regional_tg, sum) / 10^12
+
+    gcp_bu_sums <- sums %>%
+      as_tibble() %>%
+      mutate(
+        row = 1:n(),
+        year = rep(2001:(
+          2001 + nlayers(gcp_bu_stack[[j]]) / 12 - 1
+        ), each = 12),
+        month = rep(1:12, nlayers(gcp_bu_stack[[j]]) / 12)
+      ) %>%
+      dplyr::select(row, year, month, sums = value)
+    
+    gcp_bu_annual_sums <- gcp_bu_sums %>%
+      group_by(year) %>%
+      summarize(sum_mean_tg = sum(sums))
+    
+    gcp_bu_monthly_cycle <- gcp_bu_sums %>%
+      group_by(month) %>%
+      summarize(sum_mean_tg = mean(sums))
+    
+    write_csv(
+      gcp_bu_sums,
+      paste0(
+        "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/gcp-bu/",
+        product_names[j],
+        "/",
+        regions$region[i],
+        "_",
+        "timeseries.csv"
+      )
+    )
+    write_csv(
+      gcp_bu_annual_sums,
+      paste0(
+        "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/gcp-bu/",
+        product_names[j],
+        "/",
+        regions$region[i],
+        "_",
+        "annual.csv"
+      )
+    )
+    write_csv(
+      gcp_bu_monthly_cycle,
+      paste0(
+        "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/gcp-bu/",
+        product_names[j],
+        "/",
+        regions$region[i],
+        "_",
+        "mean_seasonal_cycle.csv"
+      )
+    )
+  }
+}
+```
+
+## Compile all the regional results into a table
+
+```{r compile-sums, message = F}
+product_names <- str_extract(file_names$gcp_bu, "([:upper:]|[:dash:]){2,}")
+
+gcp_bu_sums <- list()
+x <- list()
+for(i in 1:length(extents)){
+  gcp_bu_sums[[i]] <- x
+}
+
+for (i in 1:length(extents)) {
+  for (j in 1:13){
+      gcp_bu_sums[[i]][[j]] <- read_csv(
+    paste0(
+      "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/gcp-bu/",
+      product_names[j],
+      "/",
+      regions$region[i],
+      "_",
+      "annual.csv"
+    )
+  ) %>%
+    mutate(model = product_names[j],
+           product = "gcp_bu",
+           region = regions$region[i]) %>%
+    dplyr::select(product, model, region, everything()) 
+  }
+}
+
+# compile all rows
+gcp_bu_sums <- bind_rows(gcp_bu_sums)
+
+write_csv(gcp_bu_sums, "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/gcp-bu/gcp_bu_sums.csv")
+
+# get just overall means
+gcp_bu_sums_mean <- gcp_bu_sums %>% 
+  group_by(product, model, region) %>% 
+  summarize(tg_ch4 = mean(sum_mean_tg))
+
+write_csv(gcp_bu_sums_mean, "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/gcp-bu/gcp_bu_sums_mean.csv")
+```
+
+# 3. Get GCP-TD emissions (obsolete)
+
+## Read in mean and sd .tiff files as a stack
+
+```{r}
+gcp_td_stack <- list()
+for(i in 1:2){
+  gcp_td_stack[[i]] <- stack(paste0(file_paths$gcp_td, file_names$gcp_td[i]))
+}
+```
+
+## Get sums for each region
+
+Units are tgCH4 pixel-1 month-1
+
+```{r get-sums, message = F, warning = F, echo = F}
+product_names <- c("gcp-td-mean",
+                   "gcp-td-sd")
+                             
+for (j in 1:2) {
+  for (i in 1:length(extents)) {
+    # define extent
+    e <- extents[i][[1]]
+    
+    regional_r <- crop(gcp_td_stack[[j]], e)
+    
+    sums <- cellStats(regional_r, sum)
+
+    gcp_td_sums <- sums_vector %>%
+      as_tibble() %>%
+      mutate(
+        row = 1:n(),
+        year = rep(2010:(
+          2010 + nlayers(gcp_td_stack[[j]]) / 12 - 1
+        ), each = 12),
+        month = rep(1:12, nlayers(gcp_td_stack[[j]]) / 12)
+      ) %>%
+      dplyr::select(row, year, month, sums = value)
+    
+    gcp_td_annual_sums <- gcp_td_sums %>%
+      group_by(year) %>%
+      summarize(sum_tg = sum(sums))
+    
+    gcp_td_monthly_cycle <- gcp_td_sums %>%
+      group_by(month) %>%
+      summarize(sum_tg = mean(sums))
+    
+    write_csv(
+      gcp_td_sums,
+      paste0(
+        "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/gcp-td/",
+        product_names[j],
+        "/",
+        regions$region[i],
+        "_",
+        "timeseries.csv"
+      )
+    )
+    write_csv(
+      gcp_td_annual_sums,
+      paste0(
+        "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/gcp-td/",
+        product_names[j],
+        "/",
+        regions$region[i],
+        "_",
+        "annual.csv"
+      )
+    )
+    write_csv(
+      gcp_td_monthly_cycle,
+      paste0(
+        "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/gcp-td/",
+        product_names[j],
+        "/",
+        regions$region[i],
+        "_",
+        "mean_seasonal_cycle.csv"
+      )
+    )
+  }
+}
+```
+
+## Compile all the annual emissions regional TD results into a table
+
+```{r compile-sums, message = F}
+product_names <- c("gcp-td-mean",
+                   "gcp-td-sd")
+
+gcp_td_sums <- list()
+x <- list()
+for(i in 1:length(extents)){
+  gcp_td_sums[[i]] <- x
+}
+
+# get means and sd
+for (i in 1:length(extents)) {
+  for (j in 1:2){
+      gcp_td_sums[[i]][[j]] <- read_csv(
+    paste0(
+      "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/gcp-td/",
+      product_names[j],
+      "/",
+      regions$region[i],
+      "_",
+      "annual.csv"
+    )
+  ) %>%
+    mutate(mean_sd = product_names[j],
+           product = "gcp_td",
+           region = regions$region[i]) %>% 
+    dplyr::select(product, mean_sd, region, everything()) 
+  }
+  gcp_td_sums[[i]] <- bind_rows(gcp_td_sums[[i]]) # bind mean and sd together
+}
+
+# compile all rows
+gcp_td_sums <- bind_rows(gcp_td_sums) %>% 
+        pivot_wider(
+          names_from = "mean_sd",
+          values_from  = "sum_mean_tg"
+        ) %>% 
+        rename(sum_mean_tg = `gcp-td-mean`,
+               sum_sd_tg = `gcp-td-sd`) 
+
+write_csv(gcp_td_sums, "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/gcp-td/gcp_td_sums.csv")
+
+# get just overall means
+gcp_td_sums_mean <- gcp_td_sums %>% 
+  group_by(product, region) %>% 
+  summarize(sum_sd_tg = mean(sum_sd_tg),
+            sum_mean_tg = mean(sum_mean_tg))
+
+write_csv(gcp_td_sums_mean, "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/gcp-td/gcp_td_sums_mean.csv")
+```
+
+
+# 3b. Get GCP-TD emissions from ensemble products 
+
+## Read in TD rds files
+
+```{r read-td-rds}
+gcp_td_stack <- list()
+for(i in 1:length(file_names$gcp_td)){
+  
+    gcp_td_stack[[i]] <- read_rds(
+      paste0("/Volumes/Samsung_T5/Stanford/upch4_local/grids/ch4-models/gcp-ch4_ncdfs/gcp-td-post/wetlands/",
+             file_names$gcp_td[[i]])
+    )
+  
+}
+```
+
+## Get model names and observations for separate estimates later
+
+```{r get-sums, message = F, warning = F, echo = F}
+product_names <- str_extract(file_names$gcp_td, "[^_]+")
+observations <- str_remove(file_names$gcp_td, product_names) %>% 
+  str_extract("[^_]+") %>% 
+  str_remove("[0-9]+")
+
+td_models <- tibble(model = product_names,
+       observations = observations) %>% 
+  mutate(row = 1:n(),
+         observations = ifelse(model == "NTF-4DVAR" & row == 10, "GOSAT", observations),
+         observations = ifelse(model == "NTF-4DVAR" & row == 11, "SURF", observations),
+         model = str_replace(model, "-", "_")) %>% 
+  dplyr::select(-row) %>% 
+  group_by(model, observations) %>% 
+  mutate(run = 1:n())
+```
+  
+## Check nlayers and fix 9th entry
+
+```{r}
+num_layers <- c()
+for(i in 1:length(gcp_td_stack)){
+  num_layers <- append(nlayers(gcp_td_stack[[i]]), num_layers)
+}
+
+# Fix the 9th model, which has 217 layers
+gcp_td_stack[[9]] <- gcp_td_stack[[9]][[1:216]]
+
+```
+
+## Check a plot and check bounding boxes
+
+```{r check-plot}
+plot(gcp_td_stack[[1]][[1]])
+```
+
+  
+## Get sums for TD models
+
+```{r warning = F, message = F}             
+for (j in 1:length(gcp_td_stack)) {
+  for (i in 1:length(extents)) {
+    # define extent
+    e <- extents[i][[1]]
+    
+
+    regional_r <- crop(gcp_td_stack[[j]], e)
+    
+    regional_tg <- regional_r * area(regional_r) * 10^6
+    sums <- cellStats(regional_tg, sum) / 10^12
+
+    gcp_td_sums <- sums %>%
+      as_tibble() %>%
+      mutate(
+        row = 1:n(),
+        year = rep(seq(2017 - (nlayers(gcp_td_stack[[j]]) / 12 - 1), 2017, 1), each = 12), 
+        month = rep(1:12, nlayers(gcp_td_stack[[j]]) / 12)
+      ) %>%
+      dplyr::select(row, year, month, sums = value)
+    
+    gcp_td_annual_sums <- gcp_td_sums %>%
+      group_by(year) %>%
+      summarize(sum_mean_tg = sum(sums))
+    
+    gcp_td_monthly_cycle <- gcp_td_sums %>%
+      group_by(month) %>%
+      summarize(sum_mean_tg = mean(sums))
+    
+    write_csv(
+      gcp_td_sums,
+      paste0(
+        "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/gcp-td/",
+        td_models$model[j],
+        "_",
+        td_models$observations[j],
+        "_",
+        td_models$run[j],
+        "_",
+        regions$region[i],
+        "_",
+        "timeseries.csv"
+      )
+    )
+    write_csv(
+      gcp_td_annual_sums,
+      paste0(
+        "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/gcp-td/",
+        td_models$model[j],
+        "_",
+        td_models$observations[j],
+        "_",
+        td_models$run[j],
+        "_",
+        regions$region[i],
+        "_",
+        "annual.csv"
+      )
+    )
+    write_csv(
+      gcp_td_monthly_cycle,
+      paste0(
+        "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/gcp-td/",
+        td_models$model[j],
+        "_",
+        td_models$observations[j],
+        "_",
+        td_models$run[j],
+        "_",
+        regions$region[i],
+        "_",
+        "mean_seasonal_cycle.csv"
+      )
+    )
+  }
+}
+```
+
+## Compile all the regional results into a table
+
+```{r compile-sums, message = F}
+# td_models object for identifying models
+
+gcp_td_sums <- list()
+x <- list()
+for(i in 1:length(extents)){
+  gcp_td_sums[[i]] <- x
+}
+
+for (i in 1:length(extents)) {
+  for (j in 1:17){
+      gcp_td_sums[[i]][[j]] <- read_csv(
+    paste0(
+        "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/gcp-td/",
+        td_models$model[j],
+        "_",
+        td_models$observations[j],
+        "_",
+        td_models$run[j],
+        "_",
+        regions$region[i],
+        "_",
+        "annual.csv"
+    )
+  ) %>%
+    mutate(model = td_models$model[j],
+           observations = td_models$observations[j],
+           run = td_models$run[j],
+           product = "gcp_td",
+           region = regions$region[i]) %>%
+    dplyr::select(product, model, observations, run, region, everything()) 
+  }
+}
+
+# compile all rows
+gcp_td_sums <- bind_rows(gcp_td_sums)
+
+write_csv(gcp_td_sums, "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/gcp-td/gcp_td_sums.csv")
+
+# get just overall means
+gcp_td_sums_mean <- gcp_td_sums %>% 
+  group_by(product, model, observations, run, region) %>% 
+  summarize(tg_ch4 = mean(sum_mean_tg))
+
+write_csv(gcp_td_sums_mean, "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/gcp-td/gcp_td_sums_mean.csv")
+```
+
+# Create Plots of overall mean
+
+```{r read-data, message = F, warning = F}
+upch4_sums <- read_csv("/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/upch4_sums.csv")
+gcp_bu_sums <- read_csv("/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/gcp-bu/gcp_bu_sums.csv")
+gcp_td_sums <- read_csv("/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/gcp-td/gcp_td_sums.csv")
+```
+
+## Prepare data
+
+```{r prepare-data, message = F}
+upch4_sums <- upch4_sums %>%
+  mutate(class = "This Study") %>%
+  filter(year >= 2010 & year <= 2017) %>%
+  group_by(class, product, wetlands, region, mean_sd) %>%
+  summarize(tg_ch4 = mean(tg_ch4)) %>%
+  pivot_wider(names_from = mean_sd,
+              values_from = tg_ch4) %>%
+  ungroup()
+
+gcp_bu_sums <- gcp_bu_sums %>%
+  mutate(class = "Process BU") %>%
+  filter(year >= 2010 & year <= 2017) %>%
+  group_by(class, product, region) %>%
+  summarize(sum_sd_tg = sd(sum_mean_tg),
+            sum_mean_tg = mean(sum_mean_tg)) %>% 
+  mutate(wetlands = "wad2m")
+
+gcp_td_sums <- gcp_td_sums %>% 
+  filter(year >= 2010 & year <= 2017) %>%
+  mutate(class = "Inversion TD") %>% 
+  group_by(class, product, region) %>% 
+  summarize(sum_sd_tg = sd(sum_mean_tg),
+            sum_mean_tg = mean(sum_mean_tg)) %>% 
+  mutate(wetlands = "various") 
+
+# join data
+all_sums <- upch4_sums %>% 
+  bind_rows(gcp_bu_sums) %>% 
+  bind_rows(gcp_td_sums) %>% 
+  group_by(region) %>% 
+  mutate(max_sum_mean_tg = max(sum_mean_tg)) %>% 
+  arrange(desc(max_sum_mean_tg)) %>%
+  group_by(class, product, wetlands) %>% 
+  mutate(order = 1:n()) 
+```
+
+# Plots of 2010-2017 mean CH4 emissions for all regions
+
+```{r make-plot-global}
+col_vector <-  c("black","#33A02C","#377EB8","#E78AC3")
+
+# make global figure 
+all_sums %>%
+  filter(region %in% c("global",
+                       "tropics",
+                       "temperate",
+                       "northern",
+                       "arctic_boreal") &
+           wetlands != "giems") %>%
+   ggplot(aes(
+    fct_reorder(region, desc(order)),
+    sum_mean_tg,
+    shape = product,
+    color = product
+  )) +
+  geom_point(aes(
+    x = fct_reorder(region, desc(order)),
+    y = sum_mean_tg),
+    position = position_jitter(width = 0.2, height = 0.2, seed = 123),
+              alpha = 0.8,
+              width = 0.2,
+              size = 4) +
+    geom_linerange(aes(
+    fct_reorder(region, desc(order)),
+    ymin = sum_mean_tg - sum_sd_tg,
+    ymax = sum_mean_tg + sum_sd_tg),
+    position = position_jitter(width = 0.2, height = 0.2, seed = 123),
+        width = 0.2) +
+  labs(x = "Region", 
+       y = expression(atop("Global CH"[4] * " Emissions",
+                                          "(Tg yr" ^ {
+                                            -1
+                                          } * ")")),
+                          title = "Global and by-Latitude"
+     ) +
+  scale_color_manual(name = "Product-Wetlands",
+                     labels = c("BU-WAD2M",
+                                "TD-Various",
+                                "UpCH4-WAD2M"),
+                     values = col_vector[1:3]) +
+  scale_shape_manual(name = "Product-Wetlands",
+                     labels = c("BU-WAD2M",
+                                "TD-Various",
+                                "UpCH4-WAD2M"),
+                     values = c(15, 17, 19)) +
+  scale_y_continuous(limits = c(0, 200), 
+                     breaks = c(seq(0,180,20))) +
+  coord_flip() +
+  my_theme
+
+ggsave(
+  "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/figures/global.png",
+  width = 20,
+  height = 15,
+  units = c("cm"),
+  dpi = 300
+)
+```
+
+
+```{r make-plot-tropics}
+col_vector <-  c("black","#33A02C","#377EB8","#E78AC3")
+
+# make global figure 
+all_sums %>%
+  filter(region %in% c("amazon",
+                        "congo",
+                        "indonesia",
+                       "sahel",
+                       "sudd",
+                       "csamerica"),
+         wetlands != "giems") %>%
+  ggplot(aes(
+    fct_reorder(region, desc(order)),
+    sum_mean_tg,
+    shape = product,
+    color = product
+  )) +
+  geom_point(aes(
+    x = fct_reorder(region, desc(order)),
+    y = sum_mean_tg),
+    position = position_jitter(width = 0.2, height = 0.2, seed = 123),
+              alpha = 0.8,
+              width = 0.2,
+              size = 4) +
+    geom_linerange(aes(
+    fct_reorder(region, desc(order)),
+    ymin = sum_mean_tg - sum_sd_tg,
+    ymax = sum_mean_tg + sum_sd_tg),
+    position = position_jitter(width = 0.2, height = 0.2, seed = 123),
+        width = 0.2) +
+  labs(x = "Region", 
+       y = expression(atop("Global CH"[4] * " Emissions",
+                                          "(Tg yr" ^ {
+                                            -1
+                                          } * ")")),
+                          title = "Tropics"
+     ) +
+  scale_color_manual(name = "Product-Wetlands",
+                     labels = c("BU-WAD2M",
+                                "TD-Various",
+                                "UpCH4-WAD2M"),
+                     values = col_vector[1:3]) +
+  scale_shape_manual(name = "Product-Wetlands",
+                     labels = c("BU-WAD2M",
+                                "TD-Various",
+                                "UpCH4-WAD2M"),
+                     values = c(15, 17, 19)) +
+  scale_y_continuous(limits = c(0, 85), 
+                     breaks = c(seq(0,80,20))) +
+  coord_flip() +
+  my_theme
+
+ggsave(
+  "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/figures/tropics.png",
+  width = 20,
+  height = 15,
+  units = c("cm"),
+  dpi = 300
+)
+```
+
+
+```{r make-plot-high-lat}
+col_vector <-  c("black","#33A02C","#377EB8","#E78AC3")
+
+# make global figure 
+all_sums %>%
+  filter(region %in% c("arctic_boreal",
+                        "hbl",
+                        "wsl",
+                       "ppr"),
+         wetlands != "giems") %>%
+  ggplot(aes(
+    fct_reorder(region, desc(order)),
+    sum_mean_tg,
+    shape = product,
+    color = product
+  )) +
+  geom_point(aes(
+    x = fct_reorder(region, desc(order)),
+    y = sum_mean_tg),
+    position = position_jitter(width = 0.2, height = 0.2, seed = 123),
+              alpha = 0.8,
+              width = 0.2,
+              size = 4) +
+     geom_linerange(aes(
+    fct_reorder(region, desc(order)),
+    ymin = sum_mean_tg - sum_sd_tg,
+    ymax = sum_mean_tg + sum_sd_tg),
+    position = position_jitter(width = 0.2, height = 0.2, seed = 123),
+        width = 0.2) +
+  labs(x = "Region", 
+       y = expression(atop("Global CH"[4] * " Emissions",
+                                          "(Tg yr" ^ {
+                                            -1
+                                          } * ")")),
+                          title = "High Latitudes",
+       color = "Product",
+       shape = "Wetlands"
+     ) +
+  scale_color_manual(name = "Product-Wetlands",
+                     labels = c("BU-WAD2M",
+                                "TD-Various",
+                                "UpCH4-WAD2M"),
+                     values = col_vector[1:3]) +
+  scale_shape_manual(name = "Product-Wetlands",
+                     labels = c("BU-WAD2M",
+                                "TD-Various",
+                                "UpCH4-WAD2M"),
+                     values = c(15, 17, 19)) +
+  scale_y_continuous(limits = c(0, 16), 
+                     breaks = c(seq(0,15,3))) +
+  coord_flip() +
+  my_theme
+
+ggsave(
+  "/Volumes/Samsung_T5/Stanford/upch4_local/predictions/gridded/tg/global-regional/figures/high-latitude.png",
+  width = 20,
+  height = 15,
+  units = c("cm"),
+  dpi = 300
+)
+```
+

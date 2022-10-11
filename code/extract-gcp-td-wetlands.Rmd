@@ -1,0 +1,163 @@
+---
+title: "GCP Inversion Processing"
+author: "Gavin McNicol"
+date: "2/19/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Purpose
+
+To extract the wetland emissions from the posterior GCP 2019 top-down ensemble posteriors, targetting the period 2010-2017, and identifying the units and wetland product used in each product.
+
+## Packages
+
+```{r load-packages, message = F}
+rm(list=ls())
+library(tidyverse) 
+library(raster)
+library(ncdf4)
+library(sf)
+source("ggplot_theme.R")
+```
+
+
+## File Paths
+
+```{r assign-local-file-paths}
+file_paths <- list(
+  gcp_td = "/Volumes/Samsung_T5/Stanford/upch4_local/grids/ch4-models/gcp-ch4_ncdfs/gcp-td-post/"
+  )
+file_paths
+```
+
+## File Names
+
+```{r get-file-names}
+file_names <- list(
+  gcp_td = list.files(file_paths$gcp_td, pattern = ".nc")
+)
+file_names
+```
+
+## Open .nc files and check nat wetland units, year start, year stop
+
+All units are gCH4 m-2 month-1 - same as GCP BU
+Year start and stop varies
+
+```{r check-attributes}
+td_units <- c()
+td_year_start <- c()
+td_year_end <- c()
+
+for(i in 1:22){
+
+  # get .nc data
+  td_nc <- nc_open(paste0(file_paths$gcp_td, file_names$gcp_td[i]))
+  td_units <- append(td_units, td_nc$var$wetl$units)
+  td_year_start <- append(td_year_start, substr(ncatt_get(td_nc, 0, attname=NA, verbose=FALSE )$`Time period`, 1, 4))
+  td_year_end <- append(td_year_end, substr(ncatt_get(td_nc, 0, attname=NA, verbose=FALSE )$`Time period`, 6, 10))
+
+  nc_close(td_nc) 
+}
+
+# compile everything
+td_nc_attributes <- tibble(
+  file = file_names$gcp_td,
+  units = td_units,
+  yr_start = td_year_start,
+  yr_stop = td_year_end
+)
+td_nc_attributes
+```
+
+## Select only through-2017 file names and split on GOSAT vs. surface
+
+```{r filter-files}
+file_names$gcp_td_surface <- td_nc_attributes %>% 
+  mutate(obs_used = ifelse(str_detect(file, "SURF"), "Surface", "GOSAT")) %>% 
+  filter(yr_stop == 2017,
+         obs_used == "Surface") %>% 
+  pull(file)
+
+file_names$gcp_td_sat_hybrid <- td_nc_attributes %>% 
+  mutate(obs_used = ifelse(str_detect(file, "SURF"), "Surface", "GOSAT")) %>% 
+  filter(yr_stop == 2017,
+         obs_used == "GOSAT") %>% 
+  pull(file)
+```
+
+## Open .nc get wetland fluxes and stack
+
+```{r create-wetland-flux-stacks}
+td_stack <- list()
+x <- list()
+for(i in 1:3){
+  td_stack[[i]] <- x
+}
+  
+# loop over surface and GOSAT file names
+for(i in 2:3){
+  # loop over each model within each type
+  for(j in 1:length(file_names[[i]])){
+    
+  
+  td_nc <- nc_open(paste0(file_paths$gcp_td, file_names[[i]][j]))
+
+  td_ch4 <- ncvar_get(td_nc, "wetl")
+  lon <- ncvar_get(td_nc, "longitude")
+  lat <- ncvar_get(td_nc, "latitude", verbose = F)
+  t <- ncvar_get(td_nc, "time")
+  fillvalue <- ncatt_get(td_nc, "wetl", "_FillValue")
+  
+  nc_close(td_nc) 
+  
+  
+  # add NAs and reformat to rasters
+  td_ch4[td_ch4 == fillvalue$value] <- NA
+
+  r <- list()
+  
+  for(k in 1:length(t)) { 
+    
+     r[[k]] <- raster(
+       t(td_ch4[, , k]), 
+       xmn=min(-lon), xmx=max(-lon), 
+       ymn=min(-lat), ymx=max(-lat), 
+       crs=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs+ towgs84=0,0,0")
+       )
+     
+       }
+  
+    # stack monthly rasters into full timeseries
+  td_stack[[i]][[j]] <- flip(stack(r), direction = "y")
+  
+  }
+}
+
+td_stack <- list(td_stack[[2]], td_stack[[3]])
+file_names_2 <- list(file_names[[2]], file_names[[3]])
+```
+
+## Output UpCH4 mean and sd stacks 
+
+```{r write-upch4-stacks}
+for(i in 1:2){
+  for(j in 1:length(file_names_2[[i]])){
+    
+    write_rds(
+      td_stack[[i]][[j]], 
+      paste0("/Volumes/Samsung_T5/Stanford/upch4_local/grids/ch4-models/gcp-ch4_ncdfs/gcp-td-post/wetlands/",
+             str_remove(file_names_2[[i]][[j]], ".nc"),
+             ".rds")
+    )
+    
+  }
+}
+```
+
+
+
