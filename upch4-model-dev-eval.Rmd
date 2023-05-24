@@ -1,16 +1,17 @@
 ---
-title: "UpCH4: Code Notebook for Random Forest Model Dev. and Eval."
+title: "UpCH4: Random Forest Model Dev. and Eval."
 author: "Gavin McNicol"
 date: "2023-05-24"
-output::tuft_html:
-  css: notebook.css
-  tuft_variant: "envisioned"
-  highlight: pygments
+output:
+  tufte::tufte_html:
+    css: notebook.css
+    tufte_variant: "envisioned"
+    highlight: pygments
 link-citations: yes
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(eval = TRUE)
 ```
 
 ## Purpose
@@ -28,6 +29,18 @@ The final three sections output:
   6) globally upscaled product evaluations
   
 Manuscript Reference: *McNicol, G. Fluet-Chouinard, E. et al. Upscaling wetland methane emissions from the FLUXNET-CH4 eddy covariance network (UpCH4 v1.0): Model development, network assessment, and budget comparison. AGU Advances, Accepted, May 2023*
+
+```{r echo = F, fig.width = 20, fig.cap="Full UpCH4 workflow"}
+knitr::include_graphics("img/workflow-figure.pdf")
+```
+
+
+```{marginfigure}
+For brevity, this notebook does not include data pre-processing and upscaling run HPC code which is available from the corresponding authors at request. 
+```
+
+
+
 
 
 
