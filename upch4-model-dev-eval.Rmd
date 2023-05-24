@@ -16,7 +16,7 @@ knitr::opts_chunk$set(eval = TRUE)
 
 ## Purpose
 
-Code for predictive model development and evaluation for upscaling eddy covariance methane flux data from sites to the globe. The code takes pre-processed weekly mean eddy covariance flux tower from FLUXNET-CH4 v1.0 [(Delwiche et al. 2021)](http://dx.doi.org/10.5194/essd-13-3607-2021) and static and dynamic geospatial predictor datasets as input for a random forest model training pipeline, and outputs:
+Code for predictive model development and evaluation for upscaling wetland eddy covariance methane flux data from sites to the globe. The code takes pre-processed weekly mean eddy covariance flux tower from FLUXNET-CH4 v1.0 [(Delwiche et al. 2021)](http://dx.doi.org/10.5194/essd-13-3607-2021) and static and dynamic geospatial predictor datasets as input for a random forest model training pipeline, and outputs:
 
   1) a best-predictor set using forward spatial feature selection
   2) spatial cross validation metrics of model performance
@@ -30,7 +30,7 @@ The final three sections output:
   
 Manuscript Reference: *McNicol, G. Fluet-Chouinard, E. et al. Upscaling wetland methane emissions from the FLUXNET-CH4 eddy covariance network (UpCH4 v1.0): Model development, network assessment, and budget comparison. AGU Advances, Accepted, May 2023*
 
-```{r echo = F, fig.width = 20, fig.cap="Full UpCH4 workflow"}
+```{r echo = F, out.width='100%', fig.align='center', fig.cap="Figure 1. Full UpCH4 workflow"}
 knitr::include_graphics("img/workflow-figure.pdf")
 ```
 
@@ -39,6 +39,19 @@ knitr::include_graphics("img/workflow-figure.pdf")
 For brevity, this notebook does not include data pre-processing and upscaling run HPC code which is available from the corresponding authors at request. 
 ```
 
+## FLUXNET-CH4 Data
+
+The eddy covariance data used in this study are publicly available as part of the FLUXNET-CH4 community product V1.0 at [fluxnet.org](https://fluxnet.org/data/fluxnet-ch4-community-product/). The FLUXNET-CH4 synthesis activity is introduced in [Knox et al. 2019](10.1175/BAMS-D-18-0268.1) along with a detailed description of the eddy covariance post-processing steps including methane flux (FCH4) uncertainties. The first full (V1.0) dataset release (FLUXNET-CH4, hereafter) is described for 81 sites and is used in a wetland seasonality analysis in [Delwiche et al. in review](10.5194/essd-2020-307). **Data for this CH4 Upscaling Project were downloaded from [fluxnet.org](www.fluxnet.org) on Feb 22, 2021. 
+
+  - The FLUXNET-CH4 data download manifest is available in `tables/download-manifest.xlsx`.
+  - FLUXNET-CH4 metadata is available in`tables/Table S1.xlsx`.
+  - Permission was received via email on Feb 22, 2021, to use *Tier 2 Data Policy* sites in this study (SE-St1 and RU-Vrk; PI Thomas Friborg)
+  - FLUXNET-CH4 data were used both for methane fluxes (FCH4; target variable) and tower-measured bio-meteorological variables (e.g., LE, GPP, TA; predictors)
+  - Link to [FLUXNET.org variable descriptions](https://fluxnet.org/data/fluxnet-ch4-community-product/data-variables/)
+      
+## Gridded Data (Predictors)
+
+A summary of predictor data and sources is available in `tables/Table S3.xlsx`.
 
 
 
