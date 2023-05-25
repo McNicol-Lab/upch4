@@ -445,9 +445,9 @@ print(paste('added', feat_best_add))
 }
 ```
 
-##### Save all output from stepwise FFS
+Save all output from stepwise FFS:
 
-```{r}
+```{r save-output}
 feat_best_row_all <- bind_rows(feat_best_row)
 
 for(i in 1:length(rf.metrics.all)) {
@@ -470,9 +470,9 @@ write.csv(rf_metrics_all,
 
 ```
 
-##### Reload initial pair 
+Reload initial pair:
 
-```{r}
+```{r reload-initial-pair}
 feat_best_initial <- read.csv(paste(loc, "ffs/first-pair/rf-metrics/rf.metrics.all.csv", sep = "")) %>% 
   mutate(feat = paste(pred1, pred2, sep = ", ")) %>% 
   dplyr::select(-pred1, -pred2)
@@ -490,9 +490,9 @@ write.csv(feat_best_row_final,
           row.names = F)
 ```
 
-Output plots for evolution of predictors
+Output plots for evolution of predictors:
 
-```{r}
+```{r pred-evolution-plots}
 feat_best <- feat_best_row_final %>% dplyr::select(feat) %>% pull()
 
 feat_best_row_final %>% 
