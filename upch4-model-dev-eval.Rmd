@@ -1,5 +1,5 @@
 ---
-title: "UpCH4: Random Forest Model Dev. and Eval."
+title: "UpCH4: Model Development and Evaluation"
 author: "Gavin McNicol"
 date: "2023-05-24"
 output:
@@ -39,21 +39,493 @@ knitr::include_graphics("img/workflow-figure.pdf")
 For brevity, this notebook does not include data pre-processing and upscaling run HPC code which is available from the corresponding authors at request. 
 ```
 
-## FLUXNET-CH4 Data
+## Libraries
 
-The eddy covariance data used in this study are publicly available as part of the FLUXNET-CH4 community product V1.0 at [fluxnet.org](https://fluxnet.org/data/fluxnet-ch4-community-product/). The FLUXNET-CH4 synthesis activity is introduced in [Knox et al. 2019](10.1175/BAMS-D-18-0268.1) along with a detailed description of the eddy covariance post-processing steps including methane flux (FCH4) uncertainties. The first full (V1.0) dataset release (FLUXNET-CH4, hereafter) is described for 81 sites and is used in a wetland seasonality analysis in [Delwiche et al. in review](10.5194/essd-2020-307). **Data for this CH4 Upscaling Project were downloaded from [fluxnet.org](www.fluxnet.org) on Feb 22, 2021. 
+```{r packages, echo = F}
+library(tidyverse)
+library(readxl)
+library(skimr)
+```
 
-  - The FLUXNET-CH4 data download manifest is available in `tables/download-manifest.xlsx`.
-  - FLUXNET-CH4 metadata is available in`tables/Table S1.xlsx`.
+
+## Data
+
+The eddy covariance data used in this study are publicly available as part of the FLUXNET-CH4 community product V1.0 at [fluxnet.org](https://fluxnet.org/data/fluxnet-ch4-community-product/). The FLUXNET-CH4 synthesis activity is introduced in [Knox et al. 2019](10.1175/BAMS-D-18-0268.1) along with a detailed description of the eddy covariance post-processing steps including methane flux (FCH4) uncertainties. The first full (V1.0) dataset release (FLUXNET-CH4, hereafter) is described for 81 sites and is used in a wetland seasonality analysis in [Delwiche et al. in review](10.5194/essd-2020-307). 
+
+Details for this study:
+
+  - **Data for this CH4 Upscaling Project were downloaded from [fluxnet.org](www.fluxnet.org) on Feb 22, 2021.**
   - Permission was received via email on Feb 22, 2021, to use *Tier 2 Data Policy* sites in this study (SE-St1 and RU-Vrk; PI Thomas Friborg)
   - FLUXNET-CH4 data were used both for methane fluxes (FCH4; target variable) and tower-measured bio-meteorological variables (e.g., LE, GPP, TA; predictors)
   - Link to [FLUXNET.org variable descriptions](https://fluxnet.org/data/fluxnet-ch4-community-product/data-variables/)
       
-## Gridded Data (Predictors)
+      
+**FLUXNET-CH4 Download Manifest**
 
-A summary of predictor data and sources is available in `tables/Table S3.xlsx`.
+```{r review-download-manifest, echo = F, message = F, warning = F}
+knitr::kable(
+  read_xlsx("tables/download-manifest.xlsx", skip = 4) %>% filter(SITE_ID != "AA-Flx") %>% head(10),
+    type = "html")
+```
+
+**FLUXNET-CH4 Metadata**
 
 
+```{r review-site-metadata, echo = F, message = F, warning = F}
+knitr::kable(
+  read_xlsx("tables/Table S1.xlsx") %>% select(1:16) %>% filter(!is.na(ID)) %>% head(10),
+  type = "html")
+```
+
+      
+**Gridded Data (Predictors)**
+
+```{r review-gridded-data, echo = F, message = F, warning = F}
+knitr::kable(
+  read_xlsx("tables/Table S3.xlsx") %>% head(10),
+    type = "html")
+```
+
+## Forward feature selection (FFS) Setup
+
+Read in training data from `data/final.csv` and a list of predictors from `data/predictors_metadata.csv`.
+
+```{r read-ffs-data, message = F, warning = F}
+training_data <- read_csv("data/final.csv")
+predictor_metadata <- read_csv("data/predictors_metadata.csv")
+```
+
+Skim the training data:
+
+```{r skim-training, echo = F, message = F, warning = F}
+skim(training_data)
+```
+
+Select features and create indices:
+
+```{r select-feature-names-indices}
+feat <- predictor_metadata$Predictor
+feat_l <- length(feat)
+data_l <- length(training_data$Cluster)
+```
+
+Create pairwise feat combinations for FFS:
+
+```{r create-feature-pairs}
+feat_pairs_full <- combn(feat, 2, simplify = FALSE)
+paste0("There are ", length(feat_pairs_full), " feature pairs")
+```
+
+Remove pairs of static predictors (unlikely to be informative):
+**NOTE** this step is slow (~10 minutes)
+
+```{r remove-static-pairs}
+static_predictors <- predictor_metadata %>% 
+  filter(Content == "Spatial") %>% 
+  dplyr::select(Predictor, Content)
+
+feat_pairs_n <- length(feat_pairs_full)
+
+feat_pairs_remove <- bind_cols(feat_pairs_full) %>% 
+  gather(key = "pair", value = "Predictor") %>% 
+  mutate(pair = str_remove(pair, "...")) %>% 
+  left_join(static_predictors) %>% 
+  filter(!is.na(Content)) %>% 
+  group_by(pair) %>% 
+  summarize(n_static = n()) %>% 
+  filter(n_static == 2) %>% 
+  dplyr::select(pair) %>% pull() %>% as.numeric()
+
+feat_pairs <- feat_pairs_full[-feat_pairs_remove]
+
+paste0("There are ", length(feat_pairs), " feature pairs after removing static pairs.")
+```
+
+Save `feat_pairs`:
+
+```{r save-feat-pairs}
+bind_cols(feat_pairs) %>% 
+  gather(key = Pair, value = Predictor) %>% 
+  mutate(Pair = str_remove(Pair,'...')) %>% 
+  write_csv("data/feat_pairs.csv")
+```
+
+View `feat-pairs`:
+
+```{r view-feat-pairs}
+head(feat_pairs, 100)
+```
+
+## FFS: First pair selection
+
+Get training data fold number and fold names:
+
+```{r get-training-folds}
+set.seed(23)
+
+# data inner folds 
+folds <- training_data %>% 
+  mutate(Cluster = as.factor(Cluster)) %>%
+  dplyr::select(Cluster) %>%
+  pull() %>%
+  levels() %>%
+  length()
+
+fold_names <- training_data %>%
+  group_by(Cluster) %>%
+  summarize(Name = ID[1]) 
+```
+
+Setup ML folds:
+
+```{r setup-ml-folds}
+train_feat <- list()
+train_label <- list()
+validate_data <- list()
+
+for (i in 1:folds) {
+  train_label[[i]] <- training_data %>% 
+    filter(!Cluster == i) %>% 
+    dplyr::select(FCH4) %>% 
+    pull()
+  
+  train_feat[[i]] <- training_data %>%
+    filter(!Cluster == i) %>%
+    dplyr::select(feat)
+  
+  validate_data[[i]] <- training_data %>%
+    filter(Cluster == i) %>%
+    dplyr::select(Cluster, FCH4, feat)
+}
+
+folds_index <- list() # need list within list (each inner list has all fold site except LOSO fold)
+
+for (i in 1:folds) {
+  x <- list()
+  folds_index[[i]] <- x
+}
+
+for (i in 1:folds) {
+  for (j in 1:folds) {
+    folds_index[[i]][[j]] <- training_data %>% 
+      filter(!Cluster == i) %>% 
+      mutate(index = 1:n()) %>% 
+      filter(!Cluster == j) %>% 
+      dplyr::select(index) %>% 
+      pull()
+  }
+  folds_index[[i]] <- folds_index[[i]][-i]
+}
+```
+
+Are `folds_index`, `train_label`, `train_feat`, `validate_data` of the same length?
+
+```{r fold-data-length-test}
+length(folds_index) == length(train_label) & length(folds_index) == length(train_feat)  & length(folds_index) == length(validate_data)
+```
+
+Load FFS functions from source:
+
+```{r ffs-functions}
+source("code/fit_all_pairs.R")
+source("code/fit_stepwise.R")
+```
+
+
+Identifying the first feature pair:
+
+```{marginfigure}
+**NOTE:** This step considers up to 33670 feature pairs which can take a long time without parallel processing. To speed up this step, you can use the `best_pair`, which we previously identified, to simply generate predictors and performance metrics for this best pair.
+```
+
+```{r}
+set_index <- c(1:3)
+
+# numCores <- detectCores()
+
+best_pair <- c("TA", "canopyht")
+best_pair <- list(best_pair)
+
+feat_pairs[[1]]
+
+rf_pred <- lapply(best_pair, fit_all_pairs)
+
+for(i in 1:10){
+  rf_pred[[i]] <- rf_pred[[i]] %>% 
+    mutate(feat_pair = set_index[i])
+}
+
+for(i in 1:10){
+  write.csv(rf_pred[[i]], paste(loc, "ffs/first-pair/rf-pred/rf_pred_", set_index[i], ".csv", sep = ""), row.names = F)
+}
+```
+
+##### Compute FFS First Pair metrics  
+
+May need to read in `rf_pred` csv files again.
+
+```{r}
+rf.metrics <- list()
+
+files <- list.files(paste(loc, "ffs/first-pair/rf-pred/", sep = ""))
+rf_pred <- lapply(read.csv, files)
+
+compute_metrics <- function(rf_pred) {
+    rf_pred %>% 
+    dplyr::select(FCH4, FCH4P) %>% 
+    summarize(samples = n(),
+              PMARE = 100/n() * sum(abs(FCH4 - FCH4P) / abs(FCH4)),
+              R2 = cor(FCH4P, FCH4)^2,
+              NSE = 1 - sum((FCH4 - FCH4P)^2) / sum((FCH4 - mean(FCH4))^2),
+              MAE = sum(abs(FCH4 - FCH4P))/n(),
+              nMAE = MAE/sd(FCH4),
+              MeanO = mean(FCH4),
+              MedO = median(FCH4),
+              sdO = sd(FCH4),
+              MeanP = mean(FCH4P),
+              MedP = median(FCH4P),
+              sdP = sd(FCH4P),
+              nSD = sdP/sdO,
+              Bias = mean(FCH4P - FCH4),
+              cBias = abs(Bias)/sum(abs(Bias))*100,
+              predictors = list(feat_pairs[[i]]) )
+}
+
+rf.metrics <- lapply(rf_pred, compute_metrics)
+
+rf.metrics.all <- bind_rows(rf.metrics) %>% 
+  arrange(MAE) %>% 
+  rowwise() %>% 
+  mutate(pred1 = predictors[1],
+         pred2 = predictors[2]) %>% 
+  dplyr::select(-predictors)
+
+write.csv(rf.metrics.all, paste(loc, "/ffs/first-pair/rf-metrics/rf.metrics.all.csv", sep = ""), row.names = F)
+
+```
+
+##### Look at metrics distribution
+
+```{r}
+rf.metrics.all %>% 
+  ggplot(aes(R2)) +
+  geom_histogram() + my_theme
+ggsave(paste(loc, "ffs/first-pair/rf-metrics/R2_distribution.png", sep = ""),
+       width = 8, height = 15, units = c("cm"), dpi = 300) 
+
+rf.metrics.all %>% 
+  ggplot(aes(MAE)) +
+  geom_histogram() + my_theme
+ggsave(paste(loc, "ffs/first-pair/rf-metrics/MAE_distribution.png", sep = ""),
+       width = 8, height = 15, units = c("cm"), dpi = 300) 
+```
+
+##### get the min MAE and amx R2 (are they the same?)
+
+```{r}
+max(rf.metrics.all$R2)
+min(rf.metrics.all$MAE)
+rf.metrics.all
+```
+
+Yes both are for `canopyht` and `TA`.
+
+##### look at top 10 Predictor Pairs
+
+```{r}
+rf.metrics.all %>% 
+  arrange(MAE) %>% 
+  head(10) %>% 
+  dplyr::select(pred1, pred2)
+```
+##### Stepwise FFS (for first 13 steps, to avoid local minima)
+
+```{r}
+feat <- pred.metadata$Predictor
+feat_original <- feat
+data_l <- length(all_data$Cluster)
+
+
+feat_best <- c("TA", "canopyht")
+feat_best_index <- c(which(feat == "TA"), 
+                     which(feat == "canopyht"))
+
+feat <- feat[- c(feat_best_index) ]
+feat_l <- length(feat)
+```
+
+##### Setup ML folds
+
+```{r}
+train_feat <- list()
+train_label <- list()
+validate_data <- list()
+
+for (i in 1:folds) {
+  train_label[[i]] <- all_data %>% filter(!Cluster == i) %>% dplyr::select(FCH4) %>% pull()
+  train_feat[[i]] <- all_data %>% filter(!Cluster == i) %>% dplyr::select(feat_original)
+  validate_data[[i]] <- all_data %>% filter(Cluster == i) %>% dplyr::select(Cluster, FCH4, feat_original)
+}
+
+length(train_label) & length(folds_index) == length(train_feat)  & length(folds_index) == length(validate_data)
+```
+
+##### Update compute metrics function (remove predictor list variable of length 2)
+
+```{r}
+compute_metrics <- function(rf_pred) {
+    rf_pred %>% 
+    dplyr::select(FCH4, FCH4P) %>% 
+    summarize(samples = n(),
+              PMARE = 100/n() * sum(abs(FCH4 - FCH4P) / abs(FCH4)),
+              R2 = cor(FCH4P, FCH4)^2,
+              NSE = 1 - sum((FCH4 - FCH4P)^2) / sum((FCH4 - mean(FCH4))^2),
+              MAE = sum(abs(FCH4 - FCH4P))/n(),
+              nMAE = MAE/sd(FCH4),
+              MeanO = mean(FCH4),
+              MedO = median(FCH4),
+              sdO = sd(FCH4),
+              MeanP = mean(FCH4P),
+              MedP = median(FCH4P),
+              sdP = sd(FCH4P),
+              nSD = sdP/sdO,
+              Bias = mean(FCH4P - FCH4),
+              cBias = abs(Bias)/sum(abs(Bias))*100) 
+}
+```
+
+##### Train multiple RFs (with CV) for FFS to select the next 10 best predictors
+
+```{r}
+feat_initial <- 2
+feat_best_row <- list()
+rf.metrics.all <- list()
+
+for(k in 2:10){
+  
+# create index for a list of features
+feat_l <- length(feat)
+set_index <- c(1:feat_l)
+feat_list <- as.list(feat)
+
+numCores <- detectCores()
+
+# call fit a stepwise function to train RFs using one additional predictor
+rf_pred <- mclapply(feat_list, fit_stepwise, mc.cores = 6)
+
+for(l in 1:feat_l){
+  rf_pred[[l]] <- rf_pred[[l]] %>% 
+    mutate(feat_single = feat[l])
+}
+
+for(l in 1:feat_l){
+  write.csv(rf_pred[[l]], paste(loc, "ffs/stepwise/rf-pred/rf_pred_", k, "thstep_", set_index[l], "_", feat[l],  ".csv", sep = ""), row.names = F)
+}
+
+# call compute_metrics function
+rf.metrics <- lapply(rf_pred, compute_metrics)
+
+# bind rows and append feature column, then arrange by MAE
+rf.metrics.all[[k]] <- bind_rows(rf.metrics) %>% 
+  cbind(feat) %>% 
+  arrange(MAE) 
+
+# save the row of the best performing new predictor
+feat_best_row[[k]] <- rf.metrics.all[[k]] %>% 
+    filter(MAE == min(MAE))
+  
+# get the specific predictor name
+feat_best_add <- feat_best_row[[k]] %>% 
+    dplyr::select(feat) %>% 
+    pull() %>% as.character()
+  
+# add to initial best_feat
+feat_best <- c(feat_best, feat_best_add)
+  
+# add one to feat_initial size
+feat_initial <- feat_initial + 1
+  
+# remove feat_best from feat
+feat_best_add_index <- which(feat == feat_best_add)
+feat <- feat[- feat_best_add_index ]
+  
+print(paste('added', feat_best_add))
+
+}
+
+```
+
+##### Save all output from stepwise FFS
+
+```{r}
+feat_best_row_all <- bind_rows(feat_best_row)
+
+for(i in 1:length(rf.metrics.all)) {
+  rf.metrics.all[[i]] <- rf.metrics.all[[i]] %>% 
+    mutate(iteration = i)
+}
+rf_metrics_all <- bind_rows(rf.metrics.all)
+  
+write.csv(feat_best,
+          paste(loc, "ffs/stepwise/feat_best.csv", sep = ""),
+          row.names = FALSE)
+
+write.csv(feat_best_row_all, 
+          paste(loc, "ffs/stepwise/feat_best_row_all.csv", sep = ""),
+          row.names = FALSE)
+
+write.csv(rf_metrics_all,
+          paste(loc, "ffs/stepwise/rf_metrics_all.csv", sep = ""),
+          row.names = FALSE)
+
+```
+
+##### Reload initial pair 
+
+```{r}
+feat_best_initial <- read.csv(paste(loc, "ffs/first-pair/rf-metrics/rf.metrics.all.csv", sep = "")) %>% 
+  mutate(feat = paste(pred1, pred2, sep = ", ")) %>% 
+  dplyr::select(-pred1, -pred2)
+feat_best_row_all <- read.csv(paste(loc,  "ffs/stepwise/feat_best_row_all.csv", sep = ""))
+
+feat_best_initial <- feat_best_initial %>% 
+  filter(MAE == min(MAE)) 
+
+feat_best_row_final <- feat_best_initial %>% 
+  bind_rows(feat_best_row_all) %>% 
+  mutate(predictors = 1:n()+1)
+
+write.csv(feat_best_row_final, 
+          paste(loc, "ffs/stepwise/feat_best_row_final.csv", sep = ""),
+          row.names = F)
+```
+
+##### Output plots for evolution of predictors
+
+```{r}
+feat_best <- feat_best_row_final %>% dplyr::select(feat) %>% pull()
+
+feat_best_row_final %>% 
+  ggplot(aes(predictors, R2)) +
+  geom_point() +
+  geom_line() +
+  scale_x_continuous(breaks = c(2:12), labels = feat_best) +
+  my_theme +
+  theme(axis.text.x = element_text(angle = -45, hjust = 0))
+ggsave(paste(loc, "ffs/stepwise/R2_evolve.png", sep = ""),
+       width = 15, height = 12, units = c("cm"), dpi = 300)
+
+feat_best_row_final %>% 
+  ggplot(aes(predictors, MAE)) +
+  geom_point() +
+  geom_line() +
+  scale_x_continuous(breaks = c(2:12), labels = feat_best) +
+  my_theme +
+  theme(axis.text.x = element_text(angle = -45, hjust = 0))
+ggsave(paste(loc, "ffs/stepwise/MAE_evolve.png", sep = ""),
+       width = 15, height = 12, units = c("cm"), dpi = 300)
+
+```
 
 
 

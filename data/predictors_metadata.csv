@@ -1,0 +1,261 @@
+Row,Predictor,Source Category,Class,Content
+1,NEE,Tower,Biomet,Spatiotemporal
+2,GPP,Tower,Biomet,Spatiotemporal
+3,RECO,Tower,Biomet,Spatiotemporal
+4,SW_IN,Tower,Biomet,Spatiotemporal
+5,LW_IN,Tower,Biomet,Spatiotemporal
+6,LE,Tower,Biomet,Spatiotemporal
+7,TA,Tower,Biomet,Spatiotemporal
+8,PA,Tower,Biomet,Spatiotemporal
+9,VPD,Tower,Biomet,Spatiotemporal
+10,P,Tower,Biomet,Spatiotemporal
+11,NDSI_msc,Remote Sensing,Climate,Spatiotemporal
+12,NDVI_msc,Remote Sensing,Greenness,Spatiotemporal
+13,EVI_msc,Remote Sensing,Greenness,Spatiotemporal
+14,NDWI_msc,Remote Sensing,Land Cover,Spatiotemporal
+15,SRWI_msc,Remote Sensing,Land Cover,Spatiotemporal
+16,LSWI_msc,Remote Sensing,Land Cover,Spatiotemporal
+17,LSTN_msc,Remote Sensing,Climate,Spatiotemporal
+18,NDSI,Remote Sensing,Climate,Spatiotemporal
+19,NDVI,Remote Sensing,Greenness,Spatiotemporal
+20,EVI,Remote Sensing,Greenness,Spatiotemporal
+21,NDWI,Remote Sensing,Land Cover,Spatiotemporal
+22,SRWI,Remote Sensing,Land Cover,Spatiotemporal
+23,LSWI,Remote Sensing,Land Cover,Spatiotemporal
+24,LSTN,Remote Sensing,Climate,Spatiotemporal
+25,NDSI_mean,Remote Sensing,Climate,Spatiotemporal
+26,NDVI_mean,Remote Sensing,Greenness,Spatiotemporal
+27,EVI_mean,Remote Sensing,Greenness,Spatiotemporal
+28,NDWI_mean,Remote Sensing,Land Cover,Spatiotemporal
+29,SRWI_mean,Remote Sensing,Land Cover,Spatiotemporal
+30,LSWI_mean,Remote Sensing,Land Cover,Spatiotemporal
+31,LSTN_mean,Remote Sensing,Climate,Spatiotemporal
+32,NDSI_min,Remote Sensing,Climate,Spatiotemporal
+33,NDVI_min,Remote Sensing,Greenness,Spatiotemporal
+34,EVI_min,Remote Sensing,Greenness,Spatiotemporal
+35,NDWI_min,Remote Sensing,Land Cover,Spatiotemporal
+36,SRWI_min,Remote Sensing,Land Cover,Spatiotemporal
+37,LSWI_min,Remote Sensing,Land Cover,Spatiotemporal
+38,LSTN_min,Remote Sensing,Climate,Spatiotemporal
+39,NDSI_max,Remote Sensing,Climate,Spatiotemporal
+40,NDVI_max,Remote Sensing,Greenness,Spatiotemporal
+41,EVI_max,Remote Sensing,Greenness,Spatiotemporal
+42,NDWI_max,Remote Sensing,Land Cover,Spatiotemporal
+43,SRWI_max,Remote Sensing,Land Cover,Spatiotemporal
+44,LSWI_max,Remote Sensing,Land Cover,Spatiotemporal
+45,LSTN_max,Remote Sensing,Climate,Spatiotemporal
+46,NDSI_amp,Remote Sensing,Climate,Spatiotemporal
+47,NDVI_amp,Remote Sensing,Greenness,Spatiotemporal
+48,EVI_amp,Remote Sensing,Greenness,Spatiotemporal
+49,NDWI_amp,Remote Sensing,Land Cover,Spatiotemporal
+50,SRWI_amp,Remote Sensing,Land Cover,Spatiotemporal
+51,LSWI_amp,Remote Sensing,Land Cover,Spatiotemporal
+52,LSTN_amp,Remote Sensing,Climate,Spatiotemporal
+53,WF,Modeled,Land Cover,Spatiotemporal
+54,WFS,Modeled,Land Cover,Spatiotemporal
+55,WFR,Modeled,Land Cover,Spatiotemporal
+56,aet,Modeled,Biomet,Spatiotemporal
+57,aetS,Modeled,Biomet,Spatiotemporal
+58,aetR,Modeled,Biomet,Spatiotemporal
+59,soilwater,Modeled,Soil and Relief,Spatiotemporal
+60,soilwaterS,Modeled,Soil and Relief,Spatiotemporal
+61,soilwaterR,Modeled,Soil and Relief,Spatiotemporal
+62,nx_depo,Modeled,Biomet,Spatial
+63,ny_dep,Modeled,Biomet,Spatial
+64,s_dep,Modeled,Biomet,Spatial
+65,nt_depo,Modeled,Biomet,Spatial
+66,bare,Modeled,Land Cover,Spatial
+67,shrub,Modeled,Land Cover,Spatial
+68,tree,Modeled,Land Cover,Spatial
+69,rpot,Modeled,Generic,Spatial
+70,canopyht,Modeled,Land Cover,Spatial
+71,cti,Modeled,Soil and Relief,Spatial
+72,wc_mat,Measured,Climate,Spatial
+73,wc_dtr,Measured,Climate,Spatial
+74,wc_iso,Measured,Climate,Spatial
+75,wc_ts,Measured,Climate,Spatial
+76,wc_mtqm,Measured,Climate,Spatial
+77,wc_mtcm,Measured,Climate,Spatial
+78,wc_tr,Measured,Climate,Spatial
+79,wc_mtwtq,Measured,Climate,Spatial
+80,wc_mtdq,Measured,Climate,Spatial
+81,wc_mtwq,Measured,Climate,Spatial
+82,wc_mtcq,Measured,Climate,Spatial
+83,wc_map,Measured,Climate,Spatial
+84,wc_pwtm,Measured,Climate,Spatial
+85,wc_pdm,Measured,Climate,Spatial
+86,wc_ps,Measured,Climate,Spatial
+87,wc_pwtq,Measured,Climate,Spatial
+88,wc_pdq,Measured,Climate,Spatial
+89,wc_pwq,Measured,Climate,Spatial
+90,wc_pcq,Measured,Climate,Spatial
+91,awc,Modeled,Soil and Relief,Spatial
+92,bd,Modeled,Soil and Relief,Spatial
+93,clay,Modeled,Soil and Relief,Spatial
+94,hist,Modeled,Soil and Relief,Spatial
+95,ocd,Modeled,Soil and Relief,Spatial
+96,ph,Modeled,Soil and Relief,Spatial
+97,cont,Remote Sensing,Land Cover,Spatial
+98,corr,Remote Sensing,Land Cover,Spatial
+99,cv,Remote Sensing,Land Cover,Spatial
+100,diss,Remote Sensing,Land Cover,Spatial
+101,east,Modeled,Soil and Relief,Spatial
+102,elev,Modeled,Soil and Relief,Spatial
+103,entr,Remote Sensing,Land Cover,Spatial
+104,even,Remote Sensing,Land Cover,Spatial
+105,flat,Modeled,Soil and Relief,Spatial
+106,HD,Remote Sensing,Land Cover,Spatial
+107,HD7,Remote Sensing,Land Cover,Spatial
+108,HD9,Remote Sensing,Land Cover,Spatial
+109,hollow,Modeled,Soil and Relief,Spatial
+110,homo,Remote Sensing,Land Cover,Spatial
+111,max,Remote Sensing,Land Cover,Spatial
+112,north,Remote Sensing,Land Cover,Spatial
+113,pcurv,Modeled,Soil and Relief,Spatial
+114,rang,Remote Sensing,Land Cover,Spatial
+115,rough,Modeled,Soil and Relief,Spatial
+116,shan,Remote Sensing,Land Cover,Spatial
+117,simp,Remote Sensing,Land Cover,Spatial
+118,slope,Modeled,Soil and Relief,Spatial
+119,std,Remote Sensing,Land Cover,Spatial
+120,tcurv,Modeled,Soil and Relief,Spatial
+121,tpi,Modeled,Soil and Relief,Spatial
+122,unif,Remote Sensing,Land Cover,Spatial
+123,var,Remote Sensing,Land Cover,Spatial
+124,rpot_LAG4,Computed,Generic,Spatiotemporal
+125,rpot_LAG8,Computed,Generic,Spatiotemporal
+126,rpot_LAG12,Computed,Generic,Spatiotemporal
+127,rpot_LEAD4,Computed,Generic,Spatiotemporal
+128,rpot_LEAD8,Computed,Generic,Spatiotemporal
+129,rpot_LEAD12,Computed,Generic,Spatiotemporal
+130,WFS_LAG4,Modeled,Land Cover,Spatiotemporal
+131,WFS_LAG8,Modeled,Land Cover,Spatiotemporal
+132,WFS_LAG12,Modeled,Land Cover,Spatiotemporal
+133,WFS_LEAD4,Modeled,Land Cover,Spatiotemporal
+134,WFS_LEAD8,Modeled,Land Cover,Spatiotemporal
+135,WFS_LEAD12,Modeled,Land Cover,Spatiotemporal
+136,LSTN_LAG1,Remote Sensing,Climate,Spatiotemporal
+137,LSTN_LAG2,Remote Sensing,Climate,Spatiotemporal
+138,LSTN_LAG3,Remote Sensing,Climate,Spatiotemporal
+139,LSTN_LEAD1,Remote Sensing,Climate,Spatiotemporal
+140,LSTN_LEAD2,Remote Sensing,Climate,Spatiotemporal
+141,LSTN_LEAD3,Remote Sensing,Climate,Spatiotemporal
+142,NDSI_LAG1,Remote Sensing,Climate,Spatiotemporal
+143,NDSI_LAG2,Remote Sensing,Climate,Spatiotemporal
+144,NDSI_LAG3,Remote Sensing,Climate,Spatiotemporal
+145,NDSI_LEAD1,Remote Sensing,Climate,Spatiotemporal
+146,NDSI_LEAD2,Remote Sensing,Climate,Spatiotemporal
+147,NDSI_LEAD3,Remote Sensing,Climate,Spatiotemporal
+148,NDVI_LAG1,Remote Sensing,Greenness,Spatiotemporal
+149,NDVI_LAG2,Remote Sensing,Greenness,Spatiotemporal
+150,NDVI_LAG3,Remote Sensing,Greenness,Spatiotemporal
+151,NDVI_LEAD1,Remote Sensing,Greenness,Spatiotemporal
+152,NDVI_LEAD2,Remote Sensing,Greenness,Spatiotemporal
+153,NDVI_LEAD3,Remote Sensing,Greenness,Spatiotemporal
+154,EVI_LAG1,Remote Sensing,Greenness,Spatiotemporal
+155,EVI_LAG2,Remote Sensing,Greenness,Spatiotemporal
+156,EVI_LAG3,Remote Sensing,Greenness,Spatiotemporal
+157,EVI_LEAD1,Remote Sensing,Greenness,Spatiotemporal
+158,EVI_LEAD2,Remote Sensing,Greenness,Spatiotemporal
+159,EVI_LEAD3,Remote Sensing,Greenness,Spatiotemporal
+160,NDWI_LAG1,Remote Sensing,Land Cover,Spatiotemporal
+161,NDWI_LAG2,Remote Sensing,Land Cover,Spatiotemporal
+162,NDWI_LAG3,Remote Sensing,Land Cover,Spatiotemporal
+163,NDWI_LEAD1,Remote Sensing,Land Cover,Spatiotemporal
+164,NDWI_LEAD2,Remote Sensing,Land Cover,Spatiotemporal
+165,NDWI_LEAD3,Remote Sensing,Land Cover,Spatiotemporal
+166,SRWI_LAG1,Remote Sensing,Land Cover,Spatiotemporal
+167,SRWI_LAG2,Remote Sensing,Land Cover,Spatiotemporal
+168,SRWI_LAG3,Remote Sensing,Land Cover,Spatiotemporal
+169,SRWI_LEAD1,Remote Sensing,Land Cover,Spatiotemporal
+170,SRWI_LEAD2,Remote Sensing,Land Cover,Spatiotemporal
+171,SRWI_LEAD3,Remote Sensing,Land Cover,Spatiotemporal
+172,LSWI_LAG1,Remote Sensing,Land Cover,Spatiotemporal
+173,LSWI_LAG2,Remote Sensing,Land Cover,Spatiotemporal
+174,LSWI_LAG3,Remote Sensing,Land Cover,Spatiotemporal
+175,LSWI_LEAD1,Remote Sensing,Land Cover,Spatiotemporal
+176,LSWI_LEAD2,Remote Sensing,Land Cover,Spatiotemporal
+177,LSWI_LEAD3,Remote Sensing,Land Cover,Spatiotemporal
+178,soilwater_LAG4,Modeled,Soil and Relief,Spatiotemporal
+179,soilwater_LAG8,Modeled,Soil and Relief,Spatiotemporal
+180,soilwater_LAG12,Modeled,Soil and Relief,Spatiotemporal
+181,soilwater_LEAD4,Modeled,Soil and Relief,Spatiotemporal
+182,soilwater_LEAD8,Modeled,Soil and Relief,Spatiotemporal
+183,soilwater_LEAD12,Modeled,Soil and Relief,Spatiotemporal
+184,soilwaterS_LAG4,Modeled,Soil and Relief,Spatiotemporal
+185,soilwaterS_LAG8,Modeled,Soil and Relief,Spatiotemporal
+186,soilwaterS_LAG12,Modeled,Soil and Relief,Spatiotemporal
+187,soilwaterS_LEAD4,Modeled,Soil and Relief,Spatiotemporal
+188,soilwaterS_LEAD8,Modeled,Soil and Relief,Spatiotemporal
+189,soilwaterS_LEAD12,Modeled,Soil and Relief,Spatiotemporal
+190,aet_LAG4,Modeled,Biomet,Spatiotemporal
+191,aet_LAG8,Modeled,Biomet,Spatiotemporal
+192,aet_LAG12,Modeled,Biomet,Spatiotemporal
+193,aet_LEAD4,Modeled,Biomet,Spatiotemporal
+194,aet_LEAD8,Modeled,Biomet,Spatiotemporal
+195,aet_LEAD12,Modeled,Biomet,Spatiotemporal
+196,aetS_LAG4,Modeled,Biomet,Spatiotemporal
+197,aetS_LAG8,Modeled,Biomet,Spatiotemporal
+198,aetS_LAG12,Modeled,Biomet,Spatiotemporal
+199,aetS_LEAD4,Modeled,Biomet,Spatiotemporal
+200,aetS_LEAD8,Modeled,Biomet,Spatiotemporal
+201,aetS_LEAD12,Modeled,Biomet,Spatiotemporal
+202,TA_LAG1,Tower,Biomet,Spatiotemporal
+203,TA_LAG2,Tower,Biomet,Spatiotemporal
+204,TA_LAG3,Tower,Biomet,Spatiotemporal
+205,TA_LEAD1,Tower,Biomet,Spatiotemporal
+206,TA_LEAD2,Tower,Biomet,Spatiotemporal
+207,TA_LEAD3,Tower,Biomet,Spatiotemporal
+208,SW_IN_LAG1,Tower,Biomet,Spatiotemporal
+209,SW_IN_LAG2,Tower,Biomet,Spatiotemporal
+210,SW_IN_LAG3,Tower,Biomet,Spatiotemporal
+211,SW_IN_LEAD1,Tower,Biomet,Spatiotemporal
+212,SW_IN_LEAD3,Tower,Biomet,Spatiotemporal
+213,LW_IN_LAG1,Tower,Biomet,Spatiotemporal
+214,LW_IN_LAG2,Tower,Biomet,Spatiotemporal
+215,LW_IN_LAG3,Tower,Biomet,Spatiotemporal
+216,LW_IN_LEAD1,Tower,Biomet,Spatiotemporal
+217,LW_IN_LEAD2,Tower,Biomet,Spatiotemporal
+218,LW_IN_LEAD3,Tower,Biomet,Spatiotemporal
+219,PA_LAG1,Tower,Biomet,Spatiotemporal
+220,PA_LAG2,Tower,Biomet,Spatiotemporal
+221,PA_LAG3,Tower,Biomet,Spatiotemporal
+222,PA_LEAD1,Tower,Biomet,Spatiotemporal
+223,PA_LEAD2,Tower,Biomet,Spatiotemporal
+224,PA_LEAD3,Tower,Biomet,Spatiotemporal
+225,VPD_LAG1,Tower,Biomet,Spatiotemporal
+226,VPD_LAG2,Tower,Biomet,Spatiotemporal
+227,VPD_LAG3,Tower,Biomet,Spatiotemporal
+228,VPD_LEAD1,Tower,Biomet,Spatiotemporal
+229,VPD_LEAD2,Tower,Biomet,Spatiotemporal
+230,VPD_LEAD3,Tower,Biomet,Spatiotemporal
+231,P_LAG1,Tower,Biomet,Spatiotemporal
+232,P_LAG2,Tower,Biomet,Spatiotemporal
+233,P_LAG3,Tower,Biomet,Spatiotemporal
+234,P_LEAD1,Tower,Biomet,Spatiotemporal
+235,P_LEAD2,Tower,Biomet,Spatiotemporal
+236,P_LEAD3,Tower,Biomet,Spatiotemporal
+237,NEE_LAG1,Tower,Biomet,Spatiotemporal
+238,NEE_LAG2,Tower,Biomet,Spatiotemporal
+239,NEE_LAG3,Tower,Biomet,Spatiotemporal
+240,NEE_LEAD1,Tower,Biomet,Spatiotemporal
+241,NEE_LEAD2,Tower,Biomet,Spatiotemporal
+242,NEE_LEAD3,Tower,Biomet,Spatiotemporal
+243,GPP_LAG1,Tower,Biomet,Spatiotemporal
+244,GPP_LAG2,Tower,Biomet,Spatiotemporal
+245,GPP_LAG3,Tower,Biomet,Spatiotemporal
+246,GPP_LEAD1,Tower,Biomet,Spatiotemporal
+247,GPP_LEAD2,Tower,Biomet,Spatiotemporal
+248,GPP_LEAD3,Tower,Biomet,Spatiotemporal
+249,RECO_LAG1,Tower,Biomet,Spatiotemporal
+250,RECO_LAG2,Tower,Biomet,Spatiotemporal
+251,RECO_LAG3,Tower,Biomet,Spatiotemporal
+252,RECO_LEAD1,Tower,Biomet,Spatiotemporal
+253,RECO_LEAD2,Tower,Biomet,Spatiotemporal
+254,RECO_LEAD3,Tower,Biomet,Spatiotemporal
+255,LE_LAG1,Tower,Biomet,Spatiotemporal
+256,LE_LAG2,Tower,Biomet,Spatiotemporal
+257,LE_LAG3,Tower,Biomet,Spatiotemporal
+258,LE_LEAD1,Tower,Biomet,Spatiotemporal
+259,LE_LEAD2,Tower,Biomet,Spatiotemporal
+260,LE_LEAD3,Tower,Biomet,Spatiotemporal
