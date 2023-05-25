@@ -45,6 +45,9 @@ For brevity, this notebook does not include data pre-processing and upscaling ru
 library(tidyverse)
 library(readxl)
 library(skimr)
+library(caret)
+library(ranger)
+source("code/ggplot_theme.R")
 ```
 
 
@@ -93,6 +96,7 @@ Read in training data from `data/final.csv` and a list of predictors from `data/
 ```{r read-ffs-data, message = F, warning = F}
 training_data <- read_csv("data/final.csv")
 predictor_metadata <- read_csv("data/predictors_metadata.csv")
+feat_pairs <- read_csv("data/feat_pairs.csv")
 ```
 
 Skim the training data:
@@ -117,9 +121,9 @@ paste0("There are ", length(feat_pairs_full), " feature pairs")
 ```
 
 Remove pairs of static predictors (unlikely to be informative):
-**NOTE** this step is slow (~10 minutes)
+**NOTE** this step is slow (~30 minutes). This chunk is currently skipped and the `feat_pairs` object is read in at `read-ffs-data` chunk.
 
-```{r remove-static-pairs}
+```{r remove-static-pairs, eval = F}
 static_predictors <- predictor_metadata %>% 
   filter(Content == "Spatial") %>% 
   dplyr::select(Predictor, Content)
@@ -153,7 +157,7 @@ bind_cols(feat_pairs) %>%
 View `feat-pairs`:
 
 ```{r view-feat-pairs}
-head(feat_pairs, 100)
+head(feat_pairs, 10)
 ```
 
 ## FFS: First pair selection
@@ -238,7 +242,7 @@ Identifying the first feature pair:
 **NOTE:** This step considers up to 33670 feature pairs which can take a long time without parallel processing. To speed up this step, you can use the `best_pair`, which we previously identified, to simply generate predictors and performance metrics for this best pair.
 ```
 
-```{r}
+```{r identify-best-predictor-pair, warning = F}
 set_index <- c(1:3)
 
 # numCores <- detectCores()
@@ -246,29 +250,26 @@ set_index <- c(1:3)
 best_pair <- c("TA", "canopyht")
 best_pair <- list(best_pair)
 
-feat_pairs[[1]]
-
 rf_pred <- lapply(best_pair, fit_all_pairs)
 
-for(i in 1:10){
+for(i in 1){
   rf_pred[[i]] <- rf_pred[[i]] %>% 
     mutate(feat_pair = set_index[i])
 }
 
-for(i in 1:10){
-  write.csv(rf_pred[[i]], paste(loc, "ffs/first-pair/rf-pred/rf_pred_", set_index[i], ".csv", sep = ""), row.names = F)
+for(i in 1){
+  write_csv(rf_pred[[i]], 
+            paste0("output/rf_pred_", set_index[i], ".csv"))
 }
 ```
 
-##### Compute FFS First Pair metrics  
+Compute FFS First Pair metrics:
 
-May need to read in `rf_pred` csv files again.
+```{r compute-first-pair-metrics, echo = F}
+rf_metrics <- list()
 
-```{r}
-rf.metrics <- list()
-
-files <- list.files(paste(loc, "ffs/first-pair/rf-pred/", sep = ""))
-rf_pred <- lapply(read.csv, files)
+files <- list.files("output/", pattern = "rf_pred")
+rf_pred <- lapply(paste0("output/", files), read_csv)
 
 compute_metrics <- function(rf_pred) {
     rf_pred %>% 
@@ -291,59 +292,50 @@ compute_metrics <- function(rf_pred) {
               predictors = list(feat_pairs[[i]]) )
 }
 
-rf.metrics <- lapply(rf_pred, compute_metrics)
+rf_metrics <- lapply(rf_pred, compute_metrics)
 
-rf.metrics.all <- bind_rows(rf.metrics) %>% 
+rf_metrics_all <- bind_rows(rf_metrics) %>% 
   arrange(MAE) %>% 
   rowwise() %>% 
   mutate(pred1 = predictors[1],
          pred2 = predictors[2]) %>% 
   dplyr::select(-predictors)
 
-write.csv(rf.metrics.all, paste(loc, "/ffs/first-pair/rf-metrics/rf.metrics.all.csv", sep = ""), row.names = F)
-
+write_csv(rf_metrics_all, "output/rf_metrics_all.csv")
 ```
 
-##### Look at metrics distribution
+Look at metrics distribution (if many pairs have been considered):
 
-```{r}
-rf.metrics.all %>% 
+```{r view-metrics}
+rf_metrics_all %>% 
   ggplot(aes(R2)) +
   geom_histogram() + my_theme
-ggsave(paste(loc, "ffs/first-pair/rf-metrics/R2_distribution.png", sep = ""),
+ggsave("output/R2_distribution.png",
        width = 8, height = 15, units = c("cm"), dpi = 300) 
 
-rf.metrics.all %>% 
+rf_metrics_all %>% 
   ggplot(aes(MAE)) +
   geom_histogram() + my_theme
-ggsave(paste(loc, "ffs/first-pair/rf-metrics/MAE_distribution.png", sep = ""),
+ggsave("output/MAE_distribution.png",
        width = 8, height = 15, units = c("cm"), dpi = 300) 
 ```
 
-##### get the min MAE and amx R2 (are they the same?)
+Get the min MAE and max R2 (are they they from the same combination?):
 
 ```{r}
-max(rf.metrics.all$R2)
-min(rf.metrics.all$MAE)
-rf.metrics.all
+max(rf_metrics_all$R2)
+min(rf_metrics_all$MAE)
+rf_metrics_all
 ```
 
 Yes both are for `canopyht` and `TA`.
 
-##### look at top 10 Predictor Pairs
+## Stepwise FFS (for first 13 steps, to avoid local minima)
 
-```{r}
-rf.metrics.all %>% 
-  arrange(MAE) %>% 
-  head(10) %>% 
-  dplyr::select(pred1, pred2)
-```
-##### Stepwise FFS (for first 13 steps, to avoid local minima)
-
-```{r}
-feat <- pred.metadata$Predictor
+```{r stepup-feat}
+feat <- predictor_metadata$Predictor
 feat_original <- feat
-data_l <- length(all_data$Cluster)
+data_l <- length(training_data$Cluster)
 
 
 feat_best <- c("TA", "canopyht")
@@ -354,25 +346,25 @@ feat <- feat[- c(feat_best_index) ]
 feat_l <- length(feat)
 ```
 
-##### Setup ML folds
+Setup ML folds:
 
-```{r}
+```{r setup-ml-folds-2}
 train_feat <- list()
 train_label <- list()
 validate_data <- list()
 
 for (i in 1:folds) {
-  train_label[[i]] <- all_data %>% filter(!Cluster == i) %>% dplyr::select(FCH4) %>% pull()
-  train_feat[[i]] <- all_data %>% filter(!Cluster == i) %>% dplyr::select(feat_original)
-  validate_data[[i]] <- all_data %>% filter(Cluster == i) %>% dplyr::select(Cluster, FCH4, feat_original)
+  train_label[[i]] <- training_data %>% filter(!Cluster == i) %>% dplyr::select(FCH4) %>% pull()
+  train_feat[[i]] <- training_data %>% filter(!Cluster == i) %>% dplyr::select(all_of( feat_original) )
+  validate_data[[i]] <- training_data %>% filter(Cluster == i) %>% dplyr::select(Cluster, FCH4, all_of(feat_original) )
 }
 
 length(train_label) & length(folds_index) == length(train_feat)  & length(folds_index) == length(validate_data)
 ```
 
-##### Update compute metrics function (remove predictor list variable of length 2)
+Update compute metrics function (remove predictor list variable of length 2):
 
-```{r}
+```{r revise-metrics-function}
 compute_metrics <- function(rf_pred) {
     rf_pred %>% 
     dplyr::select(FCH4, FCH4P) %>% 
@@ -394,12 +386,12 @@ compute_metrics <- function(rf_pred) {
 }
 ```
 
-##### Train multiple RFs (with CV) for FFS to select the next 10 best predictors
+Train multiple RFs (with CV) for FFS to select the next 10 best predictors:
 
-```{r}
+```{r select-next-10-best-predictors}
 feat_initial <- 2
 feat_best_row <- list()
-rf.metrics.all <- list()
+rf_metrics_all <- list()
 
 for(k in 2:10){
   
@@ -419,19 +411,19 @@ for(l in 1:feat_l){
 }
 
 for(l in 1:feat_l){
-  write.csv(rf_pred[[l]], paste(loc, "ffs/stepwise/rf-pred/rf_pred_", k, "thstep_", set_index[l], "_", feat[l],  ".csv", sep = ""), row.names = F)
+  write_csv(rf_pred[[l]], "output/rf_pred_", k, "thstep_", set_index[l], "_", feat[l],  ".csv", sep = "")
 }
 
 # call compute_metrics function
-rf.metrics <- lapply(rf_pred, compute_metrics)
+rf_metrics <- lapply(rf_pred, compute_metrics)
 
 # bind rows and append feature column, then arrange by MAE
-rf.metrics.all[[k]] <- bind_rows(rf.metrics) %>% 
+rf_metrics_all[[k]] <- bind_rows(rf_metrics) %>% 
   cbind(feat) %>% 
   arrange(MAE) 
 
 # save the row of the best performing new predictor
-feat_best_row[[k]] <- rf.metrics.all[[k]] %>% 
+feat_best_row[[k]] <- rf_metrics_all[[k]] %>% 
     filter(MAE == min(MAE))
   
 # get the specific predictor name
@@ -450,9 +442,7 @@ feat_best_add_index <- which(feat == feat_best_add)
 feat <- feat[- feat_best_add_index ]
   
 print(paste('added', feat_best_add))
-
 }
-
 ```
 
 ##### Save all output from stepwise FFS
@@ -500,7 +490,7 @@ write.csv(feat_best_row_final,
           row.names = F)
 ```
 
-##### Output plots for evolution of predictors
+Output plots for evolution of predictors
 
 ```{r}
 feat_best <- feat_best_row_final %>% dplyr::select(feat) %>% pull()
