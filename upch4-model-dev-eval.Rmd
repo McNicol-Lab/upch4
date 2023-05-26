@@ -388,7 +388,7 @@ compute_metrics <- function(rf_pred) {
 
 Train multiple RFs (with CV) for FFS to select the next 10 best predictors:
 
-```{r select-next-10-best-predictors}
+```{r select-next-10-best-predictors, warning = F}
 feat_initial <- 2
 feat_best_row <- list()
 rf_metrics_all <- list()
@@ -400,10 +400,10 @@ feat_l <- length(feat)
 set_index <- c(1:feat_l)
 feat_list <- as.list(feat)
 
-numCores <- detectCores()
+# numCores <- detectCores()
 
 # call fit a stepwise function to train RFs using one additional predictor
-rf_pred <- mclapply(feat_list, fit_stepwise, mc.cores = 6)
+rf_pred <- lapply(feat_list, fit_stepwise)
 
 for(l in 1:feat_l){
   rf_pred[[l]] <- rf_pred[[l]] %>% 
@@ -411,7 +411,7 @@ for(l in 1:feat_l){
 }
 
 for(l in 1:feat_l){
-  write_csv(rf_pred[[l]], "output/rf_pred_", k, "thstep_", set_index[l], "_", feat[l],  ".csv", sep = "")
+  write_csv(rf_pred[[l]], paste0("output/ffs/",k,"/rf_pred_", k, "thstep_", set_index[l], "_", feat[l],  ".csv"))
 }
 
 # call compute_metrics function
@@ -450,23 +450,17 @@ Save all output from stepwise FFS:
 ```{r save-output}
 feat_best_row_all <- bind_rows(feat_best_row)
 
-for(i in 1:length(rf.metrics.all)) {
-  rf.metrics.all[[i]] <- rf.metrics.all[[i]] %>% 
+for(i in 2:length(rf_metrics_all)) {
+  rf_metrics_all[[i]] <- rf_metrics_all[[i]] %>% 
     mutate(iteration = i)
 }
-rf_metrics_all <- bind_rows(rf.metrics.all)
+rf_metrics_all <- bind_rows(rf_metrics_all)
   
-write.csv(feat_best,
-          paste(loc, "ffs/stepwise/feat_best.csv", sep = ""),
-          row.names = FALSE)
+write_csv(feat_best %>% as_tibble(), "output/ffs/stepwise/feat_best.csv")
 
-write.csv(feat_best_row_all, 
-          paste(loc, "ffs/stepwise/feat_best_row_all.csv", sep = ""),
-          row.names = FALSE)
+write_csv(feat_best_row_all, "output/ffs/stepwise/feat_best_row_all.csv")
 
-write.csv(rf_metrics_all,
-          paste(loc, "ffs/stepwise/rf_metrics_all.csv", sep = ""),
-          row.names = FALSE)
+write_csv(rf_metrics_all, "output/ffs/stepwise/rf_metrics_all.csv")
 
 ```
 
