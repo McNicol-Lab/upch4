@@ -511,5 +511,50 @@ ggsave(paste(loc, "ffs/stepwise/MAE_evolve.png", sep = ""),
 
 ```
 
+Reload initial pair:
+
+```{r reload-initial-pair}
+feat_best_initial <- read_csv("output/rf_metrics_all.csv") %>% 
+  mutate(feat = paste(pred1, pred2, sep = ", ")) %>% 
+  dplyr::select(-pred1, -pred2)
+feat_best_row_all <- read_csv("output/ffs/stepwise/feat_best_row_all.csv")
+
+feat_best_initial <- feat_best_initial %>% 
+  filter(MAE == min(MAE)) 
+
+feat_best_row_final <- feat_best_initial %>% 
+  bind_rows(feat_best_row_all) %>% 
+  mutate(predictors = 1:n()+1)
+
+write_csv(feat_best_row_final, 
+          "output/ffs/stepwise/feat_best_row_final.csv")
+```
+
+Output plots for evolution of predictors:
+
+```{r}
+feat_best <- feat_best_row_final %>% dplyr::select(feat) %>% pull()
+
+feat_best_row_final %>% 
+  ggplot(aes(predictors, R2)) +
+  geom_point() +
+  geom_line() +
+  scale_x_continuous(breaks = c(1:10), labels = feat_best) +
+  my_theme +
+  theme(axis.text.x = element_text(angle = -45, hjust = 0))
+ggsave("output/ffs/stepwise/R2_evolve.png",
+       width = 15, height = 12, units = c("cm"), dpi = 300)
+
+feat_best_row_final %>% 
+  ggplot(aes(predictors, MAE)) +
+  geom_point() +
+  geom_line() +
+  scale_x_continuous(breaks = c(1:10), labels = feat_best) +
+  my_theme +
+  theme(axis.text.x = element_text(angle = -45, hjust = 0))
+ggsave("output/ffs/stepwise/MAE_evolve.png",
+       width = 15, height = 12, units = c("cm"), dpi = 300)
+
+```
 
 
