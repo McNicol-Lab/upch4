@@ -17,6 +17,7 @@ Code used for in: McNicol G. Fluet-Chouinard E. et al. (2023) *Upscaling wetland
 `upch4-model-dev-eval.Rmd` contains a simplified workflow for key steps
 
 It is recommended that the file structure in the following directories is replicated when using the latter notebook:
+
   - `code`
   - `data`
   - `mc`

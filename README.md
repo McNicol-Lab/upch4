@@ -13,8 +13,12 @@ comparison* AGU Advances.
 `upch4-model-dev-eval.Rmd` contains a simplified workflow for key steps
 
 It is recommended that the file structure in the following directories
-is replicated when using the latter notebook: - `code` - `data` - `mc` -
-`output`
+is replicated when using the latter notebook:
+
+- `code`
+- `data`
+- `mc`
+- `output`
 
 **NOTE** `results`, `code_old` and `data_old` are directories for the
 older `upch4-full-notebook.Rmd` codebase
