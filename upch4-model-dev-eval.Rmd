@@ -21,12 +21,7 @@ Code for predictive model development and evaluation for upscaling wetland eddy 
   1) a best-predictor set using forward spatial feature selection
   2) spatial cross validation metrics of model performance
   3) variable importance rankings
-
-The final three sections output:
-
   4) simulated training datasets from Monte Carlo to propagate uncertainties
-  5) representativeness products (dissimilarity and constituency maps)
-  6) globally upscaled product evaluations
   
 Manuscript Reference: *McNicol, G. Fluet-Chouinard, E. et al. Upscaling wetland methane emissions from the FLUXNET-CH4 eddy covariance network (UpCH4 v1.0): Model development, network assessment, and budget comparison. AGU Advances, Accepted, May 2023*
 
@@ -49,6 +44,7 @@ library(caret)
 library(ranger)
 library(RColorBrewer)
 library(pdp)
+library(jmuOutlier)
 source("code/ggplot_theme.R")
 ```
 
@@ -2135,4 +2131,167 @@ plotPartial(ice.TA, colorkey = TRUE)
 
 ```
 
+## 4. Perform MC Simulations
 
+Read in loocv training data:
+
+```{r read-data-mc}
+data <- read_csv("data/final.csv") %>% 
+  dplyr::select(Cluster, ID, Year, Month, Week, FCH4, FCH4_UNC, TA, TA_LAG2, canopyht, wc_mtdq,  wc_pwtm, EVI_LAG3)
+head(data)
+```
+
+Read in standard deviations (static uncertainties)
+
+```{r read-static-pred-mc-data, message = F}
+canopyht <- read_csv("mc/extracted/canopyht_sd.csv")
+worldclim <- read_csv("mc/extracted/worldclim_sd.csv")
+static <- left_join(canopyht, worldclim) %>% 
+  filter(Upscaling == 1) %>% 
+  dplyr::select(ID, canopyht_sd, wc_mtdq_sd, wc_pwtm_sd)
+names(static)
+names(data)
+```
+
+Merge with training data
+
+```{r merge}
+data <- data %>% 
+  left_join(static, by = c("ID"))
+```
+
+Generate 1000 simulated observations (of the weekly data set):
+
+```{r generate-datasets-with-mc, warning = F, echo = F, message = F}
+set.seed(23)
+
+# static data
+data_temp <- data %>% 
+  dplyr::select(ID, wc_pwtm, wc_mtdq, canopyht, wc_pwtm_sd, wc_mtdq_sd, canopyht_sd) %>% 
+  distinct()
+
+data_temp
+data_temp <- data_temp[-c(2,8,22,31,34,37,39,41,49),] # remove duplicates (unexpected issue)
+  
+data1 <- data_temp %>% 
+  group_by(ID) %>% 
+  mutate(wc_mtdq_mc = list(rnorm(1000, mean = wc_mtdq, sd = wc_mtdq_sd)),
+         wc_pwtm_mc = list(rnorm(1000, mean = wc_pwtm, sd = wc_pwtm_sd)),
+         canopyht_mc = list(rnorm(1000, mean = canopyht, sd = canopyht_sd))) %>% 
+  unnest(cols = c(wc_mtdq_mc, wc_pwtm_mc, canopyht_mc)) %>% 
+  group_by(ID) %>% 
+  mutate(mc_i = 1:n()) %>% 
+  dplyr::select(mc_i, ID, wc_mtdq_mc, wc_pwtm_mc, canopyht_mc)
+
+# # check the spread for different sites
+# data1 %>% 
+#   filter(ID == "CASCB") %>% 
+#   ggplot(aes(canopyht_mc)) +
+#   geom_histogram()
+
+# temporal data
+data2 <- data %>% 
+  dplyr::select(Cluster, ID, Year, Month, Week, FCH4, FCH4_UNC, TA, TA_LAG2, EVI_LAG3) %>% 
+  rowwise() %>% 
+  mutate(FCH4_mc = list(rlaplace(1000, mean = FCH4, sd = FCH4_UNC/2)),
+         TA_mc = list(rnorm(1000, mean = TA, sd = 0.5)),
+         TA_LAG2_mc = list(rnorm(1000, mean = TA_LAG2, sd = 0.5)),
+         EVI_LAG3_mc = list(rnorm(1000, mean = EVI_LAG3, sd = 0.015))) %>% 
+  unnest(cols = c(FCH4_mc, TA_mc, TA_LAG2_mc, EVI_LAG3_mc)) %>% 
+  group_by(ID, Year, Month, Week) %>% 
+  mutate(mc_i = 1:n()) %>% 
+  dplyr::select(mc_i, Cluster, ID, Year, Month, Week, FCH4, FCH4_UNC, FCH4_mc, TA_mc, TA_LAG2_mc, EVI_LAG3_mc)
+
+# # check the spread for different sites
+# data2 %>% 
+#   filter(ID == "USMyb" & Year == "2014" & Week == "13") %>% 
+#   ggplot(aes(FCH4_mc)) +
+#   geom_histogram()
+
+# rejoin temporal and static
+data2 <- data2 %>% left_join(data1, by = c("mc_i", "ID")) %>% arrange(mc_i)
+```
+
+For each observation (week/row) sample 500/1000, with replacement, and split into 500 training datasets
+
+```{r bootstrap-sample}
+data3 <- data2 %>% 
+  group_by(ID, Year, Month, Week) %>% 
+  sample_n(500, replace = T) %>% 
+  arrange(mc_i) %>% 
+  group_by(mc_i) %>% 
+  group_split() 
+
+
+data4 <- data3 %>% bind_rows() %>% dplyr::select(mc_i, everything()) 
+```
+
+Now drop IDs at random from each of the 500 datasets (and always drop USOWC)
+
+```{r drop-random-clusters}
+set.seed(23)
+cluster_drop <- sample(1:26, 500, replace = T)
+write_csv(as_tibble(cluster_drop), "mc/data/cluster_drop.csv")
+
+data5 <- list()
+for(i in 1:500){
+  data5[[i]] <- data4 %>% 
+    filter(mc_i == i) %>% 
+    filter(Cluster != cluster_drop[i] & ID != "USOWC")
+}
+
+# bind rows
+data6 <- data5 %>% bind_rows()
+
+saveRDS(data6, 
+        "mc/data/1000mc_500bs.rds")
+```
+
+Identify which site was left out then subset those data
+
+```{r get-dropped-ids, warning = F, message = F, echo = F}
+ID.names <- data4 %>% dplyr::select(ID) %>% mutate(ID = factor(ID)) %>% distinct()
+
+# get IDs for each mc_i
+IDs <- list()
+for(i in 1:500){
+  IDs[[i]] <- data6 %>% 
+    filter(mc_i == i) %>% 
+    dplyr::select(ID) %>% 
+    distinct()
+}
+
+# get the held-out site for each mc_i
+ID.drop.list <- list()
+for(i in 1:500){
+  ID.drop.list[[i]] <- ID.names %>% 
+    anti_join(IDs[[i]]) %>% 
+    mutate(Cluster = cluster_drop[i],
+           mc_i = i) %>% 
+    dplyr::select(mc_i, Cluster, ID)
+}
+
+# compile
+ID.drop <-  bind_rows(ID.drop.list) 
+
+write_csv(ID.drop, 
+          "mc/bootstrap-site-dropped.csv")
+```
+
+Finally, subset the held-out site data from each mc_i
+
+```{r subset-held-out-site}
+data7 <- list()
+for(i in 1:500){
+  data7[[i]] <- data4 %>% 
+    filter(mc_i == i & ID %in% ID.drop.list[[i]]$ID )
+  
+}
+
+data7 <- bind_rows(data7)
+
+saveRDS(data7, 
+        "mc/data/1000mc_500bs_heldout.rds")
+```
+
+To train the full ensemble, repeat random forest sections in 2. for each of the 500 boostrap sampled MC-simulated datasets.

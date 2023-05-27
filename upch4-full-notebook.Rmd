@@ -181,13 +181,13 @@ $~$
 
 #### 3. FLUXNET-CH4 Pre-Processing
 
-##### Local machine steps:
+ Local machine steps:
 
   + Create a copy of FLUXNET-CH4 data and name it `/fluxnet-ch4-data-original`
   + Unzip all site flux files in `/fluxnet-ch4-data` 
   + Reorganize into half-hourly (`/hh`) and `/daily` folders for easy access
   
-##### Look at one site of **daily means** data.
+ Look at one site of **daily means** data.
 
 ```{r}
 # setwd(loc)
@@ -200,13 +200,13 @@ No, but there is a quality flag `_QC`. `1`= data gap shorter than 2 months, `3` 
 
 Issue: **There is also no uncertainty (`_UNC`) estimate on the downloaded daily mean data.**
 
-##### Clean up workspace:
+ Clean up workspace:
 
 ```{r}
 # rm(one_site)
 ```
 
-##### Look at one site of **half-hourly** data.
+ Look at one site of **half-hourly** data.
 
 ```{r}
 setwd(loc)
@@ -218,14 +218,14 @@ head(one_site)
   - Half-hourly data has `FCH4` uncertainty columns `FCH4_F_RANDUNC` and `FCH4_F_ANNOPTLM_UNC`. Can be averaged over day or week.
   - Missing values are filled with `-9999`
 
-##### Get FLUXNET-CH4 site names:
+ Get FLUXNET-CH4 site names:
 
 ```{r}
 files <- list.files(paste0(loc, "fluxnet-ch4-data/hh/"))
 site.names <- paste( substr(files, 5, 6), substr(files, 8, 10), sep = "")
 ```
 
-##### Get all **half-hourly** flux data: (this will take a few minutes)
+ Get all **half-hourly** flux data: (this will take a few minutes)
 
 ```{r echo = F, message = F, warning = F}
 hh <- lapply(paste(loc, "fluxnet-ch4-data/hh/", files, sep = ""), read.csv)
@@ -233,20 +233,20 @@ names(hh) <- site.names
 # str(hh)
 ```
 
-##### Create a pristine replicate:
+ Create a pristine replicate:
 
 ```{r}
 hh2 <- hh
 ```
 
-##### Look at all column names (including TIMESTAMP columns, to see date and time format):
+ Look at all column names (including TIMESTAMP columns, to see date and time format):
 
 ```{r}
 names(hh[[1]])
 head(hh[[1]]$TIMESTAMP_END)
 ```
 
-##### Write and apply function to expand `TIMESTAMP_END` into`Year`, `Month`, `Week`, `Day`, and `DOY` variables to facilitate merging with other data:
+ Write and apply function to expand `TIMESTAMP_END` into`Year`, `Month`, `Week`, `Day`, and `DOY` variables to facilitate merging with other data:
 
 ```{r}
 expand_date <- function(hh_data) {
@@ -267,7 +267,7 @@ hh <- lapply(hh, expand_date)
 hh[[2]] # check it worked
 ```
 
-##### Check if gap-filled FCH4 `CH4_F_ANNOPTLM` has already been pre-filled with observations `FCH4`, where available.
+ Check if gap-filled FCH4 `CH4_F_ANNOPTLM` has already been pre-filled with observations `FCH4`, where available.
 
 ```{r}
 hh[[1]] 
@@ -276,7 +276,7 @@ hh[[1]]
 FCH4 in row 7 in `hh[[1]]` (ID BRNpw) = 10.71, which **matches** `CH4_F_ANNOPTLM` = 1.071e+01. 
 **`CH4_F_ANNOPTLM` has been pre-filled with observations.**
 
-##### Write and apply function to create `imputed`, a flag variable where:
+ Write and apply function to create `imputed`, a flag variable where:
 
   - `1` == `CH4_F_ANNOPTLM` was imputed
   - `2` == `CH4_F_ANNOPTLM` was observed
@@ -291,7 +291,7 @@ hh <- lapply(hh, create_imputed)
 # hh[[1]] check it worked
 ```
 
-##### Create ID column:
+ Create ID column:
 
 ```{r}
 for (i in 1:length(hh)){
@@ -302,7 +302,7 @@ for (i in 1:length(hh)){
 head(hh[[1]])
 ```
 
-##### Convert missing values (`-9999`) to `NA`:
+ Convert missing values (`-9999`) to `NA`:
 
 ```{r}
 for (i in 1:length(hh)){
@@ -311,7 +311,7 @@ for (i in 1:length(hh)){
 head(hh[[1]])
 ```
 
-##### Get `u` and `v` wind components:
+ Get `u` and `v` wind components:
 
 Identify which sites lack WD:
 
@@ -349,7 +349,7 @@ hh <- lapply(hh, compute_uv)
 
 head(hh[[1]]) # check it worked
 ```
-##### Merge Random and Gap-filling uncertainty columns before taking mean 
+ Merge Random and Gap-filling uncertainty columns before taking mean 
 
 ```{r}
 for (i in 1:length(hh)){
@@ -361,7 +361,7 @@ head(hh[[1]])
 ```
 
 
-##### Compute weekly means of everything, including vector average WD and speed, excluding precip. (sums)
+ Compute weekly means of everything, including vector average WD and speed, excluding precip. (sums)
 
 Create function to compute weekly means:
 
@@ -412,7 +412,7 @@ weekly[[i]] <- weekly[[i]] %>%
 names(weekly[[1]])
 ```
 
-##### Output each "complete" weekly site as a separate .csv file:
+ Output each "complete" weekly site as a separate .csv file:
 
 ```{r}
 for (i in 1:length(weekly)) {
@@ -422,21 +422,21 @@ for (i in 1:length(weekly)) {
 ```
 
 #### 3. FLUXNET-CH4 Pre-Processing (cont.) 
-##### (re)Load Weekly Data
+ (re)Load Weekly Data
 
 ```{r message = F, warning = F, echo = F}
 files <- list.files(paste(loc, "fluxnet-ch4-data/weekly_upch4/", sep = ""))
 weekly <- lapply(paste(loc,"fluxnet-ch4-data/weekly_upch4/",files, sep = ""), read.csv)
 ```
 
-##### Bind rows
+ Bind rows
 
 ```{r}
 weekly_flat <- weekly %>% bind_rows() %>% as_tibble()
 head(weekly_flat)
 ```
 
-##### Compute FCH4 uncertainty, and subset gap-filled (and best) predictors
+ Compute FCH4 uncertainty, and subset gap-filled (and best) predictors
 
 Notes on variable selection:
 
@@ -460,7 +460,7 @@ weekly_subset <- weekly_flat %>%
 head(weekly_subset)
 ```
 
-##### Append site metadata
+ Append site metadata
 
 Pulled from [FLUXNET-CH4 Site Metadata](https://docs.google.com/spreadsheets/d/1DN0huLs-vVM3g_XcF1hBQrTpkKaGhzuWwaacfbe4iCo/edit#gid=1384338468)
 
@@ -471,7 +471,7 @@ weekly_subset_meta <- metadata %>%
   right_join(weekly_subset, by = ("ID")) 
 ```
 
-##### Save subset, flattened, and metadata-appended weekly FLUXNET-CH4 data
+ Save subset, flattened, and metadata-appended weekly FLUXNET-CH4 data
 
 ```{r}
 write.csv(weekly_subset_meta, 
@@ -481,7 +481,7 @@ write.csv(weekly_subset_meta,
 
 #### 4. Gridded Data Pre-Processing
 
-#### *Create Potential Radiation (RPot)*
+*Create Potential Radiation (RPot)*
 
 **Description**
 Get the mean seasonal cycle from Zutao Ouyang's 2001-2018 MATLAB output. Original citation for `Rpot` is [Peltola et al. 2019](10.5194/essd-11-1263-2019) where it was found to be a useful predictor of high latitude wetland FCH4.
@@ -527,7 +527,7 @@ Output `Rpot_msc.nc`:
 # writeRaster(Rpot_msc, paste(loc, "grids/computed/Rpot_msc.nc", sep = ""), format="CDF", overwrite = T)
 ```
 
-#### *MODIS*
+*MODIS*
 
 **Description**
 Zutao Ouyang (Stanford University) extracted MODIS pixels at the FLUXNET-CH4 sites in April 2020, for 9 products:
@@ -547,20 +547,20 @@ Zutao Ouyang (Stanford University) extracted MODIS pixels at the FLUXNET-CH4 sit
 **NOTE** Tables docmenting MODIS processing step effects on data are here  under [MODIS Processing](https://docs.google.com/spreadsheets/d/1DN0huLs-vVM3g_XcF1hBQrTpkKaGhzuWwaacfbe4iCo/edit#gid=1971246167) and QC figures are output to `upch4_local/modis/modis_qc`.
 
 
-##### Get file local file names/paths for 8-day extracted MODIS data:
+ Get file local file names/paths for 8-day extracted MODIS data:
 
 ```{r}
 setwd(paste(loc, "/modis/modis-extracted", sep = ""))
 files <- list.files()
 ```
 
-##### Set MODIS product/file names (for gather values):
+ Set MODIS product/file names (for gather values):
 
 ```{r}
 modis.names <- c("LSTD", "EVI", "LAI", "LSWI", "NDSI", "NDVI", "NDWI", "LSTN", "SRWI")
 ```
 
-##### Read files:
+ Read files:
 
 ```{r echo = F, warning = F, message = F}
 modis <- lapply(paste(loc, "/modis/modis-extracted/", files, sep = ""), read.csv)
@@ -568,14 +568,14 @@ names(modis) <- modis.names
 # str(modis)
 ```
 
-##### Look at head for first file:
+ Look at head for first file:
 
 ```{r}
 head(modis[[1]])
 ```
 Files are not tidy (short and wide). There are **86** extracted sites (extra sites than in FLUXNET-CH4 V1.0) but there should be **81**. 
 
-##### Correct issues in Site IDs (columan names) to match `fluxnet-ch4-site-metadata.csv`:
+ Correct issues in Site IDs (columan names) to match `fluxnet-ch4-site-metadata.csv`:
 
 ```{r}
 for(i in 1:length(modis)){
@@ -586,7 +586,7 @@ for(i in 1:length(modis)){
 dim(modis[[1]])
 ```
 
-##### Use gather to make long and narrow, remove hyphen from ID:
+ Use gather to make long and narrow, remove hyphen from ID:
 
 ```{r}
 for (i in 1:length(files)) {
@@ -598,7 +598,7 @@ for (i in 1:length(files)) {
 names(modis) <- modis.names
 ```
 
-##### Check data are same length:
+ Check data are same length:
 
 ```{r}
 str(modis)
@@ -608,14 +608,14 @@ str(modis)
 
 Will not be able to bind columns with different lengths
 
-##### Remove `LAI` and `NDSI` then rejoin:
+ Remove `LAI` and `NDSI` then rejoin:
 
 ```{r}
 modis.1.names <- c("LSTD", "EVI", "LSWI", "NDVI", "NDWI", "LSTN", "SRWI")
 modis.1 <- modis[modis.1.names]
 ```
 
-##### Select only first two columns (Date and ID) then data columns:
+ Select only first two columns (Date and ID) then data columns:
 
 ```{r}
 modis.1 <- modis.1 %>% 
@@ -625,21 +625,21 @@ modis.1 <- modis.1 %>%
 names(modis.1) <- c("Date", "ID", modis.1.names)
 ```
 
-##### Rejoin `LAI` using `Date`:
+ Rejoin `LAI` using `Date`:
 
 ```{r}
 modis.2 <- modis.1 %>% left_join(modis$LAI)
 names(modis.2)[10] <- "LAI"
 ```
 
-##### Rejoin `NDSI`:
+ Rejoin `NDSI`:
 
 ```{r}
 modis <- modis.2 %>% right_join(modis$NDSI)
 names(modis)[11] <- "NDSI"
 ```
 
-##### Convert `Date` into `Year` and `DOY`, and remove `LSTD`:
+ Convert `Date` into `Year` and `DOY`, and remove `LSTD`:
 
 ```{r}
 modis <- modis %>% 
@@ -654,7 +654,7 @@ modis <- modis %>%
   dplyr::select(ID, Date, Year, Month, Week, DOY, NDSI, NDVI, EVI, LAI, NDWI, SRWI, LSWI, LSTN) 
 ```
 
-##### Count `NAs` before despiking:
+ Count `NAs` before despiking:
 
 ```{r}
 modis_nas <- modis %>%
@@ -662,7 +662,7 @@ modis_nas <- modis %>%
   summarize_all(list(~sum(is.na(.)))) 
 modis_nas
 ```
-##### Despike outlier values for each product:
+ Despike outlier values for each product:
 
 ```{r}
 modis_dsp <- modis %>% 
@@ -678,7 +678,7 @@ dplyr::select(ID, Date, Year, Month, Week, DOY, NDSI, NDVI, EVI, LAI, NDWI, SRWI
               NDSI_dsp, NDVI_dsp, EVI_dsp, LAI_dsp, NDWI_dsp, SRWI_dsp, LSWI_dsp, LSTN_dsp) 
 ``` 
 
-##### Count `NAs` after despiking:
+ Count `NAs` after despiking:
 
 ```{r}
 modis_dsp_nas <- modis_dsp %>%
@@ -686,7 +686,7 @@ modis_dsp_nas <- modis_dsp %>%
   summarize_all(list(~sum(is.na(.)))) 
 modis_dsp_nas
 ```
-##### Calculate removed values during despiking and output to `upch4_local/modis/modis_qc/`
+ Calculate removed values during despiking and output to `upch4_local/modis/modis_qc/`
 
 ```{r}
 modis_dsp_nas %>% 
@@ -704,7 +704,7 @@ modis_dsp_nas %>%
 ```
 
 
-##### Rename without `_dsp` suffix:
+ Rename without `_dsp` suffix:
 
 ```{r}
 modis_dsp <- modis_dsp %>% 
@@ -720,7 +720,7 @@ modis_dsp <- modis_dsp %>%
 ```
 
 
-##### Calculate mean  seasonal cycle (msc), then weekly means, then fill weekly gaps with msc:
+ Calculate mean  seasonal cycle (msc), then weekly means, then fill weekly gaps with msc:
 
 ```{r}
 modis_gapfilled <- modis_dsp %>% 
@@ -761,7 +761,7 @@ modis_gapfilled <- modis_dsp %>%
 ```
 
 
-##### If snow is on the ground, set water indices to the 5% quantile (frozen):
+ If snow is on the ground, set water indices to the 5% quantile (frozen):
 
 ```{r}
 modis_frozen <- modis_gapfilled %>% 
@@ -775,7 +775,7 @@ modis_frozen <- modis_gapfilled %>%
          LSWI_F = ifelse(NDSI_F > 0, quantile(LSWI_F, 0.05, na.rm=TRUE), LSWI_F))
 ```
 
-##### Compute mean, min, max, amplitude:
+ Compute mean, min, max, amplitude:
 
 ```{r message = F, warning = F}
 modis_frozen <- modis_frozen %>% 
@@ -817,7 +817,7 @@ modis_frozen <- modis_frozen %>%
          LSTN_amp = LSTN_max-LSTN_min)
 ```
 
-##### Get site IDs:
+ Get site IDs:
 
 ```{r}
 site.names <- modis_frozen %>%
@@ -827,7 +827,7 @@ site.names <- modis_frozen %>%
   pull() %>% unique()
 ```
 
-##### Get variable names:
+ Get variable names:
 
 ```{r}
 names <- names(modis)[7:14]
@@ -835,7 +835,7 @@ names_F <- paste(names, "_F", sep = "")
 names_msc <- paste(names, "_msc", sep = "")
 ```
 
-##### Create modis qcqa figures:
+ Create modis qcqa figures:
 
 ```{r message = F, warning = F}
 for (i in 1:length(names)){
@@ -867,18 +867,18 @@ for (i in 1:length(names)){
 }
 ```
 
-##### Output processed MODIS data:
+ Output processed MODIS data:
 
 ```{r}
 write.csv(modis_frozen, paste(loc, "/modis/modis-processed/modis-processed.csv", sep = ""),
           row.names = FALSE)
 ```
 
-#### *Grid Extraction* 
+*Grid Extraction* 
 
 **Extract geospatial data at FLUXNET-CH4 sites and output a single geospatial .csv.**
 
-##### Load site metadata (ID, Latitude, Longitude), applicable to all extractions:
+ Load site metadata (ID, Latitude, Longitude), applicable to all extractions:
 
 ```{r}
 sites <- read.csv(paste(loc, "fluxnet-ch4-data/metadata/fluxnet-ch4-site-metadata.csv", sep = "")) %>% 
@@ -887,7 +887,7 @@ site.coords <- cbind(sites$Longitude, sites$Latitude) # (x, y)
 site.num <- length(site.coords[,1])
 ```
 
-##### Global Canopy Height
+ Global Canopy Height
 
 ```{r}
 raster.names <- list.files(paste(loc, "grids/global-canopy-height/", sep = ""), pattern = "tif$", full.names = FALSE)
@@ -898,7 +898,7 @@ canopyht <- cbind(sites, canopyht) %>%
 head(canopyht)
 ```
 
-###### Check for missing data
+ Check for missing data
 
 ```{r}
 canopyht %>% 
@@ -911,13 +911,13 @@ canopyht %>%
 
 No missing data
 
-###### Write data
+ Write data
 
 ```{r}
 write.csv(canopyht, paste(loc, "grids/extracted/", "canopyht.csv", sep = ""), row.names =  F)
 ```
 
-##### Computed (rpot)
+ Computed (rpot)
 
 ```{r}
 stack <- stack(paste(loc, "grids/computed/Rpot_msc.nc", sep = ""))
@@ -928,7 +928,7 @@ rpot <- cbind(sites, rpot) %>%
 head(rpot)
 ```
 
-###### Check for missing data
+ Check for missing data
 
 ```{r}
 rpot %>% 
@@ -940,13 +940,13 @@ rpot %>%
 ```
 No missing data
 
-###### Write data
+ Write data
 
 ```{r}
 write.csv(rpot, paste(loc, "grids/extracted/", "rpot.csv", sep = ""), row.names =  F)
 ```
 
-##### Compound Topographic Index
+ Compound Topographic Index
 
 ```{r}
 raster.names <- list.files(paste(loc, "grids/geomorpho90m/", sep = ""), pattern = "tif$", full.names = FALSE)
@@ -961,7 +961,7 @@ No missing data.
 
 After QC below, noticed USHRA has a high CTI value. Check on map:
 
-###### Check locations of USHRA and USHRC by cropping raster:
+ Check locations of USHRA and USHRC by cropping raster:
 
 ```{r}
 # site.coords[sites$ID %in% c("DEDgw", "USDPW"),]
@@ -981,14 +981,14 @@ points(site.coords)
 Caused by HRA being apparently closer to a river/flow channel. No difference obvious in Google Earth images. Probably an issue with the CTI product.
 Given USHRA will become an outlier, I'll correct it to match the lower USHRC value.
 
-###### Correct USHRA to USHRC value
+ Correct USHRA to USHRC value
 
 ```{r}
 cti[cti$ID == "USHRA", 15] <- cti[cti$ID == "USHRC", 15]
 ```
 
 
-###### Check for missing data
+ Check for missing data
 
 ```{r}
 cti %>% 
@@ -1002,20 +1002,20 @@ cti %>%
 
 No missing data
 
-###### Write data
+ Write data
 
 ```{r}
 write.csv(cti, paste(loc, "grids/extracted/", "cti.csv", sep = ""), row.names =  F)
 ```
 
-##### Earth Environment Texture, Land Cover and Topography
+ Earth Environment Texture, Land Cover and Topography
 
 Texture (14 variables)
 Land Cover (2 variables)
 Topography (10 variables)
 See: [Appendix: All Predictors](https://docs.google.com/spreadsheets/d/1yBCIt5nFHVIb9v_0ExX8-4Svr0wlcmjD9vdp67hGtnQ/edit#gid=800847828). Search for `EarthEnv` under column `Gridded Product`.
 
-###### First do texture:
+ First do texture:
 
 ```{r}
 raster.names <- list.files(paste(loc, "grids/earthenv/texture/", sep = ""), pattern = "tif$", full.names = FALSE)
@@ -1024,7 +1024,7 @@ earthenv_texture <- as_tibble(raster::extract(stack, site.coords))
 names(earthenv_texture) <- c("cont","corr","cv","diss","entr","even","homo","max","rang","shan","simp","std","unif","var")
 ```
 
-###### Then land cover (commented code for first-run creates `HD` - human development -  as the sum of LC7 and LC9):
+ Then land cover (commented code for first-run creates `HD` - human development -  as the sum of LC7 and LC9):
 
 ```{r}
 raster.names <- list.files(paste(loc, "grids/earthenv/cover/", sep = ""), pattern = "tif$", full.names = FALSE)
@@ -1038,7 +1038,7 @@ earthenv_cover <- as_tibble(raster::extract(stack, site.coords))
 names(earthenv_cover) <- c("HD7", "HD9", "HD")
 ```
 
-###### Then Topography:
+ Then Topography:
 
 ```{r}
 raster.names <- list.files(paste(loc, "grids/earthenv/topography/", sep = ""), pattern = "tif$", full.names = FALSE)
@@ -1047,13 +1047,13 @@ earthenv_topography <- as_tibble(raster::extract(stack, site.coords))
 names(earthenv_topography) <- c("east","elev","flat","hollow","north","pcurv","rough","slope","tcurv","tpi")
 ```
 
-###### Now combine:
+ Now combine:
 
 ```{r}
 earthenv <- cbind(sites, earthenv_texture, earthenv_cover, earthenv_topography)
 ```
 
-###### Look at data histograms:
+ Look at data histograms:
 
 ```{r}
 earthenv %>% 
@@ -1065,7 +1065,7 @@ earthenv %>%
 
 `cont`, `diss`, and `var` have extreme outliers (xmax = 10e+09)
 
-###### Replace extreme outliers with median
+ Replace extreme outliers with median
 
 ```{r}
 earthenv <- earthenv %>% 
@@ -1078,7 +1078,7 @@ earthenv <- earthenv %>%
 
 Visualize again above to check they are corrected.
 
-###### Also check for missing data:
+ Also check for missing data:
 
 ```{r}
 earthenv %>% 
@@ -1090,14 +1090,14 @@ earthenv %>%
   arrange(desc(missing))
 ```
 
-###### There are two sites (USDPW and USWPT) with missing values. Plot the sites:
+ There are two sites (USDPW and USWPT) with missing values. Plot the sites:
 
 ```{r}
 plot(stack[[1]])
 points(site.coords[sites$ID %in% c("USDPW", "USWPT"), ])
 ```
 
-###### Fill with nearby site values. 
+ Fill with nearby site values. 
 
 USDPW from USLA1
 
@@ -1108,13 +1108,13 @@ earthenv[earthenv$ID == "USDPW", c(is.na(earthenv[earthenv$ID == "USDPW", ])) ] 
 earthenv[earthenv$ID == "USWPT", c(is.na(earthenv[earthenv$ID == "USWPT", ])) ] <- earthenv[earthenv$ID == "USOWC", c(is.na(earthenv[earthenv$ID == "USWPT", ])) ] 
 ```
 
-###### Write data
+ Write data
 
 ```{r}
 write.csv(earthenv, paste(loc, "grids/extracted/", "earthenv.csv", sep = ""), row.names =  F)
 ```
 
-##### N and S Deposition
+ N and S Deposition
 
 From [Lamarque et al. 2013](10.5194/acp-13-7997-2013):
 
@@ -1128,7 +1128,7 @@ stack <- stack(paste(loc, "grids/ns-deposition/", raster.names, sep = ""))
 stack[[1]]
 ```
 
-###### Update extent (which runs 0, 360, -90, 90)
+ Update extent (which runs 0, 360, -90, 90)
 
 ```{r}
 x1 <- crop(stack, extent(180, 360, -90, 90))
@@ -1138,12 +1138,12 @@ m <- merge(x1, x2)
 names(m) <- names(stack)
 ```
 
-###### Check overlap of points
+ Check overlap of points
 
 ```{r}
 m[[1]] %>% na_if(-9999) %>% plot() 
 ```
-###### Extract ns data and sum n variables for total n (`nt_depo`)
+ Extract ns data and sum n variables for total n (`nt_depo`)
 
 ```{r}
 ns_depo <- as_tibble(raster::extract(m, site.coords)) 
@@ -1154,7 +1154,7 @@ ns_depo <- cbind(sites, ns_depo) %>%
   mutate(nt_depo = nx_depo + ny_dep)
 head(ns_depo)
 ```
-###### Check for missing data
+ Check for missing data
 
 ```{r}
 ns_depo %>% 
@@ -1168,13 +1168,13 @@ ns_depo %>%
 
 No missing data
 
-###### Write data
+ Write data
 
 ```{r}
 write.csv(ns_depo, paste(loc, "grids/extracted/", "ns_depo.csv", sep = ""), row.names =  F)
 ```
 
-##### SoilGrids
+ SoilGrids
 
 6 products:
 
@@ -1200,7 +1200,7 @@ soilgrids <- cbind(sites, soilgrids) %>%
 head(soilgrids)
 ```
 
-###### Check for missing soilgrids data:
+ Check for missing soilgrids data:
 
 ```{r}
 soilgrids %>% 
@@ -1211,7 +1211,7 @@ soilgrids %>%
             missing = sum(missing)) %>% 
   arrange(desc(missing))
 ```
-###### Check locations of DEDgw and USDPW by cropping raster:
+ Check locations of DEDgw and USDPW by cropping raster:
 
 ```{r}
 # site.coords[sites$ID %in% c("DEDgw", "USDPW"),]
@@ -1223,14 +1223,14 @@ DEDgw_loc <- crop(stack[[1]], DEDgw_bb)
 USDPW_loc <- crop(stack[[1]], USDPW_bb)
 ```
 
-###### First check DEDgw
+ First check DEDgw
 
 ```{r}
 plot(DEDgw_loc)
 points(site.coords)
 ```
 
-###### Then check USDPW
+ Then check USDPW
 
 ```{r}
 plot(USDPW_loc)
@@ -1238,7 +1238,7 @@ points(site.coords)
 ```
 By chance these two sites fall on NA pixels, by being close to water bodies.
 
-###### Shift latitude by 0.005-degrees N
+ Shift latitude by 0.005-degrees N
 
 ```{r}
 sites.temp <- sites %>% 
@@ -1249,7 +1249,7 @@ site.coords.temp <- sites.temp %>%
   unname() %>% as.matrix()
 ```
 
-###### Extract only these two lat-adjusted sites
+ Extract only these two lat-adjusted sites
 
 ```{r}
 soilgrids.temp <- as_tibble(raster::extract(stack, site.coords.temp)) 
@@ -1263,7 +1263,7 @@ soilgrids.temp <- cbind(sites.temp, soilgrids.temp) %>%
 head(soilgrids.temp)
 ```
 
-###### Rejoin soilgrids
+ Rejoin soilgrids
 
 ```{r}
 soilgrids <- soilgrids %>% 
@@ -1272,27 +1272,27 @@ soilgrids <- soilgrids %>%
   arrange(ID)
 ```
 
-###### Write data
+ Write data
 
 ```{r}
 write.csv(soilgrids, paste(loc, "grids/extracted/", "soilgrids.csv", sep = ""), row.names =  F)
 ```
 
-##### TerraClimate
+ TerraClimate
 
 2 products:
   
   - Soil Moisture (soilwater and soilwaterR (range), soilwaterS (annual seasonality))
   - Actual Evapotranspiration (aet and aetR, aetS)
   
-###### Read Actual Evapotranspiration grids
+ Read Actual Evapotranspiration grids
   
 ```{r, message = F, warning = F}
 raster.names <- list.files(paste(loc, "grids/terraclimate/aet/", sep = ""), pattern = "nc$", full.names = FALSE)
 stack <- stack(paste(loc, "grids/terraclimate/aet/", raster.names, sep = ""))
 plot(stack[[3]])
 ```
-###### Extract Actual Evapotranspiration grids
+ Extract Actual Evapotranspiration grids
 
 ```{r}
 # extract data at sites
@@ -1310,7 +1310,7 @@ terraclimate.aet <- cbind(sites,terraclimate.aet)
 head(terraclimate.aet)
 ```
 
-###### Finalize Actual Evapotranspiration
+ Finalize Actual Evapotranspiration
 
 ```{r}
 terraclimate.aet <- terraclimate.aet %>%
@@ -1326,7 +1326,7 @@ terraclimate.aet <- terraclimate.aet %>%
 head(terraclimate.aet)
 ```
 
-###### Read Soil Water grids
+ Read Soil Water grids
   
 ```{r, message = F, warning = F}
 raster.names <- list.files(paste(loc, "grids/terraclimate/soil/", sep = ""), pattern = "nc$", full.names = FALSE)
@@ -1334,7 +1334,7 @@ stack <- stack(paste(loc, "grids/terraclimate/soil/", raster.names, sep = ""))
 plot(stack[[3]])
 ```
 
-###### Extract Soil Water grids
+ Extract Soil Water grids
 
 ```{r}
 # extract data at sites
@@ -1352,7 +1352,7 @@ terraclimate.soilwater <- cbind(sites,terraclimate.soilwater)
 head(terraclimate.soilwater)
 ```
 
-###### Finalize soilwater data
+ Finalize soilwater data
 
 ```{r}
 terraclimate.soilwater <- terraclimate.soilwater %>%
@@ -1369,7 +1369,7 @@ terraclimate.soilwater <- terraclimate.soilwater %>%
 head(terraclimate.soilwater)
 ```
 
-###### Combined aet and soilwater
+ Combined aet and soilwater
 
 ```{r}
 # combine both aet and soilwater
@@ -1379,7 +1379,7 @@ terraclimate <- terraclimate.aet %>%
 head(terraclimate)
 ```
 
-###### Check for missing data
+ Check for missing data
 
 ```{r}
 terraclimate %>% 
@@ -1393,15 +1393,15 @@ terraclimate %>%
 
 No missing data
 
-###### Write data
+ Write data
 
 ```{r}
 write.csv(terraclimate, paste(loc, "grids/extracted/", "terraclimate.csv", sep = ""), row.names =  F)
 ```
 
-##### Fractional Vegetation Cover (VCF)
+ Fractional Vegetation Cover (VCF)
 
-###### Read VCF grids
+ Read VCF grids
   
 ```{r, message = F, warning = F}
 raster.names <- list.files(paste(loc, "grids/VCF5KYR/", sep = ""), pattern = "tif$", full.names = FALSE)
@@ -1414,7 +1414,7 @@ plot(stack[[3]])
 vcf <- as_tibble(raster::extract(stack, site.coords))
 ```
 
-###### Tiff names have year, however some years are missing. Create new name vector from years and data types:
+ Tiff names have year, however some years are missing. Create new name vector from years and data types:
 
 ```{r}
 years_missing <- c(seq(1982,2016,1)) %>% as_tibble() %>% rename(Year = value) %>% 
@@ -1432,7 +1432,7 @@ suffix <- c("_tree","_shrub","_bare") %>% rep(33)
 names_vcf <- paste(names_vcf, suffix, sep="")
 ```
 
-###### Rename to retain order of data, then add missing years as means of adjacent years, and extent time series by two years to 2018 (assuming no change):
+ Rename to retain order of data, then add missing years as means of adjacent years, and extent time series by two years to 2018 (assuming no change):
 
 ```{r}
 # rename to retain order
@@ -1460,13 +1460,13 @@ vcf <- vcf %>% mutate(row = 1:n()) %>%
   dplyr::select(-row)
 ```
 
-###### look at combined data
+ look at combined data
 
 ```{r}
 vcf <- cbind(sites,vcf)
 head(vcf)
 ```
-###### Finalize dataset: gather data split year and predictor
+ Finalize dataset: gather data split year and predictor
 
 ```{r}
 vcf <- vcf %>%
@@ -1476,7 +1476,7 @@ vcf <- vcf %>%
   spread(key = Predictor, value = value)
 head(vcf)
 ```
-###### Plot data
+ Plot data
 
 ```{r}
 vcf %>% 
@@ -1488,7 +1488,7 @@ vcf %>%
 ```
 Data looks reasonable, all between 0 and 100.
 
-###### Check that trends look reasonable:
+ Check that trends look reasonable:
 
 ```{r}
 vcf %>% 
@@ -1502,21 +1502,21 @@ vcf %>%
 US-AO3 looks weird (zeros)
 
 
-###### Replace USA03 with USA10 data, due to strange behavior:
+ Replace USA03 with USA10 data, due to strange behavior:
 
 ```{r}
 vcf[vcf$ID == "USA03", 16:18] <- vcf[vcf$ID == "USA10", 16:18]
 ```
 
-###### Write data
+ Write data
 
 ```{r}
 write.csv(vcf, paste(loc, "grids/extracted/", "vcf.csv", sep = ""), row.names =  F)
 ```
 
-##### Wetland Extent (WAD2M)
+ Wetland Extent (WAD2M)
 
-###### Get rasters
+ Get rasters
 
 Use the coarser 0.5-degree map because 0.25-degree edge roughness causes more missing data
 
@@ -1527,7 +1527,7 @@ stack <- stack(paste(loc, "grids/WAD2M/", sep = "", raster.names[2]))
 plot(stack[[7]])
 points(site.coords)
 ```
-###### Extract data at sites and look at it
+ Extract data at sites and look at it
 
 ```{r}
 wf <- as_tibble(raster::extract(stack, site.coords))
@@ -1535,7 +1535,7 @@ wf <- cbind(sites,wf)
 head(wf)
 ```
 
-###### Finalize WF Seasonality:
+ Finalize WF Seasonality:
 
   - Create date, month, and year columns from varnames
   - Replace any missing data with zero 
@@ -1563,7 +1563,7 @@ wf <- wf %>%
   dplyr::select(1:14, Date, Year, Month, DOY, WF, WFS, WFR)
 ```
 
-###### Look at data patterns
+ Look at data patterns
 
 ```{r}
 wf %>% 
@@ -1578,7 +1578,7 @@ Of these, "HKMPM", "JPSwL", "KRCRK", "USHRA", "USHRC", are either lakes, rice, o
 
 But these can be corrected: "DEHte", "NZKop", "USA10", "USBeo", "USBes", "USCRT","USNC4", "USNGB"
 
-###### Get bounding boxes for each correctable site
+ Get bounding boxes for each correctable site
 
 ```{r}
 coords_subset <- site.coords[sites$ID %in% c("DEHte", "NZKop", "USA10", "USBeo", "USBes", "USCRT","USNC4", "USNGB"),] 
@@ -1600,14 +1600,14 @@ for(i in 1:length(bounding_boxes)){
 }
 ```
 
-###### Match up longitudes with site names:
+ Match up longitudes with site names:
 
 ```{r}
 sites %>% 
   filter(Longitude %in% coords_subset[,1])
 ```
 
-###### Look at each site:
+ Look at each site:
 
 ```{r}
 for(i in 1:length(bounding_boxes)){
@@ -1618,7 +1618,7 @@ for(i in 1:length(bounding_boxes)){
 
 Looks like moving all 1:6 and 8 south by 1 degree, and moving 7 west by 1 degree will help with extractions:
 
-###### Adjust lat/longs and reextract just these 8 sites
+ Adjust lat/longs and reextract just these 8 sites
 
 ```{r}
 site.coords.temp <- sites %>% 
@@ -1629,7 +1629,7 @@ site.coords.temp <- sites %>%
   as.matrix() %>% unname()
 ```
 
-###### Look just at the locations of these adjusted sites:
+ Look just at the locations of these adjusted sites:
 
 ```{r}
 for(i in 1:length(bounding_boxes)){
@@ -1638,7 +1638,7 @@ for(i in 1:length(bounding_boxes)){
 }
 ```
 
-###### Re-extract at adjusted sites:
+ Re-extract at adjusted sites:
 
 ```{r}
 sites.temp <- sites %>% 
@@ -1649,7 +1649,7 @@ wf.temp <- cbind(sites.temp, wf.temp)
 head(wf.temp)
 ```
 
-###### Finalize WF Seasonality for temporary sites
+ Finalize WF Seasonality for temporary sites
 
 ```{r}
 wf.temp <- wf.temp %>%
@@ -1671,7 +1671,7 @@ wf.temp <- wf.temp %>%
   dplyr::select(1:14, Date, Year, Month, DOY, WF, WFS, WFR)
 ```
 
-###### Rejoin data
+ Rejoin data
 
 ```{r}
 wf.rm <- wf %>% 
@@ -1682,7 +1682,7 @@ wf <- wf.rm %>%
   arrange(ID, Date)
 ```
 
-###### Look at data patterns
+ Look at data patterns
 
 ```{r}
 wf %>% 
@@ -1694,13 +1694,13 @@ wf %>%
 
 Data are now complete (rice, mangrove, and lake sites still ~0 but cannot be corrected, USNC4 was a wetland and has been corrected)
 
-###### Write data
+ Write data
 
 ```{r}
 write.csv(wf, paste(loc, "grids/extracted/", "wf.csv", sep = ""), row.names =  F)
 ```
 
-##### WorldClim 2.0
+ WorldClim 2.0
 
 ```{r warning = F}
 setwd(loc)
@@ -1710,7 +1710,7 @@ plot(stack[[7]])
 points(site.coords)
 ```
 
-###### Extract worldclim data
+ Extract worldclim data
 
 ```{r}
 worldclim <- as_tibble(raster::extract(stack, site.coords)) 
@@ -1718,7 +1718,7 @@ worldclim <- cbind(sites, worldclim)
 head(worldclim)
 ```
 
-###### Check for missing data
+ Check for missing data
 
 ```{r}
 worldclim %>% 
@@ -1726,7 +1726,7 @@ worldclim %>%
 ```
 HKMPM data are missing. 
 
-###### Look at HKMPM location:
+ Look at HKMPM location:
 
 ```{r}
 coords_subset <- site.coords[sites$ID %in% c("HKMPM"),] 
@@ -1741,7 +1741,7 @@ points(114.02924,  22.49817)
 ```
 Can move onto nearby coastline by shifting west
 
-###### Shift HKMPM west:
+ Shift HKMPM west:
 
 ```{r}
 site.coords.temp <- sites %>% 
@@ -1757,7 +1757,7 @@ worldclim.temp <- as_tibble(raster::extract(stack, site.coords.temp))
 worldclim.temp <- cbind(sites.temp, worldclim.temp)
 head(worldclim.temp)
 ```
-###### Rejoin
+ Rejoin
 
 ```{r}
 worldclim <- worldclim %>% 
@@ -1766,7 +1766,7 @@ worldclim <- worldclim %>%
   arrange(ID)
 ```
 
-###### Create new name vector to match 19 products
+ Create new name vector to match 19 products
 ```{r}
 newnames <- c("wc_mat", "wc_dtr", "wc_iso", "wc_ts",
        "wc_mtqm", "wc_mtcm", "wc_tr", "wc_mtwtq",
@@ -1778,16 +1778,16 @@ oldnames <- names(worldclim)[15:33]
 worldclim <- worldclim %>% 
  rename_at(vars(oldnames), ~ newnames)
 ```
-###### Write worlclim data
+ Write worlclim data
 
 ```{r}
 write.csv(worldclim, paste(loc, "grids/extracted/worldclim.csv", sep = ""), row.names = F)
 ```
 
 
-#### *Grid Data Merge*
+*Grid Data Merge*
 
-###### Read in all .csv files
+ Read in all .csv files
 
 ```{r, warning = F}
 setwd(loc)
@@ -1796,7 +1796,7 @@ geospatial <- lapply(paste(loc, "grids/extracted/", csv.names, sep = ""), read.c
 names(geospatial) <- csv.names
 ```
 
-###### Join static data
+ Join static data
 
 ```{r, message = F, warning = F}
 
@@ -1820,7 +1820,7 @@ geospatial_data_static <- canopyht %>%
   left_join(earthenv)
 
 ```
-###### Join temporal data
+ Join temporal data
 
 ```{r}
 geospatial_data_temporal <- as_tibble(geospatial$wf.csv) %>% dplyr::select(-DOY, -Date) %>% # start with wetland fraction then add others
@@ -1829,14 +1829,14 @@ geospatial_data_temporal <- as_tibble(geospatial$wf.csv) %>% dplyr::select(-DOY,
   left_join(geospatial$vcf.csv) %>% 
   left_join(geospatial$rpot) 
 ```
-###### Merge static and temporal data
+ Merge static and temporal data
 
 ```{r}
 geospatial_data <- geospatial_data_temporal %>% 
   full_join(geospatial_data_static)
 ```
 
-###### Look at `geospatial_data` NAs
+ Look at `geospatial_data` NAs
 
 ```{r}
 nas <- geospatial_data %>% 
@@ -1851,19 +1851,19 @@ nas
 
 There is some missing data for 2000 for the Terraclimate temporal products.  Can impute at later step using caret.
 
-###### Write out NA file
+ Write out NA file
 
 ```{r}
 write.csv(nas, paste(loc, "/grids/extracted/extracted_nas.csv", sep = ""), row.names = FALSE)
 ```
 
-###### Write out `geospatial_data` file
+ Write out `geospatial_data` file
 
 ```{r}
 write.csv(geospatial_data, paste(loc, "/grids/extracted-final/geospatial.csv", sep = ""), row.names = FALSE)
 ```
 
-#### *Merge geospatial and modis data*
+*Merge geospatial and modis data*
 
 ```{r}
 geospatial_data <- read.csv(paste(loc, "grids/extracted-final/geospatial.csv", sep = "")) %>% as_tibble()
@@ -1878,21 +1878,21 @@ modis_geo <- modis_data %>% left_join(geospatial_data) %>%
                 DOI.Reference, Site.Personnel, Base.File.Host, Upscaling, Year, Month, Week, everything()) 
 ```
 
-###### Write out modis_geo data file
+ Write out modis_geo data file
 
 ```{r}
 write.csv(modis_geo, paste(loc, "training-data/modis_geospatial.csv", sep = ""), row.names = FALSE)
 ```
 
-#### *QAQC Plots for all Predictors*
+*QAQC Plots for all Predictors*
 
-##### Read in `modis_geospatial.csv`:
+ Read in `modis_geospatial.csv`:
 
 ```{r}
 modis_geo <- read.csv(paste(loc, "training-data/modis_geospatial.csv", sep = ""))
 ```
 
-##### Computed Predictors (rpot)
+ Computed Predictors (rpot)
 
 ```{r}
 modis_geo %>% 
@@ -1916,9 +1916,9 @@ Second QAQC evaluation:
   
   + No issues. Corrected modis input data site names.
 
-##### WorldClim Predictors
+ WorldClim Predictors
 
-###### Get Indices
+ Get Indices
 
 ```{r}
 names(modis_geo)
@@ -1926,7 +1926,7 @@ names(modis_geo)
 
 Need 85-103.
 
-###### Plot all worldclim
+ Plot all worldclim
 
 ```{r}
 oldnames <- names(modis_geo)[85:103]
@@ -1954,11 +1954,11 @@ ggsave(paste(loc, "grids/extracted-qc/worldclim.pdf", sep = ""),
 
 Ranges look reasonable. No outliers.
 
-##### EarthEnv Predictors
+ EarthEnv Predictors
 
 Need 110-136
 
-###### Plot earthenv
+ Plot earthenv
 
 ```{r}
 oldnames <- names(modis_geo)[110:136]
@@ -1983,11 +1983,11 @@ ggsave(paste(loc, "grids/extracted-qc/earthenv.pdf", sep = ""),
        width = 30, height = 30, units = c("cm"), dpi = 300)
 ```
 
-##### Terraclimate Predictors
+ Terraclimate Predictors
 
 Need 69-74.
 
-###### Plot the actual values
+ Plot the actual values
 
 ```{r}
 # aet
@@ -2020,7 +2020,7 @@ ggsave(paste(loc, "grids/extracted-qc/terraclimate-soilwater.pdf", sep = ""),
 
 ```
 
-###### Plot the ranges
+ Plot the ranges
 
 ```{r}
 # aet
@@ -2053,7 +2053,7 @@ ggsave(paste(loc, "grids/extracted-qc/terraclimate-soilwaterR.pdf", sep = ""),
 
 ```
 
-###### Plot the seasonality
+ Plot the seasonality
 
 ```{r}
 # aetS
@@ -2092,7 +2092,7 @@ QC issues:
   + `soilwater` seasonality is very variable within some sites, and obviously wrong in locations where wetlands are not the dominant component of the pixel
   (e.g., US-TW1 through US-Twt, which are delta marshes embedded in a dryland Mediterranean climate)
 
-##### VCF Predictors 
+ VCF Predictors 
 
 Need 79-81
 
@@ -2113,7 +2113,7 @@ ggsave(paste(loc, "grids/extracted-qc/vcf.pdf", sep = ""),
        width = 30, height = 30, units = c("cm"), dpi = 300)
 ```
 
-###### Does each cover type (shrub, tree, bare) sum to 100?
+ Does each cover type (shrub, tree, bare) sum to 100?
 ```{r}
 modis_geo %>% 
   mutate(vcf_sum = bare + shrub + tree) %>% 
@@ -2127,7 +2127,7 @@ ggsave(paste(loc, "grids/extracted-qc/vcf_var_sum.pdf", sep = ""),
 First QC passed: everything looks good, and cover types at each site sum to 100.
 
 
-##### CTI Predictors 
+ CTI Predictors 
 
 ```{r}
 modis_geo %>% 
@@ -2152,13 +2152,13 @@ First QAQC issues:
       + After inspection, corrected USHRA to USHRC value, given proximity and no visible diff. in sites. (i.e. CTI product issue)
   - Other patterns seem to make sense, `CHDav` is in the alps and should have a low/negative CTI
 
-##### Wetland Fraction (WF) Predictors 
+ Wetland Fraction (WF) Predictors 
 
 66 (WF)
 67 (WFS)
 68 (WFR)
 
-###### Plot the actual values
+ Plot the actual values
 
 ```{r}
 # WF
@@ -2182,7 +2182,7 @@ WF QC:
       + Correct HKMPM and JPSwL to 1 year-round, because they are a mangrove and lake respectively (always flooded)
       + Map and shift the others coords to get a better value
 
-###### Plot the ranges
+ Plot the ranges
 
 ```{r}
 # WFR
@@ -2199,7 +2199,7 @@ ggsave(paste(loc, "grids/extracted-qc/wad2m-wfr.pdf", sep = ""),
        width = 40, height = 30, units = c("cm"), dpi = 300)
 ```
 
-###### Plot the seasonality
+ Plot the seasonality
 
 ```{r}
 # WFS
@@ -2217,7 +2217,7 @@ ggsave(paste(loc, "grids/extracted-qc/wad2m-wfs.pdf", sep = ""),
        width = 30, height = 30, units = c("cm"), dpi = 300)
 ```
 
-##### canopyht Predictors
+ canopyht Predictors
 
 ```{r}
 modis_geo %>% 
@@ -2238,7 +2238,7 @@ ggsave(paste(loc, "grids/extracted-qc/canopyht.pdf", sep = ""),
 
 Looks OK!
 
-##### NS Deposition Predictors
+ NS Deposition Predictors
 
 Get 75-78
 
@@ -2264,7 +2264,7 @@ ggsave(paste(loc, "grids/extracted-qc/ns_depo.pdf", sep = ""),
 
 Looks fine. 
 
-##### SoilGrids250m Predictors
+ SoilGrids250m Predictors
 
 Get 104-109.
 
@@ -2292,7 +2292,7 @@ Looks fine!
 
 #### 5. Finalize Training Data
 
-##### Merge Flux and Geospatial Data
+ Merge Flux and Geospatial Data
 
 ```{r}
 fluxes <- read.csv(paste(loc, "fluxnet-ch4-data/weekly_flat/weekly_subset_meta.csv", sep = ""))
@@ -2309,7 +2309,7 @@ flux_modis_geo_weekly <- fluxes %>%
   left_join(modis_geo_subset)
 ```
 
-##### Get wetland flux sites only (45 sites):
+ Get wetland flux sites only (45 sites):
 
 ```{r}
 wetland_ids <- levels(as.factor(fluxes$ID))
@@ -2318,14 +2318,14 @@ flux_modis_geo_weekly <- flux_modis_geo_weekly %>%
   filter(ID %in% wetland_ids)
 ```
 
-##### Write merged dataset `flux_modis_geo_weekly`:
+ Write merged dataset `flux_modis_geo_weekly`:
 
 ```{r}
 write.csv(flux_modis_geo_weekly, paste(loc, "/training-data/flux_modis_geo_weekly.csv", sep = ""), row.names = F)
 names(flux_modis_geo_weekly)
 ```
 
-##### Output Flux QC Plots
+ Output Flux QC Plots
 
 ```{r}
 min(flux_modis_geo_weekly$Year)
@@ -2374,7 +2374,7 @@ names(all_data)
 
 ```
 
-##### Adjust Site Data: remove USSne year 2016
+ Adjust Site Data: remove USSne year 2016
 
 ```{r}
 all_data <- all_data %>%  
@@ -2382,13 +2382,13 @@ all_data <- all_data %>%
   filter(remove == 0) %>% dplyr::select(-remove)
 ```
 
-##### Look at data, and extent of missing data
+ Look at data, and extent of missing data
 
 ```{r}
 str(all_data)
 ```
 
-##### Summarize missingness in predictors:
+ Summarize missingness in predictors:
 
 ```{r}
 all_data %>% 
@@ -2400,7 +2400,7 @@ all_data %>%
 
 ```
 
-##### Remove extraneous variables and non-class-double data and impute the first 40 predictors
+ Remove extraneous variables and non-class-double data and impute the first 40 predictors
 
 Using predict function will not work with mixed-classes.
 Most of the missing data are in the first EC tower and MODIS variables.
@@ -2423,7 +2423,7 @@ rm(pp)
 all_data[impute_names] <- all_data_impute_pp
 ```
 
-##### Summarize missingness after imputation in predictors:
+ Summarize missingness after imputation in predictors:
 
 ```{r}
 all_data %>% 
@@ -2434,20 +2434,20 @@ all_data %>%
   write.csv(paste(loc, "training-data/missingness/predictor_missingness_after_impute_weekly.csv", sep = ""), row.names = F)
 ```
 
-##### There are still some missing data, check where:
+ There are still some missing data, check where:
 
 ```{r}
 all_data %>% 
   filter(is.na(wc_mtdq))
 ```
 
-##### Fix by set Month 2, Week 8 equal to Month 2 Week 7: [ for daily data only ]
+ Fix by set Month 2, Week 8 equal to Month 2 Week 7: [ for daily data only ]
 
 ```{r}
 # all_data[all_data$Year == 2016 & all_data$Month == 2 & all_data$Week == 8 , 57:145] <- all_data[all_data$Year == 2016 & all_data$Month == 2 & all_data$Week == 7 , 57:145]
 ```
 
-##### Summarize missingness after manual imputation in predictors: [ for daily data only ]
+ Summarize missingness after manual imputation in predictors: [ for daily data only ]
 
 ```{r}
 # all_data %>% 
@@ -2458,7 +2458,7 @@ all_data %>%
 #   write.csv(paste(loc, "training-data/missingness/predictor_missingness_after_impute_after_manual.csv", sep = ""), row.names = F)
 ```
 
-##### Add lagged variables
+ Add lagged variables
 
 ```{r}
 all_data <- all_data %>% 
@@ -2629,7 +2629,7 @@ all_data <- all_data %>%
   ungroup()
 ```
 
-##### Look at first 32 predictors (after imputation)
+ Look at first 32 predictors (after imputation)
 
 ```{r}
 names(all_data_impute)[6:15]
@@ -2758,20 +2758,20 @@ ggsave(paste(loc, "/training-data/imputation-qc/weekly/P.png", sep = ""),
 
 ```
 
-##### Filter RECO values:
+ Filter RECO values:
 
 ```{r}
 all_data <- all_data %>% 
 mutate(RECO = ifelse(RECO > 20, 0, RECO))
 ```
 
-##### Output: Write complete `all_data`
+ Output: Write complete `all_data`
 
 ```{r}
 write.csv(all_data, paste(loc, "/training-data/all_data.csv", sep = ""), row.names = F)
 ```
 
-##### Output: Table of Final FLUXNET-CH4 Inputs: 
+ Output: Table of Final FLUXNET-CH4 Inputs: 
 
   + **Manually edit to create new file `list_of_predictors_metadata.csv` with class and information content variables
 
@@ -2781,14 +2781,14 @@ names(all_data)[21:ncol(all_data)] %>% write.csv(paste(loc, "/training-data/list
 
 #### 6. Forward Feature Selection (+clustering)
 
-##### Read in data and remove upland class
+ Read in data and remove upland class
 
 ```{r}
 all_data <- read.csv(paste(loc, "/training-data/all_data.csv", sep = "")) %>% 
   dplyr::select(-`Upland.Class`)
 ```
 
-##### What is the distribution of imputed %s?
+ What is the distribution of imputed %s?
 
 ```{r}
 all_data %>% 
@@ -2802,7 +2802,7 @@ ggsave(paste0(loc, "training-data/missingness/fch4-gap-distribution.png"),
        width = 15, height = 10, units = c("cm"), dpi = 900)
 ```
 
-##### Subset only weeks with at least one day (14%) of observations
+ Subset only weeks with at least one day (14%) of observations
 
 ```{r}
 all_data <- all_data %>% 
@@ -2811,7 +2811,7 @@ all_data <- all_data %>%
 dim(all_data)
 ```
 
-##### Remove other stray NAs using complete cases
+ Remove other stray NAs using complete cases
 
 ```{r}
 all_data <- all_data %>% 
@@ -2819,7 +2819,7 @@ all_data <- all_data %>%
 dim(all_data)
 ```
 
-##### Setup LOSOCV (cluster sites based on location)
+ Setup LOSOCV (cluster sites based on location)
 
 ```{r}
 site_loc <- all_data %>% 
@@ -2851,7 +2851,7 @@ all_data <- all_data %>%
   dplyr::select(Cluster = Cluster, everything())
 ```
 
-##### Summarize clusters now that data have been filtered
+ Summarize clusters now that data have been filtered
 
 ```{r}
 # summarize folds and sites
@@ -2888,10 +2888,10 @@ write.csv(cluster_bysite, paste(loc, "/training-data/clusters/cluster_bysite.csv
 write.csv(cluster_bycluster, paste(loc, "/training-data/clusters/cluster_bycluster.csv", sep = ""), row.names = F)
 ```
 
-##### Output training data (with clusters)
+ Output training data (with clusters)
 
 
-##### Visualize clusters on global map
+ Visualize clusters on global map
 
 ```{r}
 # ggplot theme
@@ -2970,7 +2970,7 @@ ggsave(paste0(loc, "training-data/clusters/clusters_map.png"),
 write.csv(all_data, paste(loc, "training-data/final.csv", sep  = ""), row.names = F)
 ```
 
-##### Summarize/visualize the temporal distribution of data
+ Summarize/visualize the temporal distribution of data
 
 ```{r}
 all_data <- read.csv(paste0(loc, "training-data/final.csv"))
@@ -2991,7 +2991,7 @@ all_data <- read.csv(paste(loc, "training-data/final.csv", sep = ""))
 pred.metadata <- read.csv(paste(loc, "/training-data/list_of_predictors_metadata.csv", sep = ""))
 ```
 
-###### Select features
+ Select features
 
 ```{r}
 feat <- pred.metadata$Predictor
@@ -2999,14 +2999,14 @@ feat_l <- length(feat)
 data_l <- length(all_data$Cluster)
 ```
 
-###### Create pairwise feat combinations for FFS
+ Create pairwise feat combinations for FFS
 
 ```{r}
 feat_pairs_full <- combn(feat, 2, simplify = FALSE)
 length(feat_pairs_full)
 ```
 
-###### Remove pairs of static predictors (unlikely to be informative)
+ Remove pairs of static predictors (unlikely to be informative)
 
 ```{r}
 static.predictors <- pred.metadata %>% 
@@ -3030,7 +3030,7 @@ feat_pairs <- feat_pairs_full[-feat_pairs_remove]
 length(feat_pairs) 
 ```
 
-###### Save `feat_pairs` to view
+ Save `feat_pairs` to view
 
 ```{r}
 bind_cols(feat_pairs) %>% 
@@ -3041,7 +3041,7 @@ bind_cols(feat_pairs) %>%
 
 #### 6. (cont.) FFS of first predictor pair
 
-##### Get fold number and fold names
+ Get fold number and fold names
 
 ```{r}
 set.seed(23)
@@ -3051,7 +3051,7 @@ folds <- all_data %>% mutate(Cluster = as.factor(Cluster)) %>% dplyr::select(Clu
 fold_names <- all_data %>% group_by(Cluster) %>% summarize(Name = ID[1]) 
 ```
 
-##### Setup ML folds
+ Setup ML folds
 
 ```{r}
 train_feat <- list()
@@ -3084,7 +3084,7 @@ for (i in 1:folds) {
 length(folds_index) == length(train_label) & length(folds_index) == length(train_feat)  & length(folds_index) == length(validate_data)
 ```
 
-##### Run FFS First Pair in Parallel (need to re-run at some point)
+ Run FFS First Pair in Parallel (need to re-run at some point)
 
 ```{r}
 set_index <- c(1:3)
@@ -3108,7 +3108,7 @@ for(i in 1:10){
 }
 ```
 
-##### Compute FFS First Pair metrics  
+ Compute FFS First Pair metrics  
 
 May need to read in `rf_pred` csv files again.
 
@@ -3152,7 +3152,7 @@ write.csv(rf.metrics.all, paste(loc, "/ffs/first-pair/rf-metrics/rf.metrics.all.
 
 ```
 
-##### Look at metrics distribution
+ Look at metrics distribution
 
 ```{r}
 rf.metrics.all %>% 
@@ -3168,7 +3168,7 @@ ggsave(paste(loc, "ffs/first-pair/rf-metrics/MAE_distribution.png", sep = ""),
        width = 8, height = 15, units = c("cm"), dpi = 300) 
 ```
 
-##### get the min MAE and amx R2 (are they the same?)
+ get the min MAE and amx R2 (are they the same?)
 
 ```{r}
 max(rf.metrics.all$R2)
@@ -3178,7 +3178,7 @@ rf.metrics.all
 
 Yes both are for `canopyht` and `TA`.
 
-##### look at top 10 Predictor Pairs
+ look at top 10 Predictor Pairs
 
 ```{r}
 rf.metrics.all %>% 
@@ -3186,7 +3186,7 @@ rf.metrics.all %>%
   head(10) %>% 
   dplyr::select(pred1, pred2)
 ```
-##### Stepwise FFS (for first 13 steps, to avoid local minima)
+ Stepwise FFS (for first 13 steps, to avoid local minima)
 
 ```{r}
 feat <- pred.metadata$Predictor
@@ -3202,7 +3202,7 @@ feat <- feat[- c(feat_best_index) ]
 feat_l <- length(feat)
 ```
 
-##### Setup ML folds
+ Setup ML folds
 
 ```{r}
 train_feat <- list()
@@ -3218,7 +3218,7 @@ for (i in 1:folds) {
 length(train_label) & length(folds_index) == length(train_feat)  & length(folds_index) == length(validate_data)
 ```
 
-##### Update compute metrics function (remove predictor list variable of length 2)
+ Update compute metrics function (remove predictor list variable of length 2)
 
 ```{r}
 compute_metrics <- function(rf_pred) {
@@ -3242,7 +3242,7 @@ compute_metrics <- function(rf_pred) {
 }
 ```
 
-##### Train multiple RFs (with CV) for FFS to select the next 10 best predictors
+ Train multiple RFs (with CV) for FFS to select the next 10 best predictors
 
 ```{r}
 feat_initial <- 2
@@ -3303,7 +3303,7 @@ print(paste('added', feat_best_add))
 
 ```
 
-##### Save all output from stepwise FFS
+ Save all output from stepwise FFS
 
 ```{r}
 feat_best_row_all <- bind_rows(feat_best_row)
@@ -3328,7 +3328,7 @@ write.csv(rf_metrics_all,
 
 ```
 
-##### Reload initial pair 
+ Reload initial pair 
 
 ```{r}
 feat_best_initial <- read.csv(paste(loc, "ffs/first-pair/rf-metrics/rf.metrics.all.csv", sep = "")) %>% 
@@ -3348,7 +3348,7 @@ write.csv(feat_best_row_final,
           row.names = F)
 ```
 
-##### Output plots for evolution of predictors
+ Output plots for evolution of predictors
 
 ```{r}
 feat_best <- feat_best_row_final %>% dplyr::select(feat) %>% pull()
@@ -3377,13 +3377,13 @@ ggsave(paste(loc, "ffs/stepwise/MAE_evolve.png", sep = ""),
 
 #### 7. Cross Validation (Train, Predict)
 
-##### Read in training data
+ Read in training data
 
 ```{r}
 data <- read.csv(paste(loc, "training-data/final.csv", sep = ""))
 ```
 
-##### Read in feat list from FFS results
+ Read in feat list from FFS results
 
 ```{r}
 feat <- read.csv(paste(loc, "ffs/stepwise/feat_best_row_final.csv", sep = "")) %>%
@@ -3393,7 +3393,7 @@ feat <- feat[1:6] # select best
 feat_l <- length(feat)
 ```
 
-##### Finalize label and feat data
+ Finalize label and feat data
 
 ```{r}
 data_l <- length(data$Cluster)
@@ -3431,7 +3431,7 @@ for (i in 1:folds) {
 }
 ```
 
-##### Train RF
+ Train RF
 
 ```{r}
 tgrid <- list()
@@ -3474,7 +3474,7 @@ for (i in 1:folds) {
 saveRDS(rf_model, paste(loc, "ensembles/cv/best6.rds", sep = "")) # local dir.
 ```
 
-##### Look at r2 and MAE for all models 
+ Look at r2 and MAE for all models 
 
 ```{r}
 mean_MAE <- c()
@@ -3510,7 +3510,7 @@ as_tibble(cbind(metrics, values)) %>%
             row.names = F)
 ```
 
-##### Get all hold out predictions
+ Get all hold out predictions
 
 ```{r}
 rf.pred <- list()
@@ -3527,7 +3527,7 @@ write.csv(rf.pred.all,
           row.names = F)
 ```
 
-##### Quick look at pred vs obs
+ Quick look at pred vs obs
 
 ```{r}
 class_col_vector <- rep(c("#E78AC3","#F1E2CC","#33A02C","#377EB8","#E41A1C","#999999"),10)
@@ -3544,13 +3544,13 @@ ggsave(paste(loc, "predictions/cv/best6_pvo.png", sep = ""),
 ```
 
 #### 7. (cont.) Cross Validation (Evaluate)
-##### Read csv
+ Read csv
 
 ```{r}
 rf.pred.all <- read.csv(paste(loc, "predictions/cv/best6_pred.csv", sep = ""))
 ```
 
-##### Get nice plot colors
+ Get nice plot colors
 
 ```{r}
 qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
@@ -3561,7 +3561,7 @@ col_vector_values[1:6]
 class_col_vector <- c("#E78AC3","orange","#33A02C","#377EB8","#E41A1C","#999999")
 ```
 
-##### Create a Climate-by-latitude class
+ Create a Climate-by-latitude class
 
 ```{r}
 rf.pred.all <- rf.pred.all %>% 
@@ -3572,7 +3572,7 @@ rf.pred.all <- rf.pred.all %>%
   rename(Class = Site.Classification)
 ```
 
-##### Look at FCH4 predictions histograms
+ Look at FCH4 predictions histograms
 
 ```{r}
 rf.pred.all %>% 
@@ -3588,7 +3588,7 @@ ggsave(paste(loc, "predictions/cv/simple_histograms.png", sep = ""),
        width = 20, height = 10, units = c("cm"), dpi = 300)
 ```
 
-##### Trying using bias correction (notice histograms show a loss of very high and very low fluxes)
+ Trying using bias correction (notice histograms show a loss of very high and very low fluxes)
 
 ```{r}
 splinemod <- smooth.spline(y=rf.pred.all$FCH4, x=rf.pred.all$FCH4P, spar = 2)
@@ -3600,7 +3600,7 @@ lines(splinemod, col="white", lwd=5)
 
 There is no real effect. 
 
-##### Visualize bias (in residuals)
+ Visualize bias (in residuals)
 
 ```{r}
 ungroup(rf.pred.all) %>% 
@@ -3616,7 +3616,7 @@ ggsave(paste(loc, "predictions/cv/residuals_error.png", sep = ""),
        width = 13, height = 15, units = c("cm"), dpi = 300)
 ```
 
-##### Global Metrics
+ Global Metrics
 
 ```{r}
 global <- ungroup(rf.pred.all) %>% 
@@ -3739,7 +3739,7 @@ write.csv(global,
           row.names = F)
 ```
 
-##### Northern latitude metrics
+ Northern latitude metrics
 
 For comparison to Peltola et al. (2019)
 ```{r}
@@ -3789,7 +3789,7 @@ ungroup(rf.pred.all) %>%
 ```
 
 
-##### Site-mean metrics
+ Site-mean metrics
 
 ```{r}
 ## performance metrics broken down by site-means, seasonal cycle and weekly/daily anomalies
@@ -4038,7 +4038,7 @@ write.csv(sitemean_data, paste(loc, "predictions/cv/sitemean_wo_usowc.csv", sep 
 
 ```
 
-##### Other sitemean plots
+ Other sitemean plots
 
 ```{r}
 
@@ -4135,7 +4135,7 @@ ggsave(paste(loc, "predictions/cv/sitemean_pvo_climate.png", sep = ""),
        width = 13, height = 36, units = c("cm"), dpi = 300)
 ```
 
-##### Mean Seasonal Cycles
+ Mean Seasonal Cycles
 
 ```{r}
 # by-ID
@@ -4385,7 +4385,7 @@ write.csv(msc_data, paste(loc, "predictions/cv/msc_wo_usowc.csv", sep = ""),
 
 ```
 
-##### Other MSC plots
+ Other MSC plots
 
 ```{r}
 
@@ -4580,7 +4580,7 @@ ggsave(paste(loc, "predictions/cv/msc_highlowights.png", sep = ""),
 
 ```
 
-##### Look at JP-BBY hysteresis 
+ Look at JP-BBY hysteresis 
 
 ```{r jp-bby-hysteresis}
 head(rf.pred.all)
@@ -4603,7 +4603,7 @@ rf.pred.all %>%
 ggsave("/Volumes/Samsung_T5/Stanford/upch4_local/figures-writing/GBC/SI Figures/hysteresis.png", height = 10, width = 8)
 ```
 
-##### Look at all site hysteresis 
+ Look at all site hysteresis 
 
 ```{r jp-bby-hysteresis}
 head(rf.pred.all)
@@ -4624,7 +4624,7 @@ rf.pred.all %>%
   my_theme
 ```
 
-##### Anomalies (i.e., excursions from mean seasonal cycle)
+ Anomalies (i.e., excursions from mean seasonal cycle)
 
 ```{r}
 # first create mean seasonal cycle dataframe
@@ -4834,7 +4834,7 @@ ggsave(paste(loc, "predictions/cv/anomalies_timeseries.png", sep = ""),
 
 #### 8. Variable Importance
 
-##### VarImp
+ VarImp
 
 ```{r}
 # read rf model
@@ -4915,7 +4915,7 @@ ggsave(paste(loc, "varimp/pred_rank.png", sep = ""),
        width = 18, height = 13, units = c("cm"), dpi = 300)
 ```
 
-##### Variable Responses
+ Variable Responses
 
 ```{r}
 # read rf model
@@ -4944,7 +4944,7 @@ ggsave(paste(loc, "varimp/var_response_all.png", sep = ""),
 ```
 
 
-##### Partial Dependency Plots
+ Partial Dependency Plots
 
 ```{r}
 # read mc rf model
@@ -4965,7 +4965,7 @@ plotPartial(ice.TA, colorkey= TRUE)
 
 
 #### 9. Upscaled Model with Monte Carlo (MC)
-##### Forcing Data
+ Forcing Data
 
 Six final predictors:
 
@@ -4981,9 +4981,9 @@ Six final predictors:
 
 Details on Final MC [Here](https://docs.google.com/spreadsheets/d/10-veJchCsyrG2azK3UkuAGGwju4vjgIqcxeps1m9EDU/edit#gid=1658702303)
 
-##### 1) Define the uncertainty around static grid data by extracting with buffer
+ 1) Define the uncertainty around static grid data by extracting with buffer
 
-##### Get site metadata (coordinates)
+ Get site metadata (coordinates)
 
 ```{r}
 sites <- read.csv(paste(loc, "fluxnet-ch4-data/metadata/fluxnet-ch4-site-metadata.csv", sep = "")) %>% 
@@ -4992,7 +4992,7 @@ site.coords <- cbind(sites$Longitude, sites$Latitude) # (x, y)
 site.num <- length(site.coords[,1])
 ```
 
-##### Global Canopy Height
+ Global Canopy Height
 
 ```{r}
 raster.names <- list.files(paste(loc, "grids/global-canopy-height/", sep = ""), pattern = "tif$", full.names = FALSE)
@@ -5003,7 +5003,7 @@ canopyht <- cbind(sites, canopyht) %>%
 head(canopyht)
 ```
 
-###### Check for missing data
+ Check for missing data
 
 ```{r}
 canopyht %>% 
@@ -5016,13 +5016,13 @@ canopyht %>%
 
 No missing data
 
-###### Write data
+ Write data
 
 ```{r}
 write.csv(canopyht, paste(loc, "mc/extracted/", "canopyht_sd.csv", sep = ""), row.names =  F)
 ```
 
-##### WorldClim 2.0
+ WorldClim 2.0
 
 ```{r warning = F}
 setwd(loc)
@@ -5032,7 +5032,7 @@ plot(stack[[1]])
 points(site.coords)
 ```
 
-###### Extract worldclim data
+ Extract worldclim data
 
 ```{r}
 worldclim <- as_tibble(raster::extract(stack, site.coords, buffer = 25000, fun = sd, na.rm = T)) 
@@ -5040,7 +5040,7 @@ worldclim <- cbind(sites, worldclim)
 head(worldclim)
 ```
 
-###### Check for missing data
+ Check for missing data
 
 ```{r}
 worldclim %>% 
@@ -5051,7 +5051,7 @@ worldclim %>%
 ```
 HKMPM data are missing. 
 
-###### Look at HKMPM location:
+ Look at HKMPM location:
 
 ```{r}
 coords_subset <- site.coords[sites$ID %in% c("HKMPM"),] 
@@ -5066,7 +5066,7 @@ points(114.02924,  22.49817)
 ```
 Can move onto nearby coastline by shifting west
 
-###### Shift HKMPM west:
+ Shift HKMPM west:
 
 ```{r}
 site.coords.temp <- sites %>% 
@@ -5082,7 +5082,7 @@ worldclim.temp <- as_tibble(raster::extract(stack, site.coords.temp, buffer = 25
 worldclim.temp <- cbind(sites.temp, worldclim.temp)
 head(worldclim.temp)
 ```
-###### Rejoin
+ Rejoin
 
 ```{r}
 worldclim <- worldclim %>% 
@@ -5091,7 +5091,7 @@ worldclim <- worldclim %>%
   arrange(ID)
 ```
 
-###### Create new name vector to match 2 products
+ Create new name vector to match 2 products
 
 ```{r}
 newnames <- c("wc_mtdq_sd", 
@@ -5102,15 +5102,15 @@ worldclim <- worldclim %>%
  rename_at(vars(oldnames), ~ newnames)
 ```
 
-###### Write worlclim data
+ Write worlclim data
 
 ```{r}
 write.csv(worldclim, paste(loc, "mc/extracted/worldclim_sd.csv", sep = ""), row.names = F)
 ```
 
-##### 2) Perform MC Simulations
+ 2) Perform MC Simulations
 
-##### Read in loocv training data
+ Read in loocv training data
 
 ```{r}
 data <- read.csv(paste(loc, "training-data/final.csv", sep = "")) %>% 
@@ -5118,7 +5118,7 @@ data <- read.csv(paste(loc, "training-data/final.csv", sep = "")) %>%
 head(data)
 ```
 
-##### Read in standard deviations (static uncertainties)
+ Read in standard deviations (static uncertainties)
 
 ```{r}
 canopyht <- read.csv(paste(loc, "mc/extracted/canopyht_sd.csv", sep = ""))
@@ -5130,14 +5130,14 @@ names(static)
 names(data)
 ```
 
-##### Merge with training data
+ Merge with training data
 
 ```{r}
 data <- data %>% 
   left_join(static, by = c("ID"))
 ```
 
-##### Generate 1000 simulated observations (of the weekly data set)
+ Generate 1000 simulated observations (of the weekly data set)
 
 ```{r warning = F, echo = F, message = F}
 set.seed(23)
@@ -5189,7 +5189,7 @@ data2 %>%
 data2 <- data2 %>% left_join(data1, by = c("mc_i", "ID")) %>% arrange(mc_i)
 ```
 
-###### For each observation (week/row) sample 500/1000, with replacement, and split into 500 training datasets
+ For each observation (week/row) sample 500/1000, with replacement, and split into 500 training datasets
 
 ```{r}
 data3 <- data2 %>% 
@@ -5203,7 +5203,7 @@ data3 <- data2 %>%
 data4 <- data3 %>% bind_rows() %>% dplyr::select(mc_i, everything()) 
 ```
 
-##### Now drop IDs at random from each of the 500 datasets (and always drop USOWC)
+ Now drop IDs at random from each of the 500 datasets (and always drop USOWC)
 
 ```{r}
 set.seed(23)
@@ -5224,7 +5224,7 @@ saveRDS(data6,
         paste(loc, "mc/data/1000mc_500bs.rds", sep = ""))
 ```
 
-##### Identify which site was left out then subset those data
+ Identify which site was left out then subset those data
 
 ```{r warning = F, message = F, echo = F}
 ID.names <- data4 %>% dplyr::select(ID) %>% mutate(ID = factor(ID)) %>% distinct()
@@ -5256,7 +5256,7 @@ write.csv(ID.drop,
           row.names = F)
 ```
 
-##### Finally, subset the held-out site data from each mc_i
+ Finally, subset the held-out site data from each mc_i
 
 ```{r}
 data7 <- list()
@@ -5274,14 +5274,14 @@ saveRDS(data7,
 
 #### 9. (cont.) MC Model Training
 
-##### Read in training data
+ Read in training data
 
 ```{r}
 data <- readRDS(paste0(loc, "/mc/data/1000mc_500bs.rds")) # local path
 str(data)
 ```
 
-##### Get features
+ Get features
 
 ```{r}
 names(data)
@@ -5290,7 +5290,7 @@ mc.feat <- data %>%
   names()
 ```
 
-##### Set up for model training
+ Set up for model training
 
 ```{r}
 feat <- mc.feat
@@ -5304,7 +5304,7 @@ fold_names <- data %>% group_by(Cluster) %>% summarize(Name = ID[1])
 iteration_l <- length(data$mc_i)/mc_iterations
 ```
 
-##### Setup folds
+ Setup folds
 
 ```{r warning = F, message = F, echo = F}
 cluster.drop <- read.csv(paste0(loc, "mc/data/cluster.drop.csv")) %>% pull()
@@ -5344,7 +5344,7 @@ for (i in 1:500) {
 saveRDS(folds_index, paste0(loc, 'mc/data/folds_index.rds'))
 ```
 
-##### Train RF
+ Train RF
 
 ```{r echo = F, warning = F, message = F}
 folds_index <- readRDS(paste0(loc, "mc/data/folds_index.rds"))
@@ -5396,7 +5396,7 @@ saveRDS(rf_model,
 ```
 
 
-##### Look at r2 and MAE for all models 
+ Look at r2 and MAE for all models 
 
 ```{r}
 mean_MAE <- c()
@@ -5432,7 +5432,7 @@ as_tibble(cbind(metrics, values)) %>%
             row.names = F)
 ```
 
-##### Get all hold out predictions
+ Get all hold out predictions
 
 ```{r}
 # read in held out data
@@ -5452,7 +5452,7 @@ rf.pred.all <- bind_rows(rf.pred)
 write.csv(rf.pred.all, paste0(loc, "mc/predictions/rf_mc.csv"))
 ```
 
-##### Look at pred vs obs
+ Look at pred vs obs
 
 ```{r}
 rf.pred.all %>% 
@@ -5496,13 +5496,13 @@ plotPartial(ice.TA, colorkey= TRUE)
 
 #### 9. (cont.) MC Validation and Error Scaling
 
-##### Read in MC data
+ Read in MC data
 
 ```{r}
 data <- read.csv(paste0(loc, "mc/predictions/rf_mc.csv"))
 ```
 
-##### Summarize fluxes 
+ Summarize fluxes 
 
 ```{r}
 # get the mean and variance for each week
@@ -5557,7 +5557,7 @@ ggsave(paste0(loc, "mc/predictions/correlations.png", sep = ""),
 
 ```
 
-##### Output held-out data summary
+ Output held-out data summary
 
 ```{r}
 hold_out <- readRDS(paste0(loc, "mc/data/1000mc_500bs_heldout.rds"))
@@ -5570,7 +5570,7 @@ hold_out %>%
 
 ```
 
-##### Test `mc_i` with mc `rf_model` to check fit on training data 
+ Test `mc_i` with mc `rf_model` to check fit on training data 
 
 ```{r}
 data_train <- readRDS(paste0(loc, "mc/data/1000mc_500bs.rds"))
@@ -5622,15 +5622,15 @@ ggsave(paste0(loc, "mc/predictions/timeseries_train_example_fixed.png", sep = ""
 
 #### 10. Data Representativeness
 
-##### Prepare Grids
+ Prepare Grids
 
-##### Read in generic (for resampling)
+ Read in generic (for resampling)
 
 ```{r}
 rpot <- stack(paste(loc, "grids/computed/Rpot.nc", sep = ""))
 ```
 
-##### Prepare worldclim
+ Prepare worldclim
 
 ```{r echo = F, message = F, warning = F}
 wc_mtdq <- raster(paste(loc, "grids/worldclim/wc2.0_bio_30s_09.tif", sep = ""))
@@ -5643,7 +5643,7 @@ writeRaster(wc_mtdq, paste(loc, "grids/ffs/wc_mtdq.tif", sep = ""), overwrite=TR
 writeRaster(wc_pwtm, paste(loc, "grids/ffs/wc_pwtm.tif", sep = ""), overwrite=TRUE)
 ```
 
-##### Prepare canopy height
+ Prepare canopy height
 
 ```{r}
 canopyht <- raster(paste(loc, "grids/global-canopy-height/Simard_Pinto_3DGlobalVeg_JGR.tif", sep = ""))
@@ -5651,14 +5651,14 @@ canopyht_res <- resample(canopyht, rpot)
 writeRaster(canopyht_res, paste(loc, "grids/ffs/canopyht.tif", sep = ""), overwrite=TRUE)
 ```
 
-##### Air Temperature (MERRA2)
+ Air Temperature (MERRA2)
 
 ```{r}
 raster.names <- list.files(paste(loc, "grids/merra2/", sep = ""), pattern = "nc4$", full.names = F) %>% as.list()
 nc_data <- lapply(paste(loc, "grids/merra2/", raster.names, sep = ""), stack)
 ```
 
-##### Save the print(nc) dump to a text file
+ Save the print(nc) dump to a text file
 
 ```{r}
 {
@@ -5668,7 +5668,7 @@ nc_data <- lapply(paste(loc, "grids/merra2/", raster.names, sep = ""), stack)
 }
 ```
 
-##### Look at metadatafile to see which variable to use
+ Look at metadatafile to see which variable to use
 
 ```{r}
 # lon <- ncvar_get(nc_data[[1]], "lon")
@@ -5676,7 +5676,7 @@ nc_data <- lapply(paste(loc, "grids/merra2/", raster.names, sep = ""), stack)
 # fillvalue <- ncatt_get(nc_data[[1]], "T2M", "_FillValue")
 ```
 
-##### Get just temperature and close nc files
+ Get just temperature and close nc files
 
 ```{r}
 # TA <- list()
@@ -5685,7 +5685,7 @@ nc_data <- lapply(paste(loc, "grids/merra2/", raster.names, sep = ""), stack)
 # }
 ```
 
-##### replace fill values with NA
+ replace fill values with NA
 
 ```{r}
 # TA_r <- list()
@@ -5700,7 +5700,7 @@ nc_data <- lapply(paste(loc, "grids/merra2/", raster.names, sep = ""), stack)
 # }
 ```
 
-##### Create Merra2 TA Stack
+ Create Merra2 TA Stack
 
 ```{r}
 TA_stack <- stack(nc_data[13:228])
@@ -5709,7 +5709,7 @@ TA_stack <- TA_stack-273.15 # convert to celcius
 writeRaster(TA_stack, paste(loc, "grids/ffs/TA.nc", sep = ""), format = "CDF", overwrite = T)
 ```
 
-##### Create TA_msc and TA_mcs_LAG2
+ Create TA_msc and TA_mcs_LAG2
 
 ```{r}
 msc <- list()
@@ -5732,7 +5732,7 @@ TA_msc_LAG2 <- TA_msc + (TA_msc_LAG4 - TA_msc)*0.5
 writeRaster(TA_msc_LAG2, paste(loc, "grids/ffs/TA_msc_LAG2.nc", sep = ""), format="CDF", overwrite = T)
 ```
 
-##### Create TA_LAG2
+ Create TA_LAG2
 
 Fill end of stack with Dec from msc
 
@@ -5742,7 +5742,7 @@ TA_LAG2 <- TA_stack + (TA_LAG4 - TA_stack)*0.5
 writeRaster(TA_LAG2, paste(loc, "grids/ffs/TA_LAG2.nc", sep = ""), format="CDF", overwrite = T)
 ```
 
-##### Create EVI_LAG3 
+ Create EVI_LAG3 
 
 ```{r}
 raster.names <-list.files( paste(loc, "modis/grids/evi/", sep = ""), pattern = "tif$", full.names = FALSE)
@@ -5765,7 +5765,7 @@ names(evi_msc) <- c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct",
 writeRaster(evi_msc, paste(loc, "grids/ffs/EVI_msc.nc", sep = ""), format="CDF", overwrite = T)
 ```
 
-##### Get EVI_msc_LAG3
+ Get EVI_msc_LAG3
 
 ```{r}
 EVI_msc_LAG4 <- stack(evi_msc$Dec, evi_msc[[1:11]])
@@ -5773,7 +5773,7 @@ EVI_msc_LAG3 <- evi_msc + (EVI_msc_LAG4 - evi_msc)*0.75
 writeRaster(EVI_msc_LAG3, paste(loc, "grids/ffs/EVI_msc_LAG3.nc", sep = ""), format="CDF", overwrite = T)
 ```
 
-##### Get EVI_LAG3
+ Get EVI_LAG3
 
 ```{r echo = F, message = F, warning = F}
 evi <- resample(evi, rpot) # resample to 0.25degree
@@ -5784,7 +5784,7 @@ writeRaster(EVI_LAG3, paste(loc, "grids/ffs/EVI_LAG3.nc", sep = ""), format="CDF
 
 #### 10. (cont.) Global Dissimilarity
 
-##### Get colors
+ Get colors
 
 ```{r}
 # create color palette
@@ -5804,7 +5804,7 @@ col_vector_values <- read.csv(paste(loc, "dissimilarity/figures/200827_color_ram
 ```
 
 
-##### Import additional libraries
+ Import additional libraries
 
 ```{r}
 source(paste(loc, "dissimilarity/rplots/tower_color_ls.r", sep=  ""))
@@ -5814,7 +5814,7 @@ source(paste(loc, "dissimilarity/rplots/plots/custom_theme.R", sep=  ""))
 options(stringsAsFactors = F)
 ```
 
-##### Setup common extent and predictors
+ Setup common extent and predictors
 
 ```{r}
 # define common extent
@@ -5824,7 +5824,7 @@ com_ext <- extent(-180, 180,  -56, 85)
 num_pred = 6
 ```
 
-##### Read static grids
+ Read static grids
 
 ```{r}
 canopyht <- raster(paste0(loc, 'grids/ffs/canopyht.tif')) %>% crop(com_ext)
@@ -5832,7 +5832,7 @@ wc_mtdq <- raster(paste0(loc, 'grids/ffs/wc_mtdq.tif')) %>% crop(com_ext)
 wc_pwtm <- raster(paste0(loc, 'grids/ffs/wc_pwtm.tif')) %>% crop(com_ext)
 ```
 
-##### Read temporal msc (limit dissim. analysis to msc)
+ Read temporal msc (limit dissim. analysis to msc)
 
 ```{r}
 TA <- stack(paste0(loc, 'grids/ffs/TA_msc.nc')) %>% crop(com_ext)
@@ -5840,7 +5840,7 @@ TA_LAG2 <- stack(paste0(loc, 'grids/ffs/TA_msc_LAG2.nc')) %>% crop(com_ext)
 EVI_LAG3 <- stack(paste0(loc, 'grids/ffs/EVI_msc_LAG3.nc')) %>% crop(com_ext)
 ```
 
-##### Create a stack (without temporal predictors for now)
+ Create a stack (without temporal predictors for now)
 
 ```{r}
 all_stack <- list()
@@ -5849,27 +5849,27 @@ for (i in 1:12){
 }
 ```
 
-##### Define function to rescale static grids
+ Define function to rescale static grids
 
 ```{r}
 rescale01 <- function(x) {
   (x - cellStats(x, stat = 'min')) / (cellStats(x, stat = 'max') - cellStats(x, stat = 'min')) }
 ```
 
-##### Rescale static grids
+ Rescale static grids
 
 ```{r}
 scaled_data <- lapply(all_stack, rescale01)
 ```
 
-##### Define function to rescale temporal grids
+ Define function to rescale temporal grids
 
 ```{r}
 rescale02 <- function(x) {
   (x - min(x, na.rm = T)) / (max(x, na.rm = T) - min(x, na.rm = T)) }
 ```
 
-##### Rescale temporal grids
+ Rescale temporal grids
 
 ```{r}
 scaled_data_2 <- rescale02(TA)
@@ -5878,7 +5878,7 @@ scaled_data_4 <- rescale02(EVI_LAG3)
 
 ```
 
-###### Recombine and rename
+ Recombine and rename
 
 ```{r}
 for (i in 1:12){
@@ -5894,7 +5894,7 @@ all_stack_full <- stack(all_stack)
 writeRaster(all_stack_full, paste0(loc, "dissimilarity/output/stacks/all.nc"), format='CDF', overwrite = T)
 ```
 
-##### Read in all stack (for subsequent attempts)
+ Read in all stack (for subsequent attempts)
 
 ```{r}
 all_stack_full <- stack(paste0(loc, "dissimilarity/output/stacks/all.nc"))
@@ -5911,7 +5911,7 @@ for (i in 1:12){
 }
 ```
 
-###### set up weights
+ set up weights
 
 Weights come from scaled varimp output
 
@@ -5944,7 +5944,7 @@ all_stack_weighted_full <- stack(all_stack)
 writeRaster(all_stack_weighted_full, paste0(loc, "dissimilarity/output/stacks/all_weighted.nc"), format='CDF', overwrite = T)
 ```
 
-##### Read in all stack weighted (for subsequent attempts)
+ Read in all stack weighted (for subsequent attempts)
 
 ```{r}
 all_stack_weighted_full <- stack(paste0(loc, "dissimilarity/output/stacks/all_weighted.nc"))
@@ -5959,7 +5959,7 @@ for (i in 1:12){
 }
 ```
 
-##### Read wetland map ( Fw = fraction wetland )
+ Read wetland map ( Fw = fraction wetland )
 
 Only use the first year of data (2000)
 
@@ -5968,13 +5968,13 @@ Fw <- stack(paste0(loc, "grids/WAD2M/gcp-ch4_wetlands_2000-2018_025deg.nc"))
 Fw <- Fw[[1:12]]
 ```
 
-##### Crop out Antartica
+ Crop out Antartica
 
 ```{r}
 Fw <- crop(Fw, com_ext)
 ```
 
-##### Mask out zero wetland areas
+ Mask out zero wetland areas
 
 ```{r}
 all_stack_masked <- list()
@@ -5987,7 +5987,7 @@ plot(all_stack[[6]])
 writeRaster(all_stack_masked_full, paste0(loc, "dissimilarity/output/stacks/all_weighted_masked.nc"), format='CDF', overwrite = TRUE)
 ```
 
-##### Read in all stack masked and weighted (for subsequent attempts)!!!!!!
+ Read in all stack masked and weighted (for subsequent attempts)!!!!!!
 
 ```{r}
 all_stack_masked_full <- stack(paste0(loc, "dissimilarity/output/stacks/all_weighted_masked.nc"))
@@ -6003,7 +6003,7 @@ for (i in 1:12){
 
 ```
 
-##### Convert monthly (as list) stack to dataframes
+ Convert monthly (as list) stack to dataframes
 
 ```{r}
 all_stack_masked_df <- list()
@@ -6014,7 +6014,7 @@ Fw_df <- as.data.frame(as(Fw, "SpatialPixelsDataFrame")) %>% filter_all(all_vars
 ```
 
 
-##### Read tower data
+ Read tower data
 
 ```{r}
 tower_data <- read.csv("/Volumes/Samsung_T5/Stanford/upch4_local/training-data/final.csv")
@@ -6050,7 +6050,7 @@ for (i in 1:12){
 all_sites <- bind_rows(all_sites)
 ```
 
-##### Run dissimilarity analysis
+ Run dissimilarity analysis
 
 ```{r}
 # set up lists and outputs
@@ -6216,7 +6216,7 @@ for (i in 1:12){ # months
 }
 ```
 
-##### Output the monthly distance and other metrics
+ Output the monthly distance and other metrics
 
 
 ```{r}
@@ -6232,13 +6232,13 @@ write.csv(monthly_global_DI[[i]], paste0(loc, "dissimilarity/output/stats/all_mo
 }
 ```
 
-##### Remove large stack
+ Remove large stack
 
 ```{r}
 rm("all_stack")
 ```
 
-##### Create Global DI dataframe
+ Create Global DI dataframe
 
 ```{r}
 monthly_global_DI <- list()
@@ -6264,7 +6264,7 @@ write.csv(monthly_global_DI_subset, paste0(loc, "dissimilarity/output/stats/all_
 monthly_global_DI <- read.csv(paste0(loc, "dissimilarity/output/stats/all_monthly_global_DI_subset.csv"))
 ```
 
-##### Look at the distribution of distances 
+ Look at the distribution of distances 
 
 ```{r}
 monthly_global_DI %>% 
@@ -6278,7 +6278,7 @@ ggsave(paste0(loc, "dissimilarity/figures/all_min_dist_distribution.png"),
        width = 10, height = 8, units = c("cm"), dpi = 300)
 ```
 
-##### Look at the distribution of dissimilarities 
+ Look at the distribution of dissimilarities 
 
 ```{r}
 monthly_global_DI %>% 
@@ -6292,7 +6292,7 @@ ggsave(paste0(loc, "dissimilarity/figures/all_DI_distribution.png"),
        width = 10, height = 8, units = c("cm"), dpi = 300)
 ```
 
-##### What is the summed annual dissimilarity and distance?
+ What is the summed annual dissimilarity and distance?
 
 ```{r}
 monthly_global_DI %>% 
@@ -6304,7 +6304,7 @@ monthly_global_DI %>%
   write.csv(paste0(loc, "dissimilarity/output/stats/annual_DI_mindist.csv"), row.names = F)
 ```
 
-##### What is the monthly dissimilairty and distance?
+ What is the monthly dissimilairty and distance?
 
 ```{r}
 monthly_global_DI %>% 
@@ -6317,7 +6317,7 @@ monthly_global_DI %>%
   write.csv(paste0(loc, "dissimilarity/output/stats/monthly_DI_mindist.csv"), row.names = F)
 ```
 
-##### what is the summed AOA (annual)
+ what is the summed AOA (annual)
 
 ```{r}
 monthly_global_DI %>% 
@@ -6329,7 +6329,7 @@ monthly_global_DI %>%
   write.csv(paste0(loc, "dissimilarity/output/stats/annual_AOA_AOE.csv"), row.names = F)
 ```
 
-##### what is the summed AOA (monthly)
+ what is the summed AOA (monthly)
 
 ```{r}
 monthly_global_DI %>% 
@@ -6342,7 +6342,7 @@ monthly_global_DI %>%
   write.csv(paste0(loc, "dissimilarity/output/stats/monthly_AOA_AOE.csv"), row.names = F)
 ```
 
-##### look at constituency size, and the relationship with mean dissimilarity from the tower 
+ look at constituency size, and the relationship with mean dissimilarity from the tower 
 
 ```{r}
 monthly_global_DI_plot <- monthly_global_DI %>% 
@@ -6369,7 +6369,7 @@ ggsave(paste0(loc, "dissimilarity/figures/all_constituency_size_DI.png"),
        width = 15, height = 12, units = c("cm"), dpi = 300)
 ```
 
-##### Figure of the rank of DI coverages (annual by ID)
+ Figure of the rank of DI coverages (annual by ID)
 
 ```{r}
 monthly_global_DI %>% 
@@ -6394,7 +6394,7 @@ ggsave(paste0(loc, "dissimilarity/figures/all_constituency_size_rank.png"),
        width = 10, height = 20, units = c("cm"), dpi = 300)
 ```
 
-##### Figure of the rank of coverages (monthly by cluster)
+ Figure of the rank of coverages (monthly by cluster)
 
 ```{r}
 monthly_global_DI_cover <- monthly_global_DI %>% 
@@ -6425,7 +6425,7 @@ ggsave(paste0(loc, "dissimilarity/figures/all_constituency_size_rank",i,".png"),
 
 ```
 
-##### figure of the rank of dissimilarities
+ figure of the rank of dissimilarities
 
 ```{r}
 for (i in 1:12){
@@ -6445,13 +6445,13 @@ for (i in 1:12){
 }
 ```
 
-##### Output the monthly mean DI for each site (from all sites not in the same fold)
+ Output the monthly mean DI for each site (from all sites not in the same fold)
 
 ```{r}
 write.csv(all_sites_DI, paste0(loc,"dissimilarity/output/stats/all_sites_DI.csv"), row.names = F) 
 ```
 
-##### Mean network dissimilarity
+ Mean network dissimilarity
 
 ```{r}
 all_sites_DI <- read.csv(paste0(loc, "dissimilarity/output/stats/all_sites_DI.csv"))
@@ -6512,7 +6512,7 @@ all_sites_DI %>%
 
 #### 10. (cont.) Dissimilarity - Extrapolation Error
 
-##### Get performance and DI info
+ Get performance and DI info
 
 ```{r}
 site_month_metrics <- read.csv(paste0(loc, "predictions/cv/global.csv"))
@@ -6521,7 +6521,7 @@ data <- read.csv(paste0(loc, "training-data/final.csv")) # local path
 fold_names <- data %>% group_by(Cluster) %>% summarize(Name = ID[1]) 
 ```
 
-##### Plot histogram of site-month DIs
+ Plot histogram of site-month DIs
 
 ```{r}
 site_month_DI %>% 
@@ -6536,21 +6536,21 @@ ggsave(paste0(loc, "dissimilarity/figures/all_sites_DI_monthly_histogram.png"),
 ```
 
 
-##### MC Prediction Variance and Error vs. Dissimilarity
+ MC Prediction Variance and Error vs. Dissimilarity
 
-##### Read in MC data
+ Read in MC data
 
 ```{r}
 data <- read.csv(paste0(loc, "mc/predictions/rf_mc.csv"))
 ```
 
-##### Subset MC Prediction data
+ Subset MC Prediction data
 
 ```{r}
 pred <- data %>% dplyr::select(mc_i, Cluster, ID, Year, Month, Week, FCH4Pe = FCH4P)
 ```
 
-##### Calculate the monthly mean and variance of each prediction across mc iterations
+ Calculate the monthly mean and variance of each prediction across mc iterations
 
 ```{r}
 pred_full <- pred %>% 
@@ -6559,13 +6559,13 @@ pred_full <- pred %>%
             var = var(FCH4Pe, na.rm = TRUE)) 
 ```
 
-##### Read in DI
+ Read in DI
 
 ```{r}
 di <- read.csv(paste0(loc, "dissimilarity/output/stats/all_sites_DI.csv"))
 ```
 
-##### Set up model and create label function
+ Set up model and create label function
 
 ```{r}
 di_curve <- di %>% 
@@ -6583,7 +6583,7 @@ lm_eqn <- function(df){
 
 ```
 
-##### Convert to simple data frame
+ Convert to simple data frame
 
 No interesting result.
 
@@ -6607,7 +6607,7 @@ summary(lm(y ~ x, data = df))
 ```
 
 
-##### Look at relationship (MAE vs. DI)
+ Look at relationship (MAE vs. DI)
 
 ```{r}
 site_month_DI_metrics <- site_month_DI  %>% 
@@ -6633,7 +6633,7 @@ ggsave(paste0(loc, "dissimilarity/figures/error_vs_DI.png"),
 ```
 
 #### 11. Upscaling
-##### Create Forcing Data
+ Create Forcing Data
 
 ```{r}
 # define common extent
@@ -6643,7 +6643,7 @@ com_ext <- extent(-180, 180,  -56, 85)
 num_pred = 6
 ```
 
-##### Read static grids
+ Read static grids
 
 ```{r}
 canopyht <- raster(paste0(loc, 'grids/ffs/canopyht.tif')) %>% crop(com_ext)
@@ -6651,7 +6651,7 @@ wc_mtdq <- raster(paste0(loc, 'grids/ffs/wc_mtdq.tif')) %>% crop(com_ext)
 wc_pwtm <- raster(paste0(loc, 'grids/ffs/wc_pwtm.tif')) %>% crop(com_ext)
 ```
 
-##### Read temporal grids
+ Read temporal grids
 
 ```{r echo = F, message = F, warning = F}
 TA <- stack(paste0(loc, 'grids/ffs/TA.nc')) %>% crop(com_ext)
@@ -6659,7 +6659,7 @@ TA_LAG2 <- stack(paste0(loc, 'grids/ffs/TA_LAG2.nc')) %>% crop(com_ext)
 EVI_LAG3 <- stack(paste0(loc, 'grids/ffs/EVI_LAG3.nc')) %>% crop(com_ext)
 ```
 
-##### Look at grids QC
+ Look at grids QC
 
 ```{r}
 plot(EVI_LAG3[[1:7]])
@@ -6669,14 +6669,14 @@ evi_ts <- as_tibble(raster::extract(EVI_LAG3, site.coords))
 ```
 
 
-##### Check if can fill gaps in `EVI_LAG3` with `EVI_msc_LAG3`
+ Check if can fill gaps in `EVI_LAG3` with `EVI_msc_LAG3`
 
 ```{r}
 EVI_msc_LAG3 <- stack(paste0(loc, "grids/ffs/EVI_msc_LAG3.nc")) %>% crop(com_ext)
 plot(EVI_msc_LAG3[[7]])
 ```
 
-##### Fill gaps with `EVI_msc_LAG3`
+ Fill gaps with `EVI_msc_LAG3`
 
 ```{r}
 month_index <- c(rep(1:12, 18))
@@ -6688,7 +6688,7 @@ for(i in 1:216){
 }
 ```
 
-##### Create a stack (without temporal predictors for now)
+ Create a stack (without temporal predictors for now)
 
 ```{r}
 upscaling_stack <- list()
@@ -6700,7 +6700,7 @@ for (i in 1:216){
 plot(upscaling_stack[[7]])
 ```
 
-##### Write out upscaling forcing
+ Write out upscaling forcing
 
 ```{r}
 digit1 <- c(rep(0,99), rep(1,100), rep(2,17))
@@ -6729,7 +6729,7 @@ ts1 <- predict(forcing_data, rf_model[[1]])
 
 #### 11. (cont.) Upscaling Evaluation 
 
-##### Individual Bootstrap Sums 
+ Individual Bootstrap Sums 
 
 ```{r}
 data <- read.csv(paste0(loc, "upscaling-output-raw/sums/boot_sum_TgCH4month_m1.csv")) %>% dplyr::select(2:5)
@@ -6745,7 +6745,7 @@ data %>%
 ```
 
 
-##### Make map of nmol predictions (unweighted)
+ Make map of nmol predictions (unweighted)
 
 ```{r}
 # read in nmol flux map - unweighted by wetland area
@@ -6807,7 +6807,7 @@ test <- extract(nmol[[7]], coords)
 ```
 
 
-##### Get the upscaling grid predictions at each site
+ Get the upscaling grid predictions at each site
 
 ```{r}
 # read in site locations
@@ -6897,7 +6897,7 @@ write.csv(nmol.val, paste0(loc, "predictions/gridded/nmol/val-site-pred.csv"), r
 
 ```
 
-##### Compare grid predictions with some training data
+ Compare grid predictions with some training data
 
 ```{r}
 # get predictions
@@ -6922,7 +6922,7 @@ site.data <- read.csv(paste0(loc, "training-data/final.csv")) %>%
 site.all <- site.pred %>% left_join(site.data)
   
 ```
-###### Summary Stats
+ Summary Stats
 
 ```{r}
 # global metrics
@@ -6946,7 +6946,7 @@ ungroup(site.all) %>%
 ```
 
 
-###### Bog
+ Bog
 
 ```{r}
 site.all %>% 
@@ -6969,7 +6969,7 @@ ggsave(paste0(loc, "/predictions/gridded/nmol/figures/bogs.png"),
        width = 20, height = 18, units = c("cm"), dpi = 300)
 ```
 
-###### Interesting bog - NZ-Kop
+ Interesting bog - NZ-Kop
 
 ```{r}
 site.all %>% 
@@ -6991,7 +6991,7 @@ ggsave(paste0(loc, "/predictions/gridded/nmol/figures/nz-kop.png"),
        width = 14, height = 10, units = c("cm"), dpi = 300)
 ```
 
-###### Fen
+ Fen
 
 ```{r}
 site.all %>% 
@@ -7014,7 +7014,7 @@ ggsave(paste0(loc, "/predictions/gridded/nmol/figures/fens.png"),
        width = 20, height = 18, units = c("cm"), dpi = 300)
 ```
 
-###### Interesting fen - FI-Lom
+ Interesting fen - FI-Lom
 
 ```{r}
 site.all %>% 
@@ -7036,7 +7036,7 @@ ggsave(paste0(loc, "/predictions/gridded/nmol/figures/de-hte.png"),
        width = 14, height = 10, units = c("cm"), dpi = 300)
 ```
 
-###### Marsh
+ Marsh
 
 ```{r}
 site.all %>% 
@@ -7059,7 +7059,7 @@ ggsave(paste0(loc, "/predictions/gridded/nmol/figures/marshes.png"),
        width = 20, height = 22, units = c("cm"), dpi = 300)
 ```
 
-###### Interesting marsh - US-Myb
+ Interesting marsh - US-Myb
 
 ```{r}
 site.all %>% 
@@ -7081,7 +7081,7 @@ ggsave(paste0(loc, "/predictions/gridded/nmol/figures/us-myb.png"),
        width = 14, height = 10, units = c("cm"), dpi = 300)
 ```
 
-###### Wet tundra
+ Wet tundra
 
 ```{r}
 site.all %>% 
@@ -7104,7 +7104,7 @@ ggsave(paste0(loc, "/predictions/gridded/nmol/figures/wet_tundra.png"),
        width = 20, height = 24, units = c("cm"), dpi = 300)
 ```
 
-###### Interesting wet tunrda - US-Ivo
+ Interesting wet tunrda - US-Ivo
 
 ```{r}
 site.all %>% 
@@ -7126,7 +7126,7 @@ ggsave(paste0(loc, "/predictions/gridded/nmol/figures/us-ivo.png"),
        width = 14, height = 10, units = c("cm"), dpi = 300)
 ```
 
-###### Swamp
+ Swamp
 
 ```{r}
 site.all %>% 
@@ -7149,7 +7149,7 @@ ggsave(paste0(loc, "/predictions/gridded/nmol/figures/swamp.png"),
        width = 20, height = 18, units = c("cm"), dpi = 300)
 ```
 
-###### Interesting swamp 1 - MY-MLM
+ Interesting swamp 1 - MY-MLM
 
 ```{r}
 site.all %>% 
@@ -7171,7 +7171,7 @@ ggsave(paste0(loc, "/predictions/gridded/nmol/figures/my-mlm.png"),
        width = 14, height = 10, units = c("cm"), dpi = 300)
 ```
 
-###### Interesting swamp 2 - US-NC4
+ Interesting swamp 2 - US-NC4
 
 ```{r}
 site.all %>% 
@@ -7193,7 +7193,7 @@ ggsave(paste0(loc, "/predictions/gridded/nmol/figures/us-nc4.png"),
        width = 14, height = 10, units = c("cm"), dpi = 300)
 ```
 
-##### Compare grid predictions with test (AmeriFlux validation) data
+ Compare grid predictions with test (AmeriFlux validation) data
 
 ```{r}
 site.pred <- read.csv(paste0(loc, "predictions/gridded/nmol/val-site-pred.csv"))
@@ -7206,7 +7206,7 @@ site.pred <- site.pred %>%
             sd_FCH4P = mean(sd_FCH4P, na.rm=T)) 
 ```
 
-###### PEQFR
+ PEQFR
 
 ```{r}
 # read in site data
@@ -7256,7 +7256,7 @@ sum(joined_qfr$mean_FCH4P - joined_qfr$FCH4)/length(joined_qfr$mean_FCH4P) # bia
 length(joined_qfr$mean_FCH4P)
 ```
 
-###### USALQ
+ USALQ
 
 ```{r}
 # read in site data
@@ -7305,7 +7305,7 @@ sum(joined_alq$mean_FCH4P - joined_alq$FCH4)/length(joined_alq$mean_FCH4P) #bias
 length(joined_alq$mean_FCH4P)
 ```
 
-###### CACF2
+ CACF2
 
 ```{r}
 # read in site data
@@ -7354,7 +7354,7 @@ sum(joined_cf2$mean_FCH4P - joined_cf2$FCH4)/length(joined_cf2$mean_FCH4P)
 length(joined_cf2$mean_FCH4P)
 ```
 
-###### US-MBP
+ US-MBP
 
 ```{r}
 # read in site data
@@ -7403,7 +7403,7 @@ sum(joined_mbp$mean_FCH4P - joined_mbp$FCH4)/length(joined_mbp$mean_FCH4P)
 length(joined_mbp$mean_FCH4P)
 ```
 
-##### Tropical Africa flux comparisons (Jacob Shaw)
+ Tropical Africa flux comparisons (Jacob Shaw)
 
 ```{r}
 # read in mg CH4 m-2 d-1 flux map - weighted by wetland area
@@ -7458,10 +7458,10 @@ write.csv(nmolch4_coords, paste0(loc, "predictions/gridded/jacob_shaw_zambia/mgc
 ```
 
 
-##### Calculate Global Grid Tg Totals (METHOD 1: Grid output summed means and summed sd) 
+ Calculate Global Grid Tg Totals (METHOD 1: Grid output summed means and summed sd) 
 
-###### I chose the output of this method for the global sums! For the other two methods, we do not have the individual bootstrap sums for each region, only globally
-###### I then adapted this method to output sums and sds for each region (the regionalization code is commented out)
+ I chose the output of this method for the global sums! For the other two methods, we do not have the individual bootstrap sums for each region, only globally
+ I then adapted this method to output sums and sds for each region (the regionalization code is commented out)
 
 ```{r echo = F, warning = F, message = F}
 
@@ -7548,7 +7548,7 @@ write.csv(monthly_cycle, paste0(loc, "predictions/gridded/tg/sums_method1/", reg
 
 }
 ```
-##### Get regional sums for GCP TD and BU
+ Get regional sums for GCP TD and BU
 ```{r}
 # get file names
 files <- list.files("/Volumes/Samsung_T5/Stanford/upch4_local/grids/ch4-models/gcp-ch4_ncdfs/bu_td_mean_sd/")
@@ -7599,8 +7599,8 @@ write.csv(upscaling_sums, paste0(loc, "predictions/gridded/tg/sums_method1/", re
 
 
 
-##### Calculate Global Grid Tg Totals 
-###### (METHOD 2: Mean bootstrap sum and variance) ## PROBLEM: We cannot use this method for regional totals because we do not have the individual bootstrap sums for each region
+ Calculate Global Grid Tg Totals 
+ (METHOD 2: Mean bootstrap sum and variance) ## PROBLEM: We cannot use this method for regional totals because we do not have the individual bootstrap sums for each region
 
 ```{r}
 # read in csv bootstrap member sum from upscaling output (b = bootstrap, m = forcing data member, t = time)
@@ -7619,7 +7619,7 @@ bootstrap_sums %>%
   write.csv(paste0(loc, "predictions/gridded/tg/sums_method2/upscaling_sums.csv"), row.names = F)
 ```
 
-###### (METHOD 3: Individual bootstrap cumsums and variance) ## PROBLEM: We cannot use this method for regional totals because we do not have the individual bootstrap sums for each region
+ (METHOD 3: Individual bootstrap cumsums and variance) ## PROBLEM: We cannot use this method for regional totals because we do not have the individual bootstrap sums for each region
 
 ```{r}
 # read in csv bootstrap member sum from upscaling output (b = bootstrap, m = forcing data member, t = time)
@@ -7654,7 +7654,7 @@ bootstrap_sums %>%
 
 ```
 
-###### Calculate the time series average from the output of METHOD 1
+ Calculate the time series average from the output of METHOD 1
 
 ```{r}
 sums <- read.csv(paste0(loc, "predictions/gridded/tg/sums_method1/tropics/annual_sums.csv"))
@@ -7665,7 +7665,7 @@ sums %>%
 
 ```
 
-###### Plot bootstrap sum histograms
+ Plot bootstrap sum histograms
 
 ```{r}
 # read in csv bootstrap member sum from upscaling output (b = bootstrap, m = forcing data member, t = time)
@@ -7846,7 +7846,7 @@ ggsave(paste(loc, "/predictions/gridded/tg/figures/model_timeseries.png", sep = 
 
 
 
-##### Compare annual totals for GCP and Carbon Tracker, and NSE values
+ Compare annual totals for GCP and Carbon Tracker, and NSE values
 
 ```{r}
 grid_sums <- read.csv(paste0(loc, "predictions/gridded/tg/model_timeseries/gridded_sums_all.csv"))
@@ -7963,7 +7963,7 @@ ggsave(paste0(loc, "predictions/gridded/tg/figures/global_comparison.png"),
 
 #### 11. (cont.) Gridded variance vs. dissimilarity (not used!)
 
-##### Prediction variance appears to be much more related to FCH4 variance for tower constituencies
+ Prediction variance appears to be much more related to FCH4 variance for tower constituencies
 
 ```{r}
 # read in upscaling sd
