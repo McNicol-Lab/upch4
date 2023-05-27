@@ -47,6 +47,7 @@ library(readxl)
 library(skimr)
 library(caret)
 library(ranger)
+library(RColorBrewer)
 source("code/ggplot_theme.R")
 ```
 
@@ -653,12 +654,12 @@ for (i in 1:folds) {
 }
 
 # save loocv model ensemble
-saveRDS(rf_model, paste("ensembles/cv/best6.rds", sep = "")) # local dir.
+saveRDS(rf_model, "output/ensembles/cv/best-feat.rds") # local dir.
 ```
 
-##### Look at r2 and MAE for all models 
+Look at r2 and MAE for all models:
 
-```{r}
+```{r get-best-model-metrics}
 mean_MAE <- c()
 mean_r2 <- c()
 tune_r2 <- list()
@@ -688,53 +689,51 @@ metrics <- c("final_fold_oob_MAE", "final_fold_oob_R2", "inner_cv_MAE", "inner_c
 values <- c(mean(mean_MAE), mean(mean_r2), mean(tune_MAEs$MAE), mean(tune_r2s$R2) )
 
 as_tibble(cbind(metrics, values)) %>% 
-  write_csv(paste(loc, "ensembles/cv/best6_cv_metrics.csv", sep = ""),
-            row.names = F)
+  write_csv("output/ensembles/cv/best_feat_cv_metrics.csv")
 ```
 
-##### Get all hold out predictions
+Get all hold out predictions:
 
-```{r}
-rf.pred <- list()
+```{r get-hold-out-pred}
+rf_pred <- list()
 for (i in 1:folds) {
-  rf.pred[[i]] <- data %>% 
+  rf_pred[[i]] <- data %>% 
     filter(Cluster== i) %>%   
     mutate(FCH4P = predict(rf_model[[i]], .),
            index = 1:n())
 }
-rf.pred.all <- bind_rows(rf.pred)
+rf_pred_all <- bind_rows(rf.pred)
 
-write_csv(rf.pred.all, 
-          paste(loc, "predictions/cv/best6_pred.csv", sep = ""),
-          row.names = F)
+write_csv(rf_pred_all,"output/predictions/cv/best_feat_pred.csv")
 ```
 
-##### Quick look at pred vs obs
+Quick look at pred vs obs:
 
-```{r}
+```{r pred-vs-obs}
 class_col_vector <- rep(c("#E78AC3","#F1E2CC","#33A02C","#377EB8","#E41A1C","#999999"),10)
 
-rf.pred.all %>% 
+rf_pred_all %>% 
   ggplot(aes(FCH4, FCH4P)) +
   geom_abline(slope = 1) +
   geom_point(alpha = 0.2) +
   xlab(label = expression("FCH4 (nmol m"^{-2}*" s"^{-1}*")")) +
   ylab(label = expression("FCH4P (nmol m"^{-2}*" s"^{-1}*")")) +
   my_theme
-ggsave(paste(loc, "predictions/cv/best6_pvo.png", sep = ""),
+ggsave("output/predictions/cv/best_feat_pvo.png",
        width = 15, height = 8, units = c("cm"), dpi = 300)
 ```
 
-#### 7. (cont.) Cross Validation (Evaluate)
-##### Read csv
+## Cross Validation (Validate)
 
-```{r}
-rf.pred.all <- read_csv(paste(loc, "predictions/cv/best6_pred.csv", sep = ""))
+Read csv:
+
+```{r read}
+rf_pred_all <- read_csv("output/predictions/cv/best_feat_pred.csv")
 ```
 
-##### Get nice plot colors
+Get nice plot colors:
 
-```{r}
+```{r plot-colors}
 qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
 col_vector = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
 col_vector_values = sample(col_vector, length(levels(factor(rf.pred.all$Cluster))), replace=FALSE)
@@ -743,10 +742,10 @@ col_vector_values[1:6]
 class_col_vector <- c("#E78AC3","orange","#33A02C","#377EB8","#E41A1C","#999999")
 ```
 
-##### Create a Climate-by-latitude class
+Create a Climate-by-latitude class:
 
-```{r}
-rf.pred.all <- rf.pred.all %>% 
+```{r create-climate-class}
+rf_pred_all <- rf_pred_all %>% 
   mutate(Climate = ifelse(Latitude > 70 | Latitude < -70, "1", NA),
          Climate = ifelse(Latitude < 70 & Latitude > 50 | Latitude > -70 & Latitude < -50, "2", Climate),
          Climate = ifelse(Latitude < 50 & Latitude > 23 | Latitude > -50 & Latitude < -23, "3", Climate),
@@ -754,10 +753,10 @@ rf.pred.all <- rf.pred.all %>%
   rename(Class = Site.Classification)
 ```
 
-##### Look at FCH4 predictions histograms
+Look at FCH4 predictions histograms:
 
-```{r}
-rf.pred.all %>% 
+```{r pred-histograms}
+rf_pred_all %>% 
   dplyr::select(FCH4,FCH4P) %>% 
   gather(key = "Flux", value = "Value", 1:2) %>% 
   ggplot(aes(Value, fill = Flux)) +
@@ -766,26 +765,26 @@ rf.pred.all %>%
   scale_color_manual(values = class_col_vector) +
   facet_wrap(~Flux) +
   my_theme
-ggsave(paste(loc, "predictions/cv/simple_histograms.png", sep = ""),
+ggsave("output/predictions/cv/simple_histograms.png",
        width = 20, height = 10, units = c("cm"), dpi = 300)
 ```
 
-##### Trying using bias correction (notice histograms show a loss of very high and very low fluxes)
+Test using bias correction (notice histograms show a loss of very high and very low fluxes)
 
-```{r}
-splinemod <- smooth.spline(y=rf.pred.all$FCH4, x=rf.pred.all$FCH4P, spar = 2)
-plot(rf.pred.all$FCH4P,rf.pred.all$FCH4, xlim = c(0,1000), ylim = c(0,1000))
+```{r test-bias-cor}
+splinemod <- smooth.spline(y=rf_pred_all$FCH4, x=rf_pred_all$FCH4P, spar = 2)
+plot(rf_pred_all$FCH4P,rf_pred_all$FCH4, xlim = c(0,1000), ylim = c(0,1000))
 abline(0,1,col = 'blue')
 lines(splinemod, col="white", lwd=5)
 
 ```
 
-There is no real effect. 
+There is no visible effect. 
 
-##### Visualize bias (in residuals)
+Visualize bias (in residuals):
 
-```{r}
-ungroup(rf.pred.all) %>% 
+```{r visualize-bias}
+ungroup(rf_pred_all) %>% 
   mutate(index = 1:n()) %>% 
   ggplot(aes(x = NULL, y = FCH4P - FCH4, fill = Class)) +
   geom_abline(intercept = 0) +
@@ -794,14 +793,14 @@ ungroup(rf.pred.all) %>%
         axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
   ylab(label = expression("Error (nmol m"^{-2}*" s"^{-1}*")")) +
   scale_fill_manual(values = class_col_vector) 
-ggsave(paste(loc, "predictions/cv/residuals_error.png", sep = ""),
+ggsave("output/predictions/cv/residuals_error.png",
        width = 13, height = 15, units = c("cm"), dpi = 300)
 ```
 
-##### Global Metrics
+Global Metrics:
 
-```{r}
-global <- ungroup(rf.pred.all) %>% 
+```{r global-metrics}
+global <- ungroup(rf_pred_all) %>% 
   # filter(!ID == "USOWC") %>%
   summarize(samples = n(),
             R2 = cor(FCH4P, FCH4)^2,
@@ -818,7 +817,7 @@ global <- ungroup(rf.pred.all) %>%
             Bias = mean(FCH4P - FCH4),
             cBias = abs(Bias)/sum(abs(Bias))*100) 
 
-global_ID <- ungroup(rf.pred.all) %>% 
+global_ID <- ungroup(rf_pred_all) %>% 
     # filter(!ID == "USOWC") %>%
   group_by(ID) %>% 
   summarize(samples = n(),
@@ -836,7 +835,7 @@ global_ID <- ungroup(rf.pred.all) %>%
             Bias = mean(FCH4P - FCH4),
             cBias = abs(Bias)/sum(abs(Bias))*100) 
 
-global_ID_monthly <- ungroup(rf.pred.all) %>% 
+global_ID_monthly <- ungroup(rf_pred_all) %>% 
       # filter(!ID == "USOWC") %>%
   group_by(ID, Month) %>% 
   summarize(samples = n(),
@@ -856,11 +855,10 @@ global_ID_monthly <- ungroup(rf.pred.all) %>%
 
 global <- bind_rows(global, global_ID, global_ID_monthly)
 
-write_csv(global, paste(loc, "predictions/cv/global.csv", sep = ""),
-          row.names = F)
+write_csv(global, "output/predictions/cv/global.csv")
 
 
-global <- ungroup(rf.pred.all) %>% 
+global <- ungroup(rf_pred_all) %>% 
   filter(!ID == "USOWC") %>%
   summarize(samples = n(),
             R2 = cor(FCH4P, FCH4)^2,
@@ -877,7 +875,7 @@ global <- ungroup(rf.pred.all) %>%
             Bias = mean(FCH4P - FCH4),
             cBias = abs(Bias)/sum(abs(Bias))*100) 
 
-global_ID <- ungroup(rf.pred.all) %>% 
+global_ID <- ungroup(rf_pred_all) %>% 
     filter(!ID == "USOWC") %>%
   group_by(ID) %>% 
   summarize(samples = n(),
@@ -895,7 +893,7 @@ global_ID <- ungroup(rf.pred.all) %>%
             Bias = mean(FCH4P - FCH4),
             cBias = abs(Bias)/sum(abs(Bias))*100) 
 
-global_ID_monthly <- ungroup(rf.pred.all) %>% 
+global_ID_monthly <- ungroup(rf_pred_all) %>% 
       filter(!ID == "USOWC") %>%
   group_by(ID, Month) %>% 
   summarize(samples = n(),
@@ -915,18 +913,15 @@ global_ID_monthly <- ungroup(rf.pred.all) %>%
 
 global <- bind_rows(global, global_ID, global_ID_monthly)
 
-
-write_csv(global,
-          paste(loc, "predictions/cv/global_wo_usowc.csv", sep = ""), 
-          row.names = F)
+write_csv(global, "output/predictions/cv/global_wo_usowc.csv")
 ```
 
-##### Northern latitude metrics
+Northern latitude metrics for comparison to Peltola et al. (2019):
 
-For comparison to Peltola et al. (2019)
-```{r}
+
+```{r northern-lat-metrics}
 # for monthly global comparisons
-ungroup(rf.pred.all) %>% 
+ungroup(rf_pred_all) %>% 
   filter(!ID == "USOWC") %>%
   group_by(ID, Year, Month) %>% 
   summarize(FCH4 = mean(FCH4, na.rm = T),
@@ -948,7 +943,7 @@ ungroup(rf.pred.all) %>%
             cBias = abs(Bias)/sum(abs(Bias))*100) 
 
 # for monthly northern comparisons
-ungroup(rf.pred.all) %>% 
+ungroup(rf_pred_all) %>% 
   filter(!ID == "USOWC" & Latitude >= 45) %>%
   group_by(ID, Year, Month) %>% 
   summarize(FCH4 = mean(FCH4, na.rm = T),
@@ -971,12 +966,12 @@ ungroup(rf.pred.all) %>%
 ```
 
 
-##### Site-mean metrics
+Site-mean metrics:
 
-```{r}
+```{r site-mean-metrics}
 ## performance metrics broken down by site-means, seasonal cycle and weekly/daily anomalies
 # site-means
-sitemean <- ungroup(rf.pred.all) %>% 
+sitemean <- ungroup(rf_pred_all) %>% 
   group_by(ID) %>%
   # filter(!ID == "USOWC") %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
@@ -1005,7 +1000,7 @@ sitemean <- ungroup(rf.pred.all) %>%
   mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
 
 # by-ID, grouped by Class 
-sitemean_class <- ungroup(rf.pred.all) %>% 
+sitemean_class <- ungroup(rf_pred_all) %>% 
     # filter(!ID == "USOWC") %>%
   group_by(ID) %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
@@ -1033,7 +1028,7 @@ sitemean_class <- ungroup(rf.pred.all) %>%
   mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
 
 # by-ID, grouped by Climate 
-sitemean_climate <- ungroup(rf.pred.all) %>% 
+sitemean_climate <- ungroup(rf_pred_all) %>% 
     # filter(!ID == "USOWC") %>%
   group_by(ID) %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
@@ -1063,7 +1058,7 @@ sitemean_climate <- ungroup(rf.pred.all) %>%
   mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
 
 # metrics (by-site for component)
-sitemean_id <- ungroup(rf.pred.all) %>% 
+sitemean_id <- ungroup(rf_pred_all) %>% 
     # filter(!ID == "USOWC") %>%
   group_by(ID) %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
@@ -1093,12 +1088,12 @@ sitemean_id <- ungroup(rf.pred.all) %>%
 
 # join sitemean
 sitemean_data <- bind_rows(sitemean, sitemean_class, sitemean_climate, sitemean_id)
-write_csv(sitemean_data, paste(loc, "predictions/cv/sitemean.csv", sep = ""),
-          row.names = F)
+
+write_csv(sitemean_data, "output/predictions/cv/sitemean.csv")
 
 ## METRICS WITHOUT USOWC
 # site-means
-sitemean <- ungroup(rf.pred.all) %>% 
+sitemean <- ungroup(rf_pred_all) %>% 
   group_by(ID) %>%
   filter(!ID == "USOWC") %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
@@ -1127,7 +1122,7 @@ sitemean <- ungroup(rf.pred.all) %>%
   mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
 
 # by-ID, grouped by Class 
-sitemean_class <- ungroup(rf.pred.all) %>% 
+sitemean_class <- ungroup(rf_pred_all) %>% 
     filter(!ID == "USOWC") %>%
   group_by(ID) %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
@@ -1155,7 +1150,7 @@ sitemean_class <- ungroup(rf.pred.all) %>%
   mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
 
 # by-ID, grouped by Climate 
-sitemean_climate <- ungroup(rf.pred.all) %>% 
+sitemean_climate <- ungroup(rf_pred_all) %>% 
     filter(!ID == "USOWC") %>%
   group_by(ID) %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
@@ -1185,7 +1180,7 @@ sitemean_climate <- ungroup(rf.pred.all) %>%
   mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
 
 # metrics (by-site for component)
-sitemean_id <- ungroup(rf.pred.all) %>% 
+sitemean_id <- ungroup(rf_pred_all) %>% 
     filter(!ID == "USOWC") %>%
   group_by(ID) %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
@@ -1215,16 +1210,14 @@ sitemean_id <- ungroup(rf.pred.all) %>%
 
 # join sitemean
 sitemean_data <- bind_rows(sitemean, sitemean_class, sitemean_climate, sitemean_id)
-write_csv(sitemean_data, paste(loc, "predictions/cv/sitemean_wo_usowc.csv", sep = ""),
-          row.names = F)
-
+write_csv(sitemean_data, "output/predictions/cv/sitemean_wo_usowc.csv")
 ```
 
-##### Other sitemean plots
+Other sitemean plots:
 
-```{r}
+```{r other-site-mean-plots}
 
-sitemean_data <- read_csv(paste0(loc, "predictions/cv/sitemean_wo_usowc.csv"))
+sitemean_data <- read_csv("output/predictions/cv/sitemean_wo_usowc.csv")
 
 # plot histogram of site year performance: BIAS
 sitemean_data %>% 
@@ -1237,7 +1230,7 @@ sitemean_data %>%
   facet_wrap(~Metric, scales = 'free', ncol = 1) +
   scale_fill_manual(values = rep(class_col_vector,8)) +
   my_theme
-ggsave(paste(loc, "predictions/cv/sitemean_histogram_bias.png", sep = ""),
+ggsave("output/predictions/cv/sitemean_histogram_bias.png",
        width = 13, height = 24, units = c("cm"), dpi = 300)
 
 # plot histogram of site year performance: MAE
@@ -1251,11 +1244,11 @@ sitemean_data %>%
   facet_wrap(~Metric, scales = 'free', ncol = 1) +
   scale_fill_manual(values = rep(class_col_vector,8)) +
   my_theme
-ggsave(paste(loc, "predictions/cv/sitemean_histogram_mae.png", sep = ""),
+ggsave("output/predictions/cv/sitemean_histogram_mae.png",
        width = 13, height = 24, units = c("cm"), dpi = 300)
 
 # global site-mean comparison
-ungroup(rf.pred.all) %>% 
+ungroup(rf_pred_all) %>% 
   # group_by(ID, Year) %>% 
   group_by(ID) %>% 
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
@@ -1271,11 +1264,11 @@ ungroup(rf.pred.all) %>%
   scale_color_manual(values = class_col_vector) +
   my_theme +
   labs(x= expression('Observed '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'), y = expression('Predicted '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'))
-ggsave(paste(loc, "predictions/cv/sitemean_pvo.png", sep = ""),
-       width = 20, height = 13, units = c("cm"), dpi = 300)
+ggsave("output/predictions/cv/sitemean_pvo.png",
+       width = 13, height = 24, units = c("cm"), dpi = 300)
 
 # global site-mean comparison log10
-ungroup(rf.pred.all) %>% 
+ungroup(rf_pred_all) %>% 
   # group_by(ID, Year) %>% 
   group_by(ID) %>% 
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
@@ -1291,11 +1284,11 @@ ungroup(rf.pred.all) %>%
   scale_color_manual(values = class_col_vector) +
   my_theme +
   labs(x= expression('Obs. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'), y = expression('Pred. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'))
-ggsave(paste(loc, "predictions/cv/sitemean_pvo_log10.png", sep = ""),
-       width = 20, height = 20, units = c("cm"), dpi = 300)
+ggsave("output/predictions/cv/sitemean_pvo_log10.png",
+       width = 13, height = 24, units = c("cm"), dpi = 300)
 
 # by Climate/class
-ungroup(rf.pred.all) %>% 
+ungroup(rf_pred_all) %>% 
   # group_by(ID, Year) %>% 
   group_by(ID, Year) %>% 
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
@@ -1313,15 +1306,15 @@ ungroup(rf.pred.all) %>%
   facet_wrap(~Climate, scales = 'free', ncol = 1) +
   my_theme +
   labs(x= expression('Obs. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'), y = expression('Pred. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'))
-ggsave(paste(loc, "predictions/cv/sitemean_pvo_climate.png", sep = ""),
-       width = 13, height = 36, units = c("cm"), dpi = 300)
+ggsave("output/predictions/cv/sitemean_pvo_climate.png",
+       width = 13, height = 24, units = c("cm"), dpi = 300)
 ```
 
-##### Mean Seasonal Cycles
+Mean Seasonal Cycles:
 
-```{r}
+```{r msc-plots}
 # by-ID
-msc <- ungroup(rf.pred.all) %>% 
+msc <- ungroup(rf_pred_all) %>% 
     # filter(!ID == "USOWC") %>% 
   group_by(ID, Month) %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
@@ -1350,7 +1343,7 @@ msc <- ungroup(rf.pred.all) %>%
   mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
 
 # by-ID, grouped by Class 
-msc_class <- ungroup(rf.pred.all) %>% 
+msc_class <- ungroup(rf_pred_all) %>% 
     # filter(!ID == "USOWC") %>% 
   group_by(ID, Month) %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
@@ -1378,7 +1371,7 @@ msc_class <- ungroup(rf.pred.all) %>%
   mutate(cBias = abs(Bias)/sum(abs(Bias))*100) 
 
 # by-ID, grouped by Climate 
-msc_climate <- ungroup(rf.pred.all) %>% 
+msc_climate <- ungroup(rf_pred_all) %>% 
   # filter(!ID == "USOWC") %>% 
   group_by(ID, Month) %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
@@ -1408,7 +1401,7 @@ msc_climate <- ungroup(rf.pred.all) %>%
   mutate(cBias = abs(Bias)/sum(abs(Bias))*100) 
 
 # metrics (by-site for component)
-msc_id <- ungroup(rf.pred.all) %>% 
+msc_id <- ungroup(rf_pred_all) %>% 
     # filter(!ID == "USOWC") %>% 
   group_by(ID, Month) %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
@@ -1439,12 +1432,11 @@ msc_id <- ungroup(rf.pred.all) %>%
 
 # join msc
 msc_data <- bind_rows(msc, msc_class, msc_climate, msc_id)
-write_csv(msc_data, paste(loc, "predictions/cv/msc.csv", sep = ""),
-          row.names = F)
+write_csv(msc_data, "output/predictions/cv/msc.csv")
 
 ### WITHOUT US-OWC
 # by-ID
-msc <- ungroup(rf.pred.all) %>% 
+msc <- ungroup(rf_pred_all) %>% 
     filter(!ID == "USOWC") %>%
   group_by(ID, Month) %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
@@ -1473,7 +1465,7 @@ msc <- ungroup(rf.pred.all) %>%
   mutate(cBias = abs(Bias)/sum(abs(Bias))*100)
 
 # by-ID, grouped by Class 
-msc_class <- ungroup(rf.pred.all) %>% 
+msc_class <- ungroup(rf_pred_all) %>% 
       filter(!ID == "USOWC") %>%
   group_by(ID, Month) %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
@@ -1501,7 +1493,7 @@ msc_class <- ungroup(rf.pred.all) %>%
   mutate(cBias = abs(Bias)/sum(abs(Bias))*100) 
 
 # by-ID, grouped by Climate 
-msc_climate <- ungroup(rf.pred.all) %>% 
+msc_climate <- ungroup(rf_pred_all) %>% 
     filter(!ID == "USOWC") %>%
   group_by(ID, Month) %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
@@ -1531,7 +1523,7 @@ msc_climate <- ungroup(rf.pred.all) %>%
   mutate(cBias = abs(Bias)/sum(abs(Bias))*100) 
 
 # metrics (by-site for component)
-msc_id <- ungroup(rf.pred.all) %>% 
+msc_id <- ungroup(rf_pred_all) %>% 
       filter(!ID == "USOWC") %>%
   group_by(ID, Month) %>%
   summarize(MeanO = mean(FCH4, na.rm=TRUE),
@@ -1562,14 +1554,12 @@ msc_id <- ungroup(rf.pred.all) %>%
 
 # join msc
 msc_data <- bind_rows(msc, msc_class, msc_climate, msc_id)
-write_csv(msc_data, paste(loc, "predictions/cv/msc_wo_usowc.csv", sep = ""),
-          row.names = F)
-
+write_csv(msc_data, "output/predictions/cv/msc_wo_usosc.csv")
 ```
 
-##### Other MSC plots
+Other MSC plots:
 
-```{r}
+```{r other-msc-plots}
 
 # plot histogram of msc performance: R2
 msc_data %>% 
@@ -1583,7 +1573,7 @@ msc_data %>%
   facet_wrap(~Metric, ncol = 1) +
   scale_fill_manual(values = rep(class_col_vector,8)) +
   my_theme
-ggsave(paste(loc, "predictions/cv/msc_histogram_r2.png", sep = ""),
+ggsave("output/predictions/cv/msc_histogram_r2.png",
        width = 13, height = 24, units = c("cm"), dpi = 300)
 
 
@@ -1598,8 +1588,9 @@ msc_data %>%
   facet_wrap(~Metric, scales = 'free', ncol = 1) +
   scale_fill_manual(values = rep(class_col_vector,8)) +
   my_theme
-ggsave(paste(loc, "predictions/cv/msc_histogram_bias.png", sep = ""),
+ggsave("output/predictions/cv/msc_histogram_bias.png",
        width = 13, height = 24, units = c("cm"), dpi = 300)
+
 
 # plot histogram of msc performance: MAE
 msc_data %>% 
@@ -1612,11 +1603,11 @@ msc_data %>%
   facet_wrap(~Metric, scales = 'free', ncol = 1) +
   scale_fill_manual(values = rep(class_col_vector,8)) +
   my_theme
-ggsave(paste(loc, "predictions/cv/msc_histogram_mae.png", sep = ""),
+ggsave("output/predictions/cv/msc_histogram_mae.png",
        width = 13, height = 24, units = c("cm"), dpi = 300)
 
 # global msc comparison
-ungroup(rf.pred.all) %>% 
+ungroup(rf_pred_all) %>% 
   group_by(ID) %>%
   mutate(annual_meanO = mean(FCH4, na.rm=TRUE),
          annual_meanP = mean(FCH4P, na.rm=TRUE)) %>% 
@@ -1638,11 +1629,11 @@ ungroup(rf.pred.all) %>%
   scale_color_manual(values = class_col_vector) +
   my_theme +
   labs(x= expression('Obs. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'), y = expression('Pred. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'))
-ggsave(paste(loc, "predictions/cv/msc_pvo.png", sep = ""),
-       width = 20, height = 10, units = c("cm"), dpi = 300)
+ggsave("output/predictions/cv/msc_pvo.png",
+       width = 13, height = 24, units = c("cm"), dpi = 300)
 
 # MSC plots Climate
-ungroup(rf.pred.all) %>% 
+ungroup(rf_pred_all) %>% 
   group_by(ID) %>%
   mutate(annual_meanO = mean(FCH4, na.rm=TRUE),
          annual_meanP = mean(FCH4P, na.rm=TRUE)) %>% 
@@ -1663,15 +1654,15 @@ ungroup(rf.pred.all) %>%
   scale_color_manual(values = class_col_vector) +
   my_theme +
   labs(x= expression("Observed "*CH[4]*' MSC (nmol m'^{-2}*' s'^{-1}*')'), y = expression("Predicted "*CH[4]*' MSC (nmol m'^{-2}*' s'^{-1}*')')) 
-ggsave(paste(loc, "predictions/cv/msc_pvo_climate.png", sep = ""),
-       width = 24, height = 20, units = c("cm"), dpi = 300)
+ggsave("output/predictions/cv/msc_pvo_climate.png",
+       width = 13, height = 24, units = c("cm"), dpi = 300)
 
 
 ## FINAL FIGURE 
 # MSC plots ID
 climate_names <- c(`1` = "Tundra", `2` = "Boreal", `3` = "Temperate", `4` = "Tropical")
 
-ungroup(rf.pred.all) %>% 
+ungroup(rf_pred_all) %>% 
   filter(!ID == "USOWC") %>%
   mutate(Climate_letter = ifelse(Climate == 1, "(a)", NA),
          Climate_letter = ifelse(Climate == 2, "(b)", Climate_letter),
@@ -1704,14 +1695,15 @@ ungroup(rf.pred.all) %>%
         legend.direction = 'vertical') +
   my_theme +
   labs(x= expression("Observed "*CH[4]*' MSC (nmol m'^{-2}*' s'^{-1}*')'), y = expression("Predicted "*CH[4]*' MSC (nmol m'^{-2}*' s'^{-1}*')')) 
-ggsave(paste(loc, "predictions/cv/msc_pvo_id.png", sep = ""),
-       width = 20, height = 26, units = c("cm"), dpi = 300)
+ggsave("output/predictions/cv/msc_pvo_id.png",
+       width = 13, height = 24, units = c("cm"), dpi = 300)
 ```
 
+Timeseries plots:
 
-```{r}
+```{r timeseries-plots}
 # timeseries
-ungroup(rf.pred.all) %>% 
+ungroup(rf_pred_all) %>% 
   group_by(ID) %>%
   mutate(annual_meanO = mean(FCH4, na.rm=TRUE),
          annual_meanP = mean(FCH4P, na.rm=TRUE)) %>% 
@@ -1730,12 +1722,12 @@ ungroup(rf.pred.all) %>%
   scale_x_continuous(breaks = c(1:12), limits = c(1,12), labels = c("J","F","M","A","M","J","J","A","S","O","N","D")) +
   my_theme +
   labs(x= "Month", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) 
-ggsave(paste(loc, "predictions/cv/msc_timeseries.png", sep = ""),
-       width = 45, height = 25, units = c("cm"), dpi = 300)
+ggsave("output/predictions/cv/msc_timeseries.png",
+       width = 13, height = 24, units = c("cm"), dpi = 300)
 
 ## FINAL FIGURE
 # timeseries
-ungroup(rf.pred.all) %>% 
+ungroup(rf_pred_all) %>% 
   filter(ID %in% c("SEDeg", "DEHte","BWNxr", "FRLGt", "USORv", "NZKop")) %>% 
   group_by(ID) %>%
   mutate(annual_meanO = mean(FCH4, na.rm=TRUE),
@@ -1756,17 +1748,15 @@ ungroup(rf.pred.all) %>%
   scale_x_continuous(breaks = c(1:12), limits = c(1,12), labels = c("J","F","M","A","M","J","J","A","S","O","N","D")) +
   my_theme +
   labs(x= "Month", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) 
-ggsave(paste(loc, "predictions/cv/msc_highlowights.png", sep = ""),
-       width = 24, height = 14, units = c("cm"), dpi = 300)
-
-
+ggsave("output/predictions/cv/msc_highlowlights.png",
+       width = 20, height = 24, units = c("cm"), dpi = 300)
 ```
 
-##### Look at JP-BBY hysteresis 
+Look at JP-BBY hysteresis. (Ueyama et al. 2020; Chang et al. 2021)
 
 ```{r jp-bby-hysteresis}
-head(rf.pred.all)
-rf.pred.all %>% 
+head(rf_pred_all)
+rf_pred_all %>% 
   filter(ID == "JPBBY",
          Year %in% c(2015, 2016, 2017)) %>% 
   dplyr::select(ID, Year, Week, FCH4, FCH4P, TA, TA_LAG2) %>% 
@@ -1782,14 +1772,15 @@ rf.pred.all %>%
        y = expression(CH[4]*" Flux (nmol m"^{-2}*" s"^{-1}*")")) +
   scale_color_gradient2(low = "red", mid = "white", high = "blue", midpoint = 30) +
   my_theme
-ggsave("/Volumes/Samsung_T5/Stanford/upch4_local/figures-writing/GBC/SI Figures/hysteresis.png", height = 10, width = 8)
+ggsave("output/predictions/cv/hysteresis.png",
+      height = 30, width = 20, units = c("cm"), dpi = 300)
 ```
 
-##### Look at all site hysteresis 
+Look at all site hysteresis:
 
-```{r jp-bby-hysteresis}
-head(rf.pred.all)
-rf.pred.all %>% 
+```{r all-site-hysteresis}
+head(rf_pred_all)
+rf_pred_all %>% 
   filter(TA > 0) %>% 
   dplyr::select(ID, Year, Week, FCH4, FCH4P, TA, TA_LAG2) %>% 
   pivot_longer(
@@ -1806,18 +1797,18 @@ rf.pred.all %>%
   my_theme
 ```
 
-##### Anomalies (i.e., excursions from mean seasonal cycle)
+Anomalies (i.e., excursions from mean seasonal cycle)
 
-```{r}
+```{r anomalies}
 # first create mean seasonal cycle dataframe
-pred.msc <- ungroup(rf.pred.all) %>% 
+pred.msc <- ungroup(rf_pred_all) %>% 
   group_by(ID, Month) %>% 
   summarize(mscO = mean(FCH4, na.rm=TRUE),
             mscP = mean(FCH4P, na.rm=TRUE),
             Years = n()) 
 
 # then left join back onto full dataframe
-rf.pred.msc <- rf.pred.all %>% left_join(pred.msc, by = c("ID","Month")) 
+rf.pred.msc <- rf_pred_all %>% left_join(pred.msc, by = c("ID","Month")) 
 
 # global monthly anomaly summary
 anomaly <- ungroup(rf.pred.msc) %>% 
@@ -1935,8 +1926,7 @@ anomaly_id <- ungroup(rf.pred.msc) %>%
 
 # join anomalies
 anomaly_data <- bind_rows(anomaly, anomaly_class, anomaly_climate, anomaly_id)
-write_csv(anomaly_data, paste(loc, "predictions/cv/anomaly.csv", sep=""),
-          row.names=FALSE)
+write_csv(anomaly_data, "output/predictions/cv/anomaly.csv")
 
 # global anomalies 
 rf.pred.msc %>% 
@@ -1960,7 +1950,7 @@ rf.pred.msc %>%
   # facet_wrap(~Climate, scales = 'free', ncol = 1) +
   my_theme +
   labs(x= expression('Obs. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'), y = expression('Pred. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'))
-ggsave(paste(loc, "predictions/cv/anomalies_pvo.png", sep = ""),
+ggsave("output/predictions/cv/anomalies_pvo.png",
        width = 20, height = 10, units = c("cm"), dpi = 300)
 
 # now calculate monthly anomalies  
@@ -1985,7 +1975,7 @@ rf.pred.msc %>%
   facet_wrap(~Climate, scales = 'free', ncol = 1) +
   my_theme +
   labs(x= expression('Obs. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'), y = expression('Pred. '*CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')'))
-ggsave(paste(loc, "predictions/cv/anomalies_pvo_climate.png", sep = ""),
+ggsave("output/predictions/cv/anomalies_pvo_climate.png",
        width = 13, height = 36, units = c("cm"), dpi = 300)
 
 # timeseries
@@ -2009,9 +1999,8 @@ rf.pred.msc %>%
     scale_x_continuous(breaks = c(1:12), limits = c(1,12), labels = c("J","F","M","A","M","J","J","A","S","O","N","D")) +
     my_theme +
     labs(x= "Month", y = expression(CH[4]*' Flux (nmol m'^{-2}*' s'^{-1}*')')) 
-ggsave(paste(loc, "predictions/cv/anomalies_timeseries.png", sep = ""),
+ggsave("output/predictions/cv/anomalies_timeseries.png",
        width = 45, height = 25, units = c("cm"), dpi = 300)
-
 ```
 
 
