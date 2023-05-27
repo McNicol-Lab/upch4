@@ -25,3 +25,5 @@ older `upch4-full-notebook.Rmd` codebase
 
 Please contact Gavin McNicol with questions about use:
 <gmcnicol@uic.edu>
+
+[![DOI](https://zenodo.org/badge/328030687.svg)](https://zenodo.org/badge/latestdoi/328030687)

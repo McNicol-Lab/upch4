@@ -27,3 +27,6 @@ It is recommended that the file structure in the following directories is replic
 
 Please contact Gavin McNicol with questions about use: gmcnicol@uic.edu
 
+[![DOI](https://zenodo.org/badge/328030687.svg)](https://zenodo.org/badge/latestdoi/328030687)
+
+
