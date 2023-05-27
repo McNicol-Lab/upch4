@@ -48,6 +48,7 @@ library(skimr)
 library(caret)
 library(ranger)
 library(RColorBrewer)
+library(pdp)
 source("code/ggplot_theme.R")
 ```
 
@@ -2009,7 +2010,7 @@ Generate rankings with VarImp:
 
 ```{r var-imp-rankings}
 # read rf model
-rf_model <- readRDS(paste(loc, "ensembles/cv/best6.rds", sep = ""))
+rf_model <- readRDS("output/ensembles/cv/best-feat.rds")
 
 # get folds
 folds <- length(rf_model)
@@ -2048,18 +2049,17 @@ variable.importance <- as_tibble(bind_cols(variable.imp.single)) %>%
 
 view(variable.importance)
 
-write.csv(variable.importance,
-          paste(loc, "varimp/best6.csv", sep = ""),
-          row.names = FALSE)
+write_csv(variable.importance,
+          "output/varimp/best_feat.csv")
 
 # read in data again
-variable.importance <- read.csv(paste(loc, "varimp/best6.csv", sep = ""))
+variable.importance <- read.csv("output/varimp/best_feat.csv")
 
 # get effective number of predictors
 sum(variable.importance$ScaledAvgImp)
 
 # read in predictor summary
-pred.summary <- read.csv(paste(loc, "training-data/list_of_predictors_metadata.csv", sep = "")) %>% 
+pred.summary <- read_csv("data/predictors_metadata.csv") %>% 
   dplyr::select(Var = Predictor, Information = Content, Class)
 
 # var imp plot
@@ -2082,22 +2082,22 @@ variable.importance %>%
     xlab("Predictor") + ylab("Importance") +
     my_theme +
     theme(legend.position='bottom', legend.box = 'vertical')
-ggsave(paste(loc, "varimp/pred_rank.png", sep = ""),
+ggsave("output/varimp/pred_rank.png",
        width = 18, height = 13, units = c("cm"), dpi = 300)
 ```
 
-##### Variable Responses
+Variable Responses:
 
-```{r}
+```{r var-responses}
 # read rf model
-rf_model <- readRDS(paste(loc, "ensembles/cv/best6.rds", sep = ""))
+rf_model <- readRDS("output/ensembles/cv/best-feat.rds")
 
 # get feature names
 variable.importance <- varImp(rf_model[[1]], scale = TRUE)
 feat <- rownames(variable.importance$importance) %>% rev()
 
 # Read in full csv
-train <- read.csv(paste(loc, "predictions/cv/best6_pred.csv", sep = "")) # local path
+train <- read_csv("output/predictions/cv/best_feat_pred.csv") # local path
 
 # look at all relationships
 train %>% 
@@ -2110,27 +2110,28 @@ train %>%
   facet_wrap(~Predictor, scales = 'free') +
   ylab(label =  expression("FCH4 (nmol m"^{-2}*" s"^{-1}*")")) +
   my_theme
-ggsave(paste(loc, "varimp/var_response_all.png", sep = ""),
+ggsave("output/varimp/var_response_all.png",
        width = 25, height = 22, units = c("cm"), dpi = 300)
 ```
 
 
-##### Partial Dependency Plots
+Partial Dependency Plots:
 
-```{r}
+```{r pdp}
 # read mc rf model
-rf_model <- readRDS(paste0(loc, "ensembles/cv/best6.rds"))
+rf_model <- readRDS("output/ensembles/cv/best-feat.rds")
 
 # Read mc training data csv
-train <- read.csv(paste0(loc, "training-data/final.csv")) # local path
-
-# read folds index
-folds_index <- readRDS(paste0(loc, "training-data/folds_index.rds")) # local path
+train <- read_csv("data/final.csv") # local path
 
 # pdp
 ice.TA <- rf_model[[1]] %>% 
-  partial(pred.var = c("canopyht"), train = train, plot.engine = "ggplot2", ice = FALSE, center = TRUE)
-plotPartial(ice.TA, colorkey= TRUE) 
+  partial(pred.var = c("TA"), 
+          train = train, 
+          plot.engine = "ggplot2", 
+          ice = FALSE, 
+          center = TRUE)
+plotPartial(ice.TA, colorkey = TRUE) 
 
 ```
 
